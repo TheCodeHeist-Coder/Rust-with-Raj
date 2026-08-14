@@ -1,0 +1,1787 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ownership &amp; Borrowing in Rust — The Complete Guide</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.75rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 1.85rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem; padding-left: 0.35rem;
+  font-size: 0.625rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.6vw, 3.9rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif); font-size: 1.28rem; line-height: 1.28;
+  font-weight: 700; letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem; max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono); font-size: 0.75rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.5rem 1rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 1.05rem 1.15rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); font-weight: 700; }
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure); margin: 1.5rem 0;
+  padding: 1rem 1.15rem; border-radius: 2px;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  font-size: 0.9688rem; line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block; font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto; margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; background: var(--surface); }
+th, td {
+  text-align: left; padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+th {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure --------------------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0; max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 2px; overflow-x: auto;
+}
+.figure pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; color: var(--ink-soft); white-space: pre;
+}
+.figcap {
+  font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-faint);
+  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1.15rem 1.3rem; margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto; white-space: pre; color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split ---------------------------------------------------------- */
+
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem; margin: 1.5rem 0; max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0; max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember); border-radius: 2px;
+  padding: 0.95rem 1.1rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.7813rem;
+  line-height: 1.6; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Keyline -------------------------------------------------------- */
+
+.keyline {
+  max-width: var(--measure); margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.45;
+  font-style: italic; color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">Ownership in Rust</p>
+  <p class="rail-sub">Complete guide<br>18 parts</p>
+  <nav id="toc">
+    <div class="rail-group">The problem</div>
+    <a href="#p1"><span class="n">01</span><span>Why ownership exists</span></a>
+    <a href="#p2"><span class="n">02</span><span>Stack &amp; heap</span></a>
+    <a href="#p3"><span class="n">03</span><span>The three rules</span></a>
+
+    <div class="rail-group">Ownership</div>
+    <a href="#p4"><span class="n">04</span><span>Move</span></a>
+    <a href="#p5"><span class="n">05</span><span>Copy types</span></a>
+    <a href="#p6"><span class="n">06</span><span>Clone</span></a>
+    <a href="#p7"><span class="n">07</span><span>Functions take ownership</span></a>
+    <a href="#p8"><span class="n">08</span><span>Where values die</span></a>
+
+    <div class="rail-group">Borrowing</div>
+    <a href="#p9"><span class="n">09</span><span>References</span></a>
+    <a href="#p10"><span class="n">10</span><span>Mutable references</span></a>
+    <a href="#p11"><span class="n">11</span><span>The borrowing rules</span></a>
+    <a href="#p12"><span class="n">12</span><span>Why the rules exist</span></a>
+    <a href="#p13"><span class="n">13</span><span>NLL: borrows end early</span></a>
+
+    <div class="rail-group">In practice</div>
+    <a href="#p14"><span class="n">14</span><span>Slices &amp; &amp;str</span></a>
+    <a href="#p15"><span class="n">15</span><span>Structs &amp; partial moves</span></a>
+    <a href="#p16"><span class="n">16</span><span>Designing signatures</span></a>
+    <a href="#p17"><span class="n">17</span><span>Every error, decoded</span></a>
+    <a href="#p18"><span class="n">18</span><span>Cheat sheet</span></a>
+  </nav>
+</aside>
+
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Learning notes</p>
+  <h1>Ownership:<br>who <em>frees</em> this?</h1>
+  <p class="standfirst">Every language answers one question about memory: when is it safe to free this? C makes you answer it by hand, and you get it wrong. Java hires a garbage collector to answer it at runtime, and you pay for the service. Rust answers it while compiling — then erases the whole apparatus from the binary.</p>
+  <div class="masthead-meta">
+    <span><b>18</b> parts</span>
+    <span><b>Companion:</b> ownership_practice.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>Why ownership exists at all</h2>
+  </div>
+
+  <p>Every program that touches memory has to answer one question: <em>when is it safe to free this?</em> Free too early and you have a pointer to memory that now holds something else. Free twice and you corrupt the allocator. Never free and you leak.</p>
+
+  <p>There have historically been two answers, and both cost something real.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Approach</th><th>Used by</th><th>What it costs</th></tr></thead>
+      <tbody>
+        <tr><td>You free it by hand</td><td>C, C++</td><td>Use-after-free, double-free, leaks — human error, at runtime, in production</td></tr>
+        <tr><td>A garbage collector frees it</td><td>Java, Go, Python, C#</td><td>Runtime overhead, unpredictable pauses, a runtime to ship</td></tr>
+        <tr><td><strong>The compiler proves when</strong></td><td><strong>Rust</strong></td><td><strong>You must write code the compiler can prove</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keyline">Every value has exactly one owner. When the owner goes out of scope, the value is freed.</div>
+
+  <p>That is the whole idea. No runtime bookkeeping, no GC thread, no <code>free()</code> for you to forget — because the compiler knows, at compile time, the exact point where each value dies.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">The honest trade</span>
+    <p>The borrow checker will reject programs that are actually fine. That is the deal you are accepting. In exchange, an entire category of bug — the one responsible for roughly 70% of serious security vulnerabilities in large C and C++ codebases — becomes impossible to express. You argue with the compiler now instead of debugging at 3am later.</p>
+  </div>
+
+  <p>One thing worth fixing in your head immediately: <strong>ownership is not a runtime feature.</strong> It has no representation in the compiled binary. It is a set of rules the compiler checks and then throws away. The machine code Rust emits looks like what a careful C programmer would have written by hand.</p>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2>Stack and heap — the picture you must have</h2>
+  </div>
+
+  <p>You cannot understand moves without this, so it comes first.</p>
+
+  <p>The <strong>stack</strong> is fast and rigid. Values go on and come off in order, like a stack of plates. Every value must have a size known at compile time. Pushing is just moving a pointer along.</p>
+
+  <p>The <strong>heap</strong> is flexible and slower. You ask the allocator for space, it finds a spot and hands back a pointer. Data can grow. Somebody has to give the space back.</p>
+
+  <p>A <code>String</code> uses <em>both</em>, and this split is the single most important picture in the language:</p>
+
+  <div class="figure">
+<pre>          STACK                              HEAP
+    ┌─────────────────┐              ┌───┬───┬───┬───┬───┐
+ s  │ ptr    ─────────┼─────────────►│ h │ e │ l │ l │ o │
+    │ len    5        │              └───┴───┴───┴───┴───┘
+    │ cap    5        │
+    └─────────────────┘
+     24 bytes, fixed,               the actual characters —
+     known at compile time          size known only at runtime</pre>
+    <p class="figcap">A <code>String</code> is a 24-byte handle on the stack, pointing at bytes on the heap.</p>
+  </div>
+
+  <p>You do not have to take my word for the sizes:</p>
+
+  <div class="code">
+    <div class="code-label">Measuring the handle — verified output</div>
+<pre><code><span class="fn">println!</span>(<span class="st">"size_of String  = {}"</span>, std::mem::size_of::&lt;<span class="ty">String</span>&gt;());
+<span class="fn">println!</span>(<span class="st">"size_of &amp;String = {}"</span>, std::mem::size_of::&lt;&amp;<span class="ty">String</span>&gt;());
+<span class="fn">println!</span>(<span class="st">"size_of Vec&lt;u8&gt; = {}"</span>, std::mem::size_of::&lt;<span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;&gt;());
+<span class="fn">println!</span>(<span class="st">"size_of i32     = {}"</span>, std::mem::size_of::&lt;<span class="ty">i32</span>&gt;());</code></pre>
+<pre><code><span class="cm">// size_of String  = 24</span>
+<span class="cm">// size_of &amp;String = 8</span>
+<span class="cm">// size_of Vec&lt;u8&gt; = 24</span>
+<span class="cm">// size_of i32     = 4</span></code></pre>
+  </div>
+
+  <p>Three pieces of eight bytes: pointer, length, capacity. A <code>Vec</code> is the same shape — not a coincidence, since a <code>String</code> is essentially a <code>Vec&lt;u8&gt;</code> that promises to hold valid UTF-8.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Why this matters next</span>
+    <p>When you assign a <code>String</code> to another variable, Rust copies the 24-byte handle — cheap. It does <em>not</em> copy the heap bytes. So now two handles point at the same allocation. That is precisely the problem the ownership system exists to solve, and it is what Part 04 is about.</p>
+  </div>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>The three rules</h2>
+  </div>
+
+  <p>Memorise these. Everything else in this guide is a consequence.</p>
+
+  <div class="keyline">1. Each value has an owner. &nbsp;·&nbsp; 2. Only one owner at a time. &nbsp;·&nbsp; 3. When the owner goes out of scope, the value is dropped.</div>
+
+  <p>Rule 2 is the one that catches people arriving from other languages. In Python or Java, ten variables can happily refer to one list. In Rust one value has one owner — and if another name wants to use it, you must <em>move</em> ownership (Part 04), <em>copy</em> it (Part 05), <em>clone</em> it (Part 06), or <em>borrow</em> it (Part 09). Those four options are the entire menu.</p>
+
+  <p>Rule 3 is what replaces the garbage collector:</p>
+
+  <div class="code">
+    <div class="code-label">Scope is usually just a block</div>
+<pre><code><span class="k">fn</span> <span class="fn">main</span>() {
+    <span class="cm">// s does not exist yet</span>
+    {
+        <span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);  <span class="cm">// s is valid from here</span>
+        <span class="fn">println!</span>(<span class="st">"{s}"</span>);
+    }                                    <span class="cm">// scope ends → s dropped, heap freed</span>
+    <span class="cm">// using s here would not compile</span>
+}</code></pre>
+  </div>
+
+  <p>There is no <code>free()</code>. The closing brace <em>is</em> the free. Rust inserts the call for you, and because the point is known at compile time, deciding when costs nothing at runtime.</p>
+
+  <h3>Drop order runs backwards</h3>
+
+  <p>Values drop in the opposite order they were declared — last declared, first dropped, exactly like a stack. This occasionally matters, and it is easy to demonstrate:</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">struct</span> <span class="ty">Noisy</span>(&amp;<span class="td">'static</span> <span class="ty">str</span>);
+<span class="k">impl</span> <span class="ty">Drop</span> <span class="k">for</span> <span class="ty">Noisy</span> {
+    <span class="k">fn</span> <span class="fn">drop</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) { <span class="fn">println!</span>(<span class="st">"dropping {}"</span>, <span class="k">self</span>.<span class="nu">0</span>); }
+}
+
+<span class="k">fn</span> <span class="fn">main</span>() {
+    <span class="k">let</span> _first  = <span class="ty">Noisy</span>(<span class="st">"first"</span>);
+    <span class="k">let</span> _second = <span class="ty">Noisy</span>(<span class="st">"second"</span>);
+    <span class="k">let</span> _third  = <span class="ty">Noisy</span>(<span class="st">"third"</span>);
+}</code></pre>
+<pre><code><span class="cm">// dropping third</span>
+<span class="cm">// dropping second</span>
+<span class="cm">// dropping first</span></code></pre>
+  </div>
+
+  <p><code>Drop</code> is an ordinary trait — the same machinery from the traits guide. Implementing it lets you run code when a value dies, which is how Rust closes files and releases locks without <code>finally</code> blocks or <code>defer</code>.</p>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2>Move — the default for heap data</h2>
+  </div>
+
+  <p>Here is the three-line program that confuses everybody once:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> s1 = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> s2 = s1;
+<span class="fn">println!</span>(<span class="st">"{s1}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `s1`
+ --&gt; e1.rs:4:16
+  |
+2 |     let s1 = String::from("hello");
+  |         -- move occurs because `s1` has type `String`, which does not implement the `Copy` trait
+3 |     let s2 = s1;
+  |              -- value moved here
+4 |     println!("{s1}");
+  |                ^^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+3 |     let s2 = s1.clone();
+  |                ++++++++</pre>
+  </div>
+
+  <p>In most languages that middle line copies a reference and both names keep working. In Rust <code>s1</code> is <strong>moved</strong> into <code>s2</code>, and <code>s1</code> stops existing as far as the compiler is concerned.</p>
+
+  <h3>Why not just copy the heap data?</h3>
+
+  <p>Go back to the picture from Part 02. If Rust copied the 24-byte handle and left both variables valid, this is what you would have:</p>
+
+  <div class="figure">
+<pre>        STACK                          HEAP
+  ┌────────────────┐          ┌───┬───┬───┬───┬───┐
+s1│ ptr ───────────┼─────────►│ h │ e │ l │ l │ o │
+  │ len 5          │     ┌───►└───┴───┴───┴───┴───┘
+  └────────────────┘     │
+  ┌────────────────┐     │     Both owners. Both scopes end.
+s2│ ptr ───────────┼─────┘     Both call free on the same
+  │ len 5          │           pointer  →  DOUBLE FREE.
+  └────────────────┘</pre>
+    <p class="figcap">Why two owners cannot be permitted: each would free the same allocation.</p>
+  </div>
+
+  <p>Rust has three options and takes the third:</p>
+
+  <ul>
+    <li><strong>Copy the heap data too</strong> — safe, but silently expensive. A 4&nbsp;MB string assignment quietly becoming a 4&nbsp;MB memcpy is exactly the kind of hidden cost Rust refuses to have.</li>
+    <li><strong>Let both free it</strong> — a double-free. Not an option.</li>
+    <li><strong>Invalidate the original.</strong> Free, safe, and obvious once you see it. This is the move.</li>
+  </ul>
+
+  <p>So a move costs nothing at runtime. It is a 24-byte handle copy plus a compile-time note that <code>s1</code> is dead. Nothing is memcpy'd, nothing is freed, nothing happens at all.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">Read the message properly</span>
+    <p>It says <em>"move occurs because <code>s1</code> has type <code>String</code>, which does not implement the <code>Copy</code> trait."</em> That is the compiler stating the exact rule: types without <code>Copy</code> move; types with <code>Copy</code> copy. Which is which is Part 05.</p>
+  </div>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2>Copy types — when assignment is harmless</h2>
+  </div>
+
+  <p>This works, and by now you should be able to explain why before reading on:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> a = <span class="nu">5</span>;
+<span class="k">let</span> b = a;
+<span class="fn">println!</span>(<span class="st">"a={a} b={b}"</span>);   <span class="cm">// both usable → a=5 b=5</span></code></pre>
+  </div>
+
+  <p>An <code>i32</code> lives entirely on the stack. There is no allocation, so there is nothing to double-free, so there is no reason to invalidate <code>a</code>. Copying four bytes is as cheap as marking them dead. Types like this implement the <code>Copy</code> trait, and for them assignment copies rather than moves.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><code>Copy</code> — assignment copies</th><th>Not <code>Copy</code> — assignment moves</th></tr></thead>
+      <tbody>
+        <tr><td>All integers — <code>i32</code>, <code>u8</code>, <code>usize</code>…</td><td><code>String</code></td></tr>
+        <tr><td><code>f32</code>, <code>f64</code></td><td><code>Vec&lt;T&gt;</code></td></tr>
+        <tr><td><code>bool</code>, <code>char</code></td><td><code>HashMap</code>, <code>HashSet</code></td></tr>
+        <tr><td>Shared references <code>&amp;T</code></td><td>Mutable references <code>&amp;mut T</code></td></tr>
+        <tr><td>Tuples/arrays if <em>every</em> element is <code>Copy</code></td><td>Any struct you write, unless you derive it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keyline">If the value owns heap memory, it is not <code>Copy</code>.</div>
+
+  <p><code>(i32, i32)</code> is <code>Copy</code>. <code>(i32, String)</code> is not, because one field owns an allocation. That single test predicts every row in the table above.</p>
+
+  <h3>Making your own type Copy</h3>
+
+  <div class="code">
+    <div class="code-label">Both usable afterwards</div>
+<pre><code><span class="at">#[derive(Debug, Clone, Copy)]</span>
+<span class="k">struct</span> <span class="ty">Point</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span> }
+
+<span class="k">let</span> p1 = <span class="ty">Point</span> { x: <span class="nu">1</span>, y: <span class="nu">2</span> };
+<span class="k">let</span> p2 = p1;
+<span class="fn">println!</span>(<span class="st">"{p1:?} {p2:?}"</span>);</code></pre>
+  </div>
+
+  <p>You must derive <code>Clone</code> alongside <code>Copy</code>, because <code>Copy</code> is a subtrait of <code>Clone</code>. And you can only derive it when every field is itself <code>Copy</code> — add a <code>String</code> field and the derive stops compiling, which is the compiler enforcing the rule above for you.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Not an error-silencer</span>
+    <p>Do not reach for <code>Copy</code> to make borrow errors go away. On a large struct it turns every assignment into a silent memcpy. <code>Copy</code> is for small, cheap, value-like things: coordinates, IDs, flags. If you want <code>Copy</code> on something big, what you actually want is a <em>borrow</em> — Part 09.</p>
+  </div>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2>Clone — the explicit deep copy</h2>
+  </div>
+
+  <p>When you genuinely need two independent owned values, ask for one out loud:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> s3 = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> s4 = s3.<span class="fn">clone</span>();
+<span class="fn">println!</span>(<span class="st">"s3={s3} s4={s4}"</span>);   <span class="cm">// → s3=hello s4=hello</span></code></pre>
+  </div>
+
+  <p><code>.clone()</code> allocates fresh heap space and copies the bytes into it. Now there really are two independent values with two owners, and both can be freed safely.</p>
+
+  <div class="figure">
+<pre>        STACK                          HEAP
+  ┌────────────────┐          ┌───┬───┬───┬───┬───┐
+s3│ ptr ───────────┼─────────►│ h │ e │ l │ l │ o │
+  └────────────────┘          └───┴───┴───┴───┴───┘
+  ┌────────────────┐          ┌───┬───┬───┬───┬───┐
+s4│ ptr ───────────┼─────────►│ h │ e │ l │ l │ o │
+  └────────────────┘          └───┴───┴───┴───┴───┘
+                        two allocations, two owners, no conflict</pre>
+    <p class="figcap"><code>.clone()</code> duplicates the heap data — that is the cost you are paying.</p>
+  </div>
+
+  <p>Rust makes you write <code>.clone()</code> explicitly out of honesty about cost. In a language where assignment might deep-copy, you cannot tell an expensive line from a cheap one by reading it. In Rust, if you see <code>.clone()</code> an allocation happens; if you do not, none does.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">The beginner trap</span>
+    <p>The borrow checker complains, you add <code>.clone()</code>, the error goes away. It works — and occasionally it is genuinely right. But if <code>.clone()</code> is your fix for <em>every</em> error, you are paying real allocations to avoid learning borrowing. The rule of thumb: <strong>clone when you need a second independent value; borrow when you just need to look at the first one.</strong></p>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Functions take ownership too</h2>
+  </div>
+
+  <p>Passing a value to a function moves it, by exactly the same rule as assignment:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">fn</span> <span class="fn">main</span>() {
+    <span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+    <span class="fn">takes_ownership</span>(s);
+    <span class="fn">println!</span>(<span class="st">"{s}"</span>);
+}
+
+<span class="k">fn</span> <span class="fn">takes_ownership</span>(text: <span class="ty">String</span>) {
+    <span class="fn">println!</span>(<span class="st">"{text}"</span>);
+}   <span class="cm">// text dropped here — the String is freed</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `s`
+ --&gt; e2.rs:4:16
+  |
+2 |     let s = String::from("hello");
+  |         - move occurs because `s` has type `String`, which does not implement the `Copy` trait
+3 |     takes_ownership(s);
+  |                     - value moved here
+4 |     println!("{s}");
+  |                ^ value borrowed here after move
+  |
+note: consider changing this parameter type in function `takes_ownership` to borrow instead if owning the value isn't necessary
+ --&gt; e2.rs:7:26
+  |
+7 | fn takes_ownership(text: String) {
+  |    ---------------       ^^^^^^ this parameter takes ownership of the value
+  |    |
+  |    in this function</pre>
+  </div>
+
+  <p>That second note is the compiler running your design review. It has noticed the function only <em>reads</em> <code>text</code>, and is telling you the parameter type is wrong. This is one of the most useful diagnostics in the language, and acting on it is Part 09.</p>
+
+  <h3>Giving ownership back, the clumsy way</h3>
+
+  <p>Before you know about borrowing, the only way to get a value back is to return it:</p>
+
+  <div class="code">
+    <div class="code-label">It works, and you should not write it</div>
+<pre><code><span class="k">fn</span> <span class="fn">length_of</span>(s: <span class="ty">String</span>) -&gt; (<span class="ty">String</span>, <span class="ty">usize</span>) {
+    <span class="k">let</span> n = s.<span class="fn">len</span>();
+    (s, n)                          <span class="cm">// hand it back</span>
+}
+
+<span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> (s, n) = <span class="fn">length_of</span>(s);         <span class="cm">// give, and take back</span>
+<span class="fn">println!</span>(<span class="st">"'{s}' has length {n}"</span>);   <span class="cm">// → 'hello' has length 5</span></code></pre>
+  </div>
+
+  <p>Borrowing exists precisely so that you never have to write this.</p>
+
+  <h3>Returning ownership outward</h3>
+
+  <p>A function can also <em>create</em> an owned value and hand it to the caller. Completely normal, and free — the value is constructed directly where the caller wants it:</p>
+
+  <div class="code is-good">
+    <div class="code-label">The shape most functions should have</div>
+<pre><code><span class="k">fn</span> <span class="fn">make_greeting</span>(name: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="fn">format!</span>(<span class="st">"Hello, {name}!"</span>)     <span class="cm">// ownership moves to the caller</span>
+}</code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The pattern to notice</span>
+    <p>Take <code>&amp;str</code>, return <code>String</code>. Borrow what you only read; hand back ownership of what you create. That one line is most of good Rust API design, and Part 16 develops it into a full method.</p>
+  </div>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2>Where values actually die</h2>
+  </div>
+
+  <p>Three things end a value's life. Being able to tell which one happened is most of debugging E0382.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cause</th><th>Code</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td>Scope ends</td><td><code>{ let s = …; }</code></td><td>dropped at the closing brace</td></tr>
+        <tr><td>Moved elsewhere</td><td><code>let b = a;</code></td><td><code>a</code> dead; <code>b</code> will do the dropping</td></tr>
+        <tr><td>Dropped by hand</td><td><code>drop(s);</code></td><td>freed right there, not at end of scope</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><code>std::mem::drop</code> is not compiler magic. Its entire definition is this:</p>
+
+  <div class="code">
+    <div class="code-label">The whole function</div>
+<pre><code><span class="k">pub fn</span> <span class="fn">drop</span>&lt;<span class="ty">T</span>&gt;(_x: <span class="ty">T</span>) {}</code></pre>
+  </div>
+
+  <p>It takes ownership and does nothing. The value dies at the end of <code>drop</code>'s body, because that is where its new owner's scope ends. Ownership alone is enough to build it — no special support required.</p>
+
+  <h3>The loop trap</h3>
+
+  <p>This is where moves actually bite people in real code:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> names = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"a"</span>), <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"b"</span>)];
+<span class="k">for</span> n <span class="k">in</span> names {          <span class="cm">// moves the whole vec</span>
+    <span class="fn">println!</span>(<span class="st">"{n}"</span>);
+}
+<span class="fn">println!</span>(<span class="st">"{names:?}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `names`
+   --&gt; e7.rs:6:16
+    |
+  2 |     let names = vec![String::from("a"), String::from("b")];
+    |         ----- move occurs because `names` has type `Vec&lt;String&gt;`, which does not implement the `Copy` trait
+  3 |     for n in names {
+    |              ----- `names` moved due to this implicit call to `.into_iter()`
+...
+  6 |     println!("{names:?}");
+    |                ^^^^^ value borrowed here after move
+    |
+note: `into_iter` takes ownership of the receiver `self`, which moves `names`
+help: consider iterating over a slice of the `Vec&lt;String&gt;`'s content to avoid moving into the `for` loop
+    |
+  3 |     for n in &amp;names {
+    |              +</pre>
+  </div>
+
+  <p>The compiler lays out the whole mechanism: <code>for</code> calls <code>.into_iter()</code>, which takes <code>self</code> by value, which moves the vector. The fix is one character — <code>&amp;names</code> — and that character is a borrow. Which is finally what we turn to.</p>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>References — borrowing without taking</h2>
+  </div>
+
+  <p>A <strong>reference</strong> lets a function use a value without owning it. You make one with <code>&amp;</code>:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Compare with the tuple version in Part 07</div>
+<pre><code><span class="k">fn</span> <span class="fn">main</span>() {
+    <span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+    <span class="k">let</span> n = <span class="fn">length_of</span>(&amp;s);            <span class="cm">// lend it</span>
+    <span class="fn">println!</span>(<span class="st">"'{s}' has length {n}"</span>);   <span class="cm">// s is still ours</span>
+}
+
+<span class="k">fn</span> <span class="fn">length_of</span>(s: &amp;<span class="ty">String</span>) -&gt; <span class="ty">usize</span> {
+    s.<span class="fn">len</span>()
+}   <span class="cm">// s goes out of scope — but it does not own, so nothing is dropped</span></code></pre>
+  </div>
+
+  <p>No tuple return, no giving-and-taking-back, and <code>s</code> is still usable afterwards. The function borrowed it and gave it back automatically.</p>
+
+  <div class="figure">
+<pre>        STACK                                   HEAP
+  ┌────────────────┐                   ┌───┬───┬───┬───┬───┐
+s │ ptr ───────────┼──────────────────►│ h │ e │ l │ l │ o │
+  │ len 5          │                   └───┴───┴───┴───┴───┘
+  │ cap 5          │                            ▲
+  └────────────────┘                            │
+  ┌────────────────┐                            │
+r │ ptr ───────────┼────────────────────────────┘
+  └────────────────┘
+    8 bytes            r points at s. s still owns the data.
+                       When r dies, nothing is freed.</pre>
+    <p class="figcap">A reference is a pointer that explicitly does <em>not</em> own what it points at.</p>
+  </div>
+
+  <p>The word for this is <strong>borrowing</strong>, and the metaphor is exact: you may use a borrowed thing, you must give it back, and you may not destroy it. The owner stays responsible for cleanup.</p>
+
+  <h3>Sharing freely</h3>
+
+  <p>You can have as many shared references as you like, all alive at once:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> r1 = &amp;s;
+<span class="k">let</span> r2 = &amp;s;
+<span class="k">let</span> r3 = &amp;s;
+<span class="fn">println!</span>(<span class="st">"{r1} {r2} {r3}"</span>);   <span class="cm">// → hello hello hello</span></code></pre>
+  </div>
+
+  <p>Safe, because none of them can change anything. Any number of readers is fine as long as there are no writers — which is the entire rule, stated formally in Part 11.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">The real-world shape</span>
+    <p>A config object read by twenty functions should be passed as <code>&amp;Config</code> to all twenty. No clones, no ownership juggling, no cost beyond passing an 8-byte pointer.</p>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">struct</span> <span class="ty">Config</span> { host: <span class="ty">String</span>, port: <span class="ty">u16</span>, retries: <span class="ty">u8</span> }
+
+<span class="k">fn</span> <span class="fn">describe</span>(c: &amp;<span class="ty">Config</span>) -&gt; <span class="ty">String</span> {
+    <span class="fn">format!</span>(<span class="st">"{}:{} (retries={})"</span>, c.host, c.port, c.retries)
+}
+
+<span class="k">let</span> cfg = <span class="ty">Config</span> { host: <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"localhost"</span>), port: <span class="nu">8080</span>, retries: <span class="nu">3</span> };
+<span class="fn">println!</span>(<span class="st">"{}"</span>, <span class="fn">describe</span>(&amp;cfg));
+<span class="fn">println!</span>(<span class="st">"{}"</span>, <span class="fn">describe</span>(&amp;cfg));   <span class="cm">// reusable — we only ever borrowed</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, <span class="fn">describe</span>(&amp;cfg));</code></pre>
+<pre><code><span class="cm">// localhost:8080 (retries=3)</span>
+<span class="cm">// localhost:8080 (retries=3)</span>
+<span class="cm">// localhost:8080 (retries=3)</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>Mutable references — borrowing to change</h2>
+  </div>
+
+  <p>Shared references are read-only. To modify through a borrow you need <code>&amp;mut</code>, and the value itself must be declared <code>mut</code>:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">fn</span> <span class="fn">bump</span>(c: &amp;<span class="k">mut</span> <span class="ty">i32</span>) {
+    *c += <span class="nu">1</span>;              <span class="cm">// * to reach through the reference</span>
+}
+
+<span class="k">let</span> <span class="k">mut</span> count = <span class="nu">0</span>;       <span class="cm">// must be mut</span>
+<span class="fn">bump</span>(&amp;<span class="k">mut</span> count);          <span class="cm">// must say &amp;mut at the call site too</span>
+<span class="fn">bump</span>(&amp;<span class="k">mut</span> count);
+<span class="fn">println!</span>(<span class="st">"count = {count}"</span>);   <span class="cm">// → count = 2</span></code></pre>
+  </div>
+
+  <p>Three <code>mut</code>s in that snippet, and they are three different statements:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Where</th><th>What it says</th></tr></thead>
+      <tbody>
+        <tr><td><code>let mut count</code></td><td>this variable's value may change</td></tr>
+        <tr><td><code>&amp;mut count</code></td><td>I am lending it out mutably, right here</td></tr>
+        <tr><td><code>c: &amp;mut i32</code></td><td>this function requires a mutable loan</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The call-site <code>&amp;mut</code> is deliberate. In C++ a reference parameter can modify your variable invisibly at the call site; in Rust you can always see it in the calling code.</p>
+
+  <h3>The dereference operator</h3>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> val = <span class="nu">42</span>;
+<span class="k">let</span> rf = &amp;val;
+<span class="fn">println!</span>(<span class="st">"*rf = {}  rf = {}  equal: {}"</span>, *rf, rf, *rf == val);
+<span class="cm">// → *rf = 42  rf = 42  equal: true</span></code></pre>
+  </div>
+
+  <p>You mostly do not need it. Rust auto-dereferences for method calls and for traits like <code>Display</code> — that is why <code>rf</code> prints as <code>42</code>, and why <code>s.len()</code> works on an <code>&amp;String</code>. You need an explicit <code>*</code> mainly when <em>assigning</em> through a reference, as in <code>*c += 1</code> above.</p>
+
+  <h3>The three relationships, in one example</h3>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="at">#[derive(Debug)]</span>
+<span class="k">struct</span> <span class="ty">Book</span> { title: <span class="ty">String</span> }
+
+<span class="k">fn</span> <span class="fn">borrow_to_read</span>(b: &amp;<span class="ty">Book</span>) -&gt; <span class="ty">usize</span> { b.title.<span class="fn">len</span>() }
+<span class="k">fn</span> <span class="fn">annotate</span>(b: &amp;<span class="k">mut</span> <span class="ty">Book</span>) { b.title.<span class="fn">push_str</span>(<span class="st">" (annotated)"</span>); }
+<span class="k">fn</span> <span class="fn">donate</span>(b: <span class="ty">Book</span>) -&gt; <span class="ty">String</span> { b.title }      <span class="cm">// consumes it</span>
+
+<span class="k">let</span> <span class="k">mut</span> book = <span class="ty">Book</span> { title: <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"The Rust Book"</span>) };
+<span class="fn">println!</span>(<span class="st">"length while borrowed: {}"</span>, <span class="fn">borrow_to_read</span>(&amp;book));
+<span class="fn">annotate</span>(&amp;<span class="k">mut</span> book);
+<span class="fn">println!</span>(<span class="st">"after annotate: {}"</span>, book.title);
+<span class="k">let</span> title = <span class="fn">donate</span>(book);            <span class="cm">// book is consumed here</span>
+<span class="fn">println!</span>(<span class="st">"donated, got title: {title}"</span>);</code></pre>
+<pre><code><span class="cm">// length while borrowed: 13</span>
+<span class="cm">// after annotate: The Rust Book (annotated)</span>
+<span class="cm">// donated, got title: The Rust Book (annotated)</span></code></pre>
+  </div>
+
+  <p>Three functions, three relationships: <em>read it</em>, <em>change it</em>, <em>take it</em>. That is the entire vocabulary of the language on this subject. The library-book metaphor holds all the way down — you can read a borrowed book, you can pencil notes into one you have mutable access to, and once you have donated it, it is not yours to read any more.</p>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>The borrowing rules</h2>
+  </div>
+
+  <div class="keyline">At any one time: any number of <code>&amp;T</code>, <strong>or</strong> exactly one <code>&amp;mut T</code>. Never both. And every reference must always be valid.</div>
+
+  <p>Two errors enforce that first sentence. Mixing shared with mutable:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> r1 = &amp;s;
+<span class="k">let</span> r2 = &amp;<span class="k">mut</span> s;
+<span class="fn">println!</span>(<span class="st">"{r1} {r2}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0502]</span>: cannot borrow `s` as mutable because it is also borrowed as immutable
+ --&gt; e3.rs:4:14
+  |
+3 |     let r1 = &amp;s;
+  |              -- immutable borrow occurs here
+4 |     let r2 = &amp;mut s;
+  |              ^^^^^^ mutable borrow occurs here
+5 |     println!("{r1} {r2}");
+  |                -- immutable borrow later used here</pre>
+  </div>
+
+  <p>And two mutable borrows at once:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> r1 = &amp;<span class="k">mut</span> s;
+<span class="k">let</span> r2 = &amp;<span class="k">mut</span> s;
+<span class="fn">println!</span>(<span class="st">"{r1} {r2}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0499]</span>: cannot borrow `s` as mutable more than once at a time
+ --&gt; e4.rs:4:14
+  |
+3 |     let r1 = &amp;mut s;
+  |              ------ first mutable borrow occurs here
+4 |     let r2 = &amp;mut s;
+  |              ^^^^^^ second mutable borrow occurs here
+5 |     println!("{r1} {r2}");
+  |                -- first borrow later used here</pre>
+  </div>
+
+  <p>Notice that both messages end by pointing at the <code>println!</code> — <em>"later used here."</em> That is the key to the whole system, and Part 13 explains it: the conflict is not that two references exist, it is that both are <strong>alive at the same moment</strong>.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">One sentence</span>
+    <p>Many readers, or one writer, never both. It is the rule that governs concurrent access to shared data in every language ever written — Rust just enforces it at compile time, for single-threaded code as well. Which is exactly why the same rule later makes Rust's threading safe for free.</p>
+  </div>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>Why the rules exist</h2>
+  </div>
+
+  <p>The rules feel arbitrary until you see what they prevent. Here are three real bugs, all caught at compile time.</p>
+
+  <h3>Bug 1 — the invalidated pointer</h3>
+
+  <p>This is the best example in the topic, because the danger is completely invisible in the source text:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile — and that is a rescue, not a nuisance</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> first = &amp;v[<span class="nu">0</span>];      <span class="cm">// borrow pointing into the heap buffer</span>
+v.<span class="fn">push</span>(<span class="nu">4</span>);              <span class="cm">// may reallocate!</span>
+<span class="fn">println!</span>(<span class="st">"{first}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0502]</span>: cannot borrow `v` as mutable because it is also borrowed as immutable
+ --&gt; e9.rs:4:5
+  |
+3 |     let first = &amp;v[0];
+  |                  - immutable borrow occurs here
+4 |     v.push(4);
+  |     ^^^^^^^^^ mutable borrow occurs here
+5 |     println!("{first}");
+  |                ----- immutable borrow later used here</pre>
+  </div>
+
+  <p>Why this is genuinely dangerous rather than merely pedantic: when a <code>Vec</code> runs out of capacity it allocates a <em>new, larger</em> buffer, copies the elements across, and frees the old one.</p>
+
+  <div class="figure">
+<pre>BEFORE push:                        AFTER push (reallocation):
+
+  v ──► ┌───┬───┬───┐                 v ──► ┌───┬───┬───┬───┬───┬───┐
+        │ 1 │ 2 │ 3 │  cap 3                │ 1 │ 2 │ 3 │ 4 │   │   │  cap 6
+        └───┴───┴───┘                       └───┴───┴───┴───┴───┴───┘
+          ▲                                   (a new address)
+          │
+      first                             first ──► ┌───┬───┬───┐
+                                                  │ ░ │ ░ │ ░ │  FREED
+                                                  └───┴───┴───┘
+                                                 dangling pointer</pre>
+    <p class="figcap">In C++ this compiles, runs, and reads freed memory. In Rust it does not compile.</p>
+  </div>
+
+  <p>This is iterator invalidation — the exact bug behind a long line of C++ security advisories. The borrow rule catches it with no runtime check whatsoever.</p>
+
+  <h3>Bug 2 — the data race</h3>
+
+  <p>A data race needs three ingredients: two or more pointers to the same data, at least one of them writing, and no synchronisation. The borrowing rule makes that combination unrepresentable — if anyone holds a <code>&amp;mut</code>, nobody else holds any reference at all.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">The payoff, later</span>
+    <p>This is why "fearless concurrency" is not marketing. The rules you are learning now for single-threaded code are the same rules that make multithreaded Rust safe. You are not learning two systems — by the time you reach threads, you will already have done the hard part.</p>
+  </div>
+
+  <h3>Bug 3 — the dangling return</h3>
+
+  <p>Rust also refuses to let you return a reference to something about to die:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">fn</span> <span class="fn">dangle</span>() -&gt; &amp;<span class="ty">String</span> {
+    <span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+    &amp;s
+}   <span class="cm">// s is dropped here — the reference would point at freed memory</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0106]</span>: missing lifetime specifier
+ --&gt; e5.rs:6:16
+  |
+6 | fn dangle() -&gt; &amp;String {
+  |                ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but there is no value for it to be borrowed from
+help: instead, you are more likely to want to return an owned value
+  |
+6 - fn dangle() -&gt; &amp;String {
+6 + fn dangle() -&gt; String {
+  |</pre>
+  </div>
+
+  <p>The compiler's own suggestion is the right fix: return <code>String</code>, not <code>&amp;String</code>. Move ownership out instead of lending something that will not survive the trip. And that phrase — <em>"no value for it to be borrowed from"</em> — is your first sight of <strong>lifetimes</strong>, which are a topic of their own.</p>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>NLL — borrows end at their last use</h2>
+  </div>
+
+  <p>If borrows lasted until the end of their block, Rust would be unbearable to write. They do not. A borrow ends after its <strong>last use</strong> — a rule called <em>non-lexical lifetimes</em>. So this compiles:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> s2 = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> r = &amp;s2;
+<span class="fn">println!</span>(<span class="st">"r={r}"</span>);           <span class="cm">// last use of r — the borrow ends HERE</span>
+s2.<span class="fn">push_str</span>(<span class="st">" world"</span>);      <span class="cm">// legal: nothing borrows s2 any more</span>
+<span class="fn">println!</span>(<span class="st">"s2={s2}"</span>);          <span class="cm">// → r=hello  then  s2=hello world</span></code></pre>
+  </div>
+
+  <div class="figure">
+<pre>let mut s2 = String::from("hello");
+let r = &amp;s2;                          ┐
+println!("r={r}");                    ┘  r's borrow lives only here
+s2.push_str(" world");                   ← free to mutate: no live borrows
+println!("s2={s2}");</pre>
+    <p class="figcap">A borrow's life is its <em>use</em> span, not its enclosing block.</p>
+  </div>
+
+  <p>Now go back and reread the E0502 and E0499 messages in Part 11. Both ended with <em>"borrow later used here"</em> pointing at the <code>println!</code> — because that final use is exactly what kept the first borrow alive across the second one. Delete that <code>println!</code> and both examples compile.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">A practical debugging move</span>
+    <p>When you hit E0502 or E0499, find the "later used here" line. Very often you can simply move that use earlier, shortening the borrow's span, and the error disappears with no restructuring at all.</p>
+  </div>
+
+  <p>You can also end a borrow deliberately with a block, which is sometimes the cleanest fix available:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+{
+    <span class="k">let</span> m = &amp;<span class="k">mut</span> v;
+    m.<span class="fn">push</span>(<span class="nu">4</span>);
+    <span class="fn">println!</span>(<span class="st">"via mut borrow: {m:?}"</span>);
+}                                <span class="cm">// m dies here</span>
+<span class="fn">println!</span>(<span class="st">"after: {v:?}"</span>);      <span class="cm">// v usable again</span></code></pre>
+<pre><code><span class="cm">// via mut borrow: [1, 2, 3, 4]</span>
+<span class="cm">// after: [1, 2, 3, 4]</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>Slices, and why <code>&amp;str</code> exists</h2>
+  </div>
+
+  <p>A <strong>slice</strong> is a borrow of part of a collection. It is a pointer plus a length, and crucially it owns nothing:</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> owned: <span class="ty">String</span> = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello world"</span>);
+<span class="k">let</span> slice: &amp;<span class="ty">str</span> = &amp;owned[<span class="nu">0</span>..<span class="nu">5</span>];
+<span class="fn">println!</span>(<span class="st">"owned={owned} slice={slice}"</span>);
+<span class="fn">println!</span>(<span class="st">"size_of &amp;str = {}"</span>, std::mem::size_of::&lt;&amp;<span class="ty">str</span>&gt;());</code></pre>
+<pre><code><span class="cm">// owned=hello world slice=hello</span>
+<span class="cm">// size_of &amp;str = 16</span></code></pre>
+  </div>
+
+  <p>Sixteen bytes: a pointer and a length. That is why it is called a <em>fat pointer</em> — bigger than the 8-byte <code>&amp;String</code>, because it has to carry how far the window extends.</p>
+
+  <div class="figure">
+<pre>  owned ──► ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐
+            │ h │ e │ l │ l │ o │   │ w │ o │ r │ l │ d │
+            └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
+              ▲           ▲
+              └───────────┘
+              slice = ptr + len 5      no allocation, no copy</pre>
+    <p class="figcap">A slice is a window onto data that somebody else owns.</p>
+  </div>
+
+  <h3>The signature rule this produces</h3>
+
+  <p>Take <code>&amp;str</code> rather than <code>&amp;String</code> and your function accepts both — because <code>&amp;String</code> auto-converts to <code>&amp;str</code>, but not the reverse:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">fn</span> <span class="fn">shout</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> { s.<span class="fn">to_uppercase</span>() }
+
+<span class="k">let</span> owned = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello world"</span>);
+<span class="k">let</span> literal = <span class="st">"a literal"</span>;
+<span class="fn">println!</span>(<span class="st">"{} {}"</span>, <span class="fn">shout</span>(&amp;owned), <span class="fn">shout</span>(literal));
+<span class="cm">// → HELLO WORLD A LITERAL</span></code></pre>
+  </div>
+
+  <p>The same rule applies to vectors: take <code>&amp;[T]</code>, not <code>&amp;Vec&lt;T&gt;</code>, and the function works on vectors, arrays and sub-ranges alike:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">fn</span> <span class="fn">sum</span>(nums: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i32</span> { nums.<span class="fn">iter</span>().<span class="fn">sum</span>() }
+
+<span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>, <span class="nu">40</span>, <span class="nu">50</span>];
+<span class="fn">println!</span>(<span class="st">"sum of all      = {}"</span>, <span class="fn">sum</span>(&amp;v));        <span class="cm">// → 150</span>
+<span class="fn">println!</span>(<span class="st">"sum of middle 3 = {}"</span>, <span class="fn">sum</span>(&amp;v[<span class="nu">1</span>..<span class="nu">4</span>]));  <span class="cm">// → 90</span></code></pre>
+  </div>
+
+  <h3>Returning a slice into the input</h3>
+
+  <p>A function can return a borrow <em>of its own argument</em> — safe, because the caller still owns the data:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">fn</span> <span class="fn">first_word</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> {
+    <span class="k">match</span> s.<span class="fn">find</span>(<span class="st">' '</span>) {
+        <span class="ty">Some</span>(i) =&gt; &amp;s[..i],
+        <span class="ty">None</span> =&gt; s,
+    }
+}
+
+<span class="k">let</span> sentence = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"the quick brown fox"</span>);
+<span class="fn">println!</span>(<span class="st">"first word = {}"</span>, <span class="fn">first_word</span>(&amp;sentence));   <span class="cm">// → the</span></code></pre>
+  </div>
+
+  <p>No allocation at all — the returned <code>&amp;str</code> points straight into <code>sentence</code>'s buffer. Contrast this with <code>dangle</code> in Part 12: that failed because there was nothing for the reference to borrow <em>from</em>. Here there is — the argument.</p>
+
+  <h3>Two mutable borrows, legitimately</h3>
+
+  <p>The one-writer rule is about overlapping regions, not about variable names. <code>split_at_mut</code> hands you two mutable slices over disjoint halves:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> data = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>];
+<span class="k">let</span> (left, right) = data.<span class="fn">split_at_mut</span>(<span class="nu">2</span>);
+left[<span class="nu">0</span>] = <span class="nu">100</span>;
+right[<span class="nu">0</span>] = <span class="nu">200</span>;
+<span class="fn">println!</span>(<span class="st">"{data:?}"</span>);   <span class="cm">// → [100, 2, 200, 4]</span></code></pre>
+  </div>
+
+  <p>Two live <code>&amp;mut</code> into one vector, and it compiles — because the compiler knows they cannot overlap.</p>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Structs, partial moves, and collections</h2>
+  </div>
+
+  <p>Moving one field out of a struct moves <em>only that field</em>, leaving the rest usable:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile — but only because of one line</div>
+<pre><code><span class="k">struct</span> <span class="ty">User</span> { name: <span class="ty">String</span>, age: <span class="ty">u32</span> }
+
+<span class="k">let</span> u = <span class="ty">User</span> { name: <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Ada"</span>), age: <span class="nu">36</span> };
+<span class="k">let</span> n = u.name;             <span class="cm">// partial move</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, u.name);     <span class="cm">// error — this field is gone</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, u.age);      <span class="cm">// fine — this one is not</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `u.name`
+ --&gt; e6.rs:9:20
+  |
+8 |     let n = u.name;
+  |             ------ value moved here
+9 |     println!("{}", u.name);
+  |                    ^^^^^^ value borrowed here after move
+  |
+  = note: move occurs because `u.name` has type `String`, which does not implement the `Copy` trait</pre>
+  </div>
+
+  <p>Read the error carefully: it is about <code>u.name</code>, not <code>u</code>. The struct is <em>partially</em> dead. <code>u.age</code> still works, because <code>u32</code> is <code>Copy</code> and was never moved.</p>
+
+  <h3>You cannot move out of an index</h3>
+
+  <p>Collections refuse partial moves entirely, because there is nowhere to record that one element is dead:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"a"</span>), <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"b"</span>)];
+<span class="k">let</span> first = v[<span class="nu">0</span>];</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0507]</span>: cannot move out of index of `Vec&lt;String&gt;`
+ --&gt; e8.rs:3:17
+  |
+3 |     let first = v[0];
+  |                 ^^^^ move occurs because value has type `String`, which does not implement the `Copy` trait
+  |
+help: consider borrowing here
+  |
+3 |     let first = &amp;v[0];
+  |                 +
+help: consider cloning the value if the performance cost is acceptable
+  |
+3 |     let first = v[0].clone();
+  |                     ++++++++</pre>
+  </div>
+
+  <p>Both suggestions are valid, and choosing between them is the real decision: <code>&amp;v[0]</code> if you only need to look at it, <code>.clone()</code> if you need your own copy. There is a third option the compiler does not mention — <code>v.remove(0)</code> or <code>v.swap_remove(0)</code>, which genuinely take the element out and adjust the vector.</p>
+
+  <h3>Ownership moves into collections</h3>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> scores: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">u32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+<span class="k">let</span> key = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"ada"</span>);
+scores.<span class="fn">insert</span>(key, <span class="nu">10</span>);         <span class="cm">// key moves into the map</span>
+<span class="cm">// println!("{key}");           // would be E0382</span>
+<span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(v) = scores.<span class="fn">get</span>(<span class="st">"ada"</span>) {   <span class="cm">// &amp;str lookup — nothing moves</span>
+    <span class="fn">println!</span>(<span class="st">"got {v} without moving anything"</span>);
+}</code></pre>
+  </div>
+
+  <p>The collection takes ownership of what you put into it, and hands out borrows when you look things up. That asymmetry — <strong>own on insert, borrow on read</strong> — is the same shape you met in the vectors and hashmap guides. Now you know the reason for it.</p>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Designing signatures — the decision that matters</h2>
+  </div>
+
+  <p>Everything so far has been mechanics. This part is judgement, and it is what separates fighting the borrow checker from working with it. For every parameter you write, ask one question: <strong>what does this function need to do with the value?</strong></p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>You need to…</th><th>Take</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td>read it</td><td><code>&amp;T</code> / <code>&amp;str</code> / <code>&amp;[T]</code></td><td>cheapest, most flexible, caller keeps the value</td></tr>
+        <tr><td>modify it in place</td><td><code>&amp;mut T</code></td><td>caller keeps it and sees the change</td></tr>
+        <tr><td>store it, or consume it</td><td><code>T</code></td><td>you genuinely need ownership</td></tr>
+        <tr><td><em>maybe</em> store it</td><td><code>&amp;T</code>, clone inside</td><td>do not make every caller pay for the maybe</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The default is <code>&amp;T</code></span>
+    <p>Take ownership only when you can say why. A function taking <code>String</code> that only reads it forces every caller to either give up their value or clone — a cost you imposed on them by accident. This is exactly what the compiler was hinting at in Part 07: <em>"consider changing this parameter type … to borrow instead."</em></p>
+  </div>
+
+  <h3>A worked example — an inventory</h3>
+
+  <p>Every method below uses a different relationship, chosen deliberately. Read the comments as design rationale rather than description:</p>
+
+  <div class="code">
+    <div class="code-label">Each signature is a decision</div>
+<pre><code><span class="at">#[derive(Debug, Clone, PartialEq)]</span>
+<span class="k">struct</span> <span class="ty">Product</span> { sku: <span class="ty">String</span>, name: <span class="ty">String</span>, price: <span class="ty">f64</span>, qty: <span class="ty">u32</span> }
+
+<span class="k">struct</span> <span class="ty">Inventory</span> { items: <span class="ty">Vec</span>&lt;<span class="ty">Product</span>&gt; }
+
+<span class="k">impl</span> <span class="ty">Inventory</span> {
+    <span class="cm">// TAKES OWNERSHIP: the inventory stores it, so it must own it.</span>
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, p: <span class="ty">Product</span>) {
+        <span class="k">self</span>.items.<span class="fn">push</span>(p);
+    }
+
+    <span class="cm">// BORROWS: read-only lookup, returning a borrow tied to &amp;self.</span>
+    <span class="k">fn</span> <span class="fn">find</span>(&amp;<span class="k">self</span>, sku: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">Product</span>&gt; {
+        <span class="k">self</span>.items.<span class="fn">iter</span>().<span class="fn">find</span>(|p| p.sku == sku)
+    }
+
+    <span class="cm">// MUTABLE BORROW: change in place, nothing moves.</span>
+    <span class="k">fn</span> <span class="fn">restock</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, sku: &amp;<span class="ty">str</span>, extra: <span class="ty">u32</span>) -&gt; <span class="ty">bool</span> {
+        <span class="k">match</span> <span class="k">self</span>.items.<span class="fn">iter_mut</span>().<span class="fn">find</span>(|p| p.sku == sku) {
+            <span class="ty">Some</span>(p) =&gt; { p.qty += extra; <span class="k">true</span> }
+            <span class="ty">None</span> =&gt; <span class="k">false</span>,
+        }
+    }
+
+    <span class="cm">// BORROWS to compute; returns an owned f64.</span>
+    <span class="k">fn</span> <span class="fn">total_value</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> {
+        <span class="k">self</span>.items.<span class="fn">iter</span>().<span class="fn">map</span>(|p| p.price * p.qty <span class="k">as</span> <span class="ty">f64</span>).<span class="fn">sum</span>()
+    }
+
+    <span class="cm">// BORROWS, and returns borrows — no cloning anywhere.</span>
+    <span class="k">fn</span> <span class="fn">low_stock</span>(&amp;<span class="k">self</span>, threshold: <span class="ty">u32</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Product</span>&gt; {
+        <span class="k">self</span>.items.<span class="fn">iter</span>().<span class="fn">filter</span>(|p| p.qty &lt; threshold).<span class="fn">collect</span>()
+    }
+
+    <span class="cm">// GIVES UP OWNERSHIP of one item: removes it and hands it over.</span>
+    <span class="k">fn</span> <span class="fn">remove</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, sku: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">Product</span>&gt; {
+        <span class="k">let</span> idx = <span class="k">self</span>.items.<span class="fn">iter</span>().<span class="fn">position</span>(|p| p.sku == sku)?;
+        <span class="ty">Some</span>(<span class="k">self</span>.items.<span class="fn">remove</span>(idx))
+    }
+
+    <span class="cm">// CONSUMES self: transforms the whole thing. No clone needed —</span>
+    <span class="cm">// we own everything, so the Strings move straight out.</span>
+    <span class="k">fn</span> <span class="fn">into_price_map</span>(<span class="k">self</span>) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">f64</span>&gt; {
+        <span class="k">self</span>.items.<span class="fn">into_iter</span>().<span class="fn">map</span>(|p| (p.sku, p.price)).<span class="fn">collect</span>()
+    }
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="cm">// 1. find KB-1 = Some("Keyboard")</span>
+<span class="cm">//    find ZZ-9 = None</span>
+<span class="cm">// 2. restock CB-3 by 20 -&gt; true</span>
+<span class="cm">//    restock ZZ-9       -&gt; false</span>
+<span class="cm">//    CB-3 qty now = Some(21)</span>
+<span class="cm">// 3. total value = 1137.40</span>
+<span class="cm">// 4. low stock (&lt;5) = ["Monitor"]</span>
+<span class="cm">// 5. removed = Some("Monitor")</span>
+<span class="cm">//    remaining = 2</span>
+<span class="cm">// 6. price map keys = ["CB-3", "KB-1"]</span>
+<span class="cm">//    KB-1 price = Some(49.99)</span></code></pre>
+  </div>
+
+  <h3>The three <code>self</code> forms</h3>
+
+  <p>Methods take <code>self</code> by the same three relationships, and you choose between them the same way:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Form</th><th>Meaning</th><th>In the example above</th></tr></thead>
+      <tbody>
+        <tr><td><code>&amp;self</code></td><td>read the struct</td><td><code>find</code>, <code>total_value</code>, <code>low_stock</code></td></tr>
+        <tr><td><code>&amp;mut self</code></td><td>modify the struct</td><td><code>add</code>, <code>restock</code>, <code>remove</code></td></tr>
+        <tr><td><code>self</code></td><td>consume the struct</td><td><code>into_price_map</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">The <code>into_</code> convention</span>
+    <p>A method that takes <code>self</code> by value conventionally starts with <code>into_</code>, warning you at the call site that the original is being consumed. You have already met one: <code>into_iter()</code>. Now you know why it is named that — and why the <code>for</code> loop back in Part 08 ate the whole vector.</p>
+  </div>
+</section>
+
+<!-- ============ PART 17 ============ -->
+<section id="p17">
+  <div class="part-head">
+    <span class="part-num">PART 17</span>
+    <h2>Every error in this guide, decoded</h2>
+  </div>
+
+  <p>All six, each with a one-line diagnosis and the usual fix.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Says</th><th>Means</th><th>Usual fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>E0382</code></td>
+          <td>borrow of moved value</td>
+          <td>you used something after giving it away</td>
+          <td>borrow instead (<code>&amp;x</code>), or clone, or restructure</td>
+        </tr>
+        <tr>
+          <td><code>E0502</code></td>
+          <td>cannot borrow as mutable, also borrowed as immutable</td>
+          <td>a reader is still alive when a writer starts</td>
+          <td>shorten the reader's span — move its last use earlier</td>
+        </tr>
+        <tr>
+          <td><code>E0499</code></td>
+          <td>cannot borrow as mutable more than once</td>
+          <td>two writers at the same time</td>
+          <td>scope one in a block, or do the work sequentially</td>
+        </tr>
+        <tr>
+          <td><code>E0507</code></td>
+          <td>cannot move out of index / borrowed content</td>
+          <td>taking ownership from something you only borrowed</td>
+          <td><code>&amp;v[0]</code>, <code>.clone()</code>, or <code>.remove(i)</code></td>
+        </tr>
+        <tr>
+          <td><code>E0106</code></td>
+          <td>missing lifetime specifier</td>
+          <td>returning a reference to nothing that outlives the call</td>
+          <td>return an owned value instead</td>
+        </tr>
+        <tr>
+          <td><code>E0596</code></td>
+          <td>cannot borrow as mutable, not declared as mutable</td>
+          <td>the binding is not <code>mut</code></td>
+          <td>add <code>mut</code> to the <code>let</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>That last one is the friendliest error in Rust, and worth seeing once:</p>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0596]</span>: cannot borrow `s` as mutable, as it is not declared as mutable
+ --&gt; e10.rs:3:5
+  |
+3 |     s.push_str(" world");
+  |     ^ cannot borrow as mutable
+  |
+help: consider changing this to be mutable
+  |
+2 |     let mut s = String::from("hello");
+  |         +++</pre>
+  </div>
+
+  <h3>How to read any borrow error</h3>
+
+  <div class="keyline">Find the cause line. Find the "later used here" line. Ask whether the second can happen before the first.</div>
+
+  <ol>
+    <li>Find the line marked <strong>"value moved here"</strong> or <strong>"borrow occurs here"</strong> — that is the cause.</li>
+    <li>Find the line marked <strong>"later used here"</strong> — that is what keeps the borrow alive.</li>
+    <li>Ask: can step 2 happen <em>before</em> step 1? That is usually the entire fix.</li>
+    <li>If not: do you actually need ownership here, or would <code>&amp;</code> do?</li>
+    <li>Only then reach for <code>.clone()</code>.</li>
+  </ol>
+
+  <p>The compiler's <code>help:</code> suggestions are unusually good on these particular errors — across this guide it proposed <code>.clone()</code>, <code>&amp;names</code>, <code>&amp;v[0]</code>, returning <code>String</code>, and adding <code>mut</code>. It is frequently right. Just be sure you pick the suggestion that matches your <em>intent</em>, rather than the first one that makes the red text disappear.</p>
+</section>
+
+<!-- ============ PART 18 ============ -->
+<section id="p18">
+  <div class="part-head">
+    <span class="part-num">PART 18</span>
+    <h2>Cheat sheet</h2>
+  </div>
+
+  <h3>The rules</h3>
+  <div class="code">
+<pre><code><span class="cm">// OWNERSHIP</span>
+<span class="cm">// 1. Each value has one owner.</span>
+<span class="cm">// 2. Only one owner at a time.</span>
+<span class="cm">// 3. Owner leaves scope → value dropped.</span>
+
+<span class="cm">// BORROWING</span>
+<span class="cm">// Any number of &amp;T, OR exactly one &amp;mut T. Never both.</span>
+<span class="cm">// Every reference must always be valid.</span></code></pre>
+  </div>
+
+  <h3>What happens on assignment</h3>
+  <div class="code">
+<pre><code><span class="k">let</span> b = a;            <span class="cm">// a: i32     → copy,   a still usable</span>
+<span class="k">let</span> b = a;            <span class="cm">// a: String  → move,   a is dead</span>
+<span class="k">let</span> b = a.<span class="fn">clone</span>();    <span class="cm">// a: String  → deep copy, both usable</span>
+<span class="k">let</span> b = &amp;a;           <span class="cm">// a: String  → borrow, both usable</span></code></pre>
+  </div>
+
+  <h3>Parameter forms</h3>
+  <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">read</span>(x: &amp;<span class="ty">T</span>)          <span class="cm">// look at it       — the default choice</span>
+<span class="k">fn</span> <span class="fn">change</span>(x: &amp;<span class="k">mut</span> <span class="ty">T</span>)    <span class="cm">// modify in place  — caller keeps it</span>
+<span class="k">fn</span> <span class="fn">consume</span>(x: <span class="ty">T</span>)       <span class="cm">// take it          — caller loses it</span>
+
+<span class="k">fn</span> <span class="fn">f</span>(s: &amp;<span class="ty">str</span>)            <span class="cm">// accepts &amp;String AND &amp;str      ← prefer</span>
+<span class="k">fn</span> <span class="fn">f</span>(s: &amp;<span class="ty">String</span>)         <span class="cm">// accepts only &amp;String          ← avoid</span>
+<span class="k">fn</span> <span class="fn">g</span>(v: &amp;[<span class="ty">T</span>])           <span class="cm">// accepts &amp;Vec, arrays, slices  ← prefer</span>
+<span class="k">fn</span> <span class="fn">g</span>(v: &amp;<span class="ty">Vec</span>&lt;<span class="ty">T</span>&gt;)        <span class="cm">// accepts only &amp;Vec             ← avoid</span></code></pre>
+  </div>
+
+  <h3>Method receivers</h3>
+  <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">get</span>(&amp;<span class="k">self</span>)           <span class="cm">// read the struct</span>
+<span class="k">fn</span> <span class="fn">set</span>(&amp;<span class="k">mut</span> <span class="k">self</span>)       <span class="cm">// modify the struct</span>
+<span class="k">fn</span> <span class="fn">into_x</span>(<span class="k">self</span>)         <span class="cm">// consume it — name it into_*</span></code></pre>
+  </div>
+
+  <h3>Iterating without losing your collection</h3>
+  <div class="code">
+<pre><code><span class="k">for</span> x <span class="k">in</span> &amp;v            <span class="cm">// borrows      → x: &amp;T       v still usable</span>
+<span class="k">for</span> x <span class="k">in</span> &amp;<span class="k">mut</span> v        <span class="cm">// mut borrows  → x: &amp;mut T   v still usable</span>
+<span class="k">for</span> x <span class="k">in</span> v             <span class="cm">// MOVES        → x: T        v is gone</span></code></pre>
+  </div>
+
+  <h3>Fixes, in order of preference</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Try this</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td>add <code>&amp;</code></td><td>you only need to read — by far the most common real fix</td></tr>
+        <tr><td>move the last use earlier</td><td>E0502/E0499, where a borrow simply lives too long</td></tr>
+        <tr><td>wrap in a block <code>{ }</code></td><td>you need a borrow to end at a precise point</td></tr>
+        <tr><td>return owned instead of borrowed</td><td>E0106 on a return type</td></tr>
+        <tr><td>add <code>mut</code></td><td>E0596 — you forgot to declare it mutable</td></tr>
+        <tr><td><code>.clone()</code></td><td>you genuinely need two independent values</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">If you remember one thing</span>
+    <p>Ownership answers <em>who frees this</em>. Borrowing answers <em>who may look at it, and who may change it</em>. Every borrow-checker error is the compiler telling you that one of those two questions currently has more than one answer.</p>
+  </div>
+
+  <div class="foot">
+    <p><b>Practice.</b> Companion workbook: <b>ownership_practice.html</b> — 49 exercises with worked solutions, plus a 6-part capstone. Borrowing clicks when you write it; reading about it is not enough.</p>
+    <p><b>Next topic.</b> Lifetimes. You met them twice here — E0106's <em>"missing lifetime specifier"</em>, and <code>first_word</code> returning a borrow tied to its input. Lifetimes are how you write those relationships down explicitly, and they are far less frightening once ownership is solid. Error handling with <code>Result</code> and <code>?</code> is equally ready to go.</p>
+    <p>All output in this guide was verified against rustc 1.96.0, edition 2021.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

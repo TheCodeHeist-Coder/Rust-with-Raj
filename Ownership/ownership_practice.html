@@ -1,0 +1,2114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ownership &amp; Borrowing in Rust — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Shares the palette and identity of iterators_guide.html.
+   Denser register: this is a workbook, not a reference.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.progress { margin: 1.5rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill { height: 100%; width: 0%; background: var(--rust); transition: width 0.25s ease; }
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.15rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+.howto {
+  max-width: calc(var(--measure) + 10ch);
+  margin: 0 0 3.5rem; padding: 1.35rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust); border-radius: 2px;
+}
+.howto h2 {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.85rem; font-weight: 700;
+}
+.howto ol { margin: 0; padding-left: 1.3rem; font-size: 0.9688rem; }
+.howto li { margin-bottom: 0.45rem; }
+.howto li:last-child { margin-bottom: 0; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.set-head h2 {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-underline-offset: 2px; }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 3px; margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch); overflow: hidden;
+}
+.ex-head {
+  display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; gap: 0.7rem;
+  padding: 0.7rem 1rem; background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked { background: var(--oxide); border-color: var(--oxide); }
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-out { border-left-color: var(--oxide); }
+.code.is-bad { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint ----------------------------------------------------------- */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong); border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line { border-bottom: 1px solid var(--rule-strong); height: 1.5rem; }
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none; padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before { content: "▸"; color: var(--rust); font-size: 0.8rem; }
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+.set-note { max-width: var(--measure); margin: 0 0 1.5rem; font-size: 0.9688rem; color: var(--ink-soft); }
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">Ownership in Rust</p>
+  <p class="rail-sub">49 exercises<br>+ 6-part capstone</p>
+  <nav id="toc">
+    <div class="rail-group">Sets</div>
+    <a href="#s1"><span class="n">01</span><span>Moves and copies</span></a>
+    <a href="#s2"><span class="n">02</span><span>Borrowing basics</span></a>
+    <a href="#s3"><span class="n">03</span><span>Fixing borrow errors</span></a>
+    <a href="#s4"><span class="n">04</span><span>Slices and &amp;str</span></a>
+    <a href="#s5"><span class="n">05</span><span>Structs and methods</span></a>
+    <a href="#s6"><span class="n">06</span><span>Collections</span></a>
+    <a href="#s7"><span class="n">07</span><span>Designing signatures</span></a>
+
+    <div class="rail-group">Final</div>
+    <a href="#cap"><span class="n">★</span><span>Capstone: a document</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 0 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Practice workbook</p>
+  <h1>Ownership:<br><em>49 exercises</em></h1>
+  <p class="standfirst">Borrowing is a reflex, not a fact — you learn it by having the compiler reject you a few dozen times. These are the rejections worth having. Solutions stay hidden until you ask.</p>
+  <div class="masthead-meta">
+    <span><b>49</b> exercises + capstone</span>
+    <span><b>Guide:</b> ownership_guide.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Solutions</b> verified on rustc 1.96</span>
+  </div>
+</header>
+
+<div class="howto">
+  <h2>How to use this workbook</h2>
+  <ol>
+    <li>Write your attempt <strong>before</strong> opening the solution.</li>
+    <li>Compile and run: <code>rustc --edition 2021 practice.rs &amp;&amp; ./practice</code></li>
+    <li>When the borrow checker rejects you, read the <strong>"later used here"</strong> line first — that is usually where the fix goes, not where the error points.</li>
+    <li>If your instinct is <code>.clone()</code>, pause and ask whether <code>&amp;</code> would do. Sometimes it would not, and that is fine — but check.</li>
+  </ol>
+</div>
+
+<!-- ============ SET 1 ============ -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 01</span>
+    <h2>Moves and copies</h2>
+  </div>
+  <p class="set-note">Which assignments kill the original, and which do not.</p>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Keep both alive</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make <code>let s1 = String::from("hello"); let s2 = s1;</code> compile with <em>both</em> names still usable afterwards. Do not change the types.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified</div>
+<pre><code><span class="k">let</span> s1 = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+<span class="k">let</span> s2 = s1.<span class="fn">clone</span>();
+<span class="fn">println!</span>(<span class="st">"{s1} {s2}"</span>);   <span class="cm">// → hello hello</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why</span>
+          <p><code>String</code> is not <code>Copy</code>, so plain assignment moves. <code>.clone()</code> makes a second independent allocation, so there are genuinely two owners and both can be freed safely.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Predict: does this compile?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Before running: does <code>let a = 5; let b = a; println!("{a} {b}");</code> compile? Say why, in terms of one trait.</p>
+      <div class="answer-lines">
+        <p>Compiles?</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Yes — verified output <code>a=5 b=5</code></div>
+<pre><code><span class="k">let</span> a = <span class="nu">5</span>;
+<span class="k">let</span> b = a;        <span class="cm">// copy, not move — i32 implements Copy</span>
+<span class="fn">println!</span>(<span class="st">"{a} {b}"</span>);</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The test</span>
+          <p><code>i32</code> lives entirely on the stack. No heap allocation means nothing to double-free, so invalidating <code>a</code> would buy nothing. That is exactly the rule: <strong>if the value owns heap memory, it is not <code>Copy</code></strong>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Give and take back</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn takes_and_returns(v: Vec&lt;i32&gt;) -&gt; (Vec&lt;i32&gt;, usize)</code> that reports the length and hands the vector back. (This is the clumsy pattern borrowing replaces — write it once to feel why.)</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[1, 2, 3] len=3</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">takes_and_returns</span>(v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) -&gt; (<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, <span class="ty">usize</span>) {
+    <span class="k">let</span> n = v.<span class="fn">len</span>();
+    (v, n)
+}</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Do not ship this</span>
+          <p>It works, but every caller has to write <code>let (v, n) = takes_and_returns(v);</code> just to keep their own vector. <code>fn len_of(v: &amp;[i32]) -&gt; usize</code> is the real answer — see set 2.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.4">
+    <div class="ex-head">
+      <span class="ex-id">1.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Measure the handle</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Print <code>size_of::&lt;String&gt;()</code>. Predict the number first, and say what the three parts are.</p>
+      <div class="answer-lines">
+        <p>Bytes, and the three fields</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>24</code></div>
+<pre><code><span class="fn">println!</span>(<span class="st">"{}"</span>, std::mem::size_of::&lt;<span class="ty">String</span>&gt;());   <span class="cm">// 24</span>
+<span class="cm">// ptr (8) + len (8) + cap (8) = 24 bytes on the stack.</span>
+<span class="cm">// The characters themselves live on the heap.</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.5">
+    <div class="ex-head">
+      <span class="ex-id">1.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Move through a function</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn identity(s: String) -&gt; String</code> that takes ownership and returns it unchanged. Then explain: how many allocations happen when you call it?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>moved</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">identity</span>(s: <span class="ty">String</span>) -&gt; <span class="ty">String</span> { s }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Zero allocations</span>
+          <p>Ownership moves in and straight back out. Only the 24-byte handle is copied — twice — and the heap buffer is never touched. Moves are free.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.6">
+    <div class="ex-head">
+      <span class="ex-id">1.6</span><span class="pill med">medium</span>
+      <span class="ex-title">Count without consuming</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function that counts items in a list of <code>String</code>s <em>without</em> taking ownership. Pick the most flexible parameter type you can.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>2</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">count</span>(items: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">usize</span> { items.<span class="fn">len</span>() }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why <code>&amp;[String]</code> and not <code>&amp;Vec&lt;String&gt;</code></span>
+          <p>A slice parameter accepts vectors, arrays, and sub-ranges. <code>&amp;Vec&lt;String&gt;</code> accepts only vectors, for no benefit at all.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 2 ============ -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 02</span>
+    <h2>Borrowing basics</h2>
+  </div>
+  <p class="set-note">Reading with <code>&amp;</code>, writing with <code>&amp;mut</code>, and the dereference operator.</p>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Length by borrow</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Rewrite exercise 1.3 as a borrow: a function that returns the length and leaves the caller's value untouched.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>5</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">length_of</span>(s: &amp;<span class="ty">String</span>) -&gt; <span class="ty">usize</span> { s.<span class="fn">len</span>() }</code></pre>
+        </div>
+        <p>No tuple, no giving-back. The next exercise improves it further.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Accept both kinds of string</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Change 2.1 so it accepts <em>both</em> <code>&amp;String</code> and a plain <code>"literal"</code>. One character changes.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>7 5</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">length_of</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">usize</span> { s.<span class="fn">len</span>() }
+
+<span class="fn">length_of</span>(<span class="st">"literal"</span>);              <span class="cm">// 7</span>
+<span class="fn">length_of</span>(&amp;<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"owned"</span>));  <span class="cm">// 5</span></code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">The rule</span>
+          <p><code>&amp;String</code> auto-converts to <code>&amp;str</code>, but not the reverse. So <code>&amp;str</code> is strictly more flexible — always prefer it in parameters.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Increment through a reference</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn bump(n: &amp;mut i32)</code> that adds one. Then call it twice on the same variable.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>11</code> from a start of 10</div>
+<pre><code><span class="k">fn</span> <span class="fn">bump</span>(n: &amp;<span class="k">mut</span> <span class="ty">i32</span>) { *n += <span class="nu">1</span>; }
+
+<span class="k">let</span> <span class="k">mut</span> n = <span class="nu">10</span>;
+<span class="fn">bump</span>(&amp;<span class="k">mut</span> n);</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Three <code>mut</code>s</span>
+          <p><code>let mut n</code> (the value may change), <code>&amp;mut n</code> (lending it mutably here), <code>n: &amp;mut i32</code> (this function demands a mutable loan). Miss any one and it will not compile.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.4">
+    <div class="ex-head">
+      <span class="ex-id">2.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Push through a mutable borrow</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn add(v: &amp;mut Vec&lt;i32&gt;, x: i32)</code>. Why is <code>&amp;mut Vec</code> right here, when set 1 said to prefer slices?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[1, 2, 3]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">add</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, x: <span class="ty">i32</span>) { v.<span class="fn">push</span>(x); }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">When <code>&amp;mut Vec</code> beats <code>&amp;mut [T]</code></span>
+          <p>A slice has a fixed length — you can change elements through it, but you cannot <em>grow</em> it. <code>push</code> needs the vector itself. Prefer slices for reading; take <code>&amp;mut Vec</code> when you must resize.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.5">
+    <div class="ex-head">
+      <span class="ex-id">2.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">Append to a string in place</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn append(s: &amp;mut String, suffix: &amp;str)</code>. Note the asymmetry in the two parameter types and be able to justify it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>hi there</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">append</span>(s: &amp;<span class="k">mut</span> <span class="ty">String</span>, suffix: &amp;<span class="ty">str</span>) {
+    s.<span class="fn">push_str</span>(suffix);
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The asymmetry is the point</span>
+          <p>We <em>modify</em> the first, so it must be <code>&amp;mut String</code>. We only <em>read</em> the second, so <code>&amp;str</code> — which lets callers pass a literal without allocating.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.6">
+    <div class="ex-head">
+      <span class="ex-id">2.6</span><span class="pill easy">easy</span>
+      <span class="ex-title">Sum a slice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn total(v: &amp;[i32]) -&gt; i32</code>, then call it on both a whole vector and a sub-range of it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>10</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i32</span> { v.<span class="fn">iter</span>().<span class="fn">sum</span>() }
+
+<span class="fn">total</span>(&amp;v);        <span class="cm">// whole vector</span>
+<span class="fn">total</span>(&amp;v[<span class="nu">1</span>..<span class="nu">4</span>]);  <span class="cm">// a window into it — no copying</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.7">
+    <div class="ex-head">
+      <span class="ex-id">2.7</span><span class="pill med">medium</span>
+      <span class="ex-title">Return a borrow</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function returning the first element of a slice as <code>Option&lt;&amp;i32&gt;</code>. Why can this return a reference safely, when <code>dangle()</code> in the guide could not?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some(7)</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">first</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">i32</span>&gt; { v.<span class="fn">first</span>() }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The difference</span>
+          <p>The returned reference borrows <em>from the argument</em>, which the caller still owns. <code>dangle()</code> tried to return a borrow of a local that was about to be dropped — there was nothing for it to borrow from.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.8">
+    <div class="ex-head">
+      <span class="ex-id">2.8</span><span class="pill med">medium</span>
+      <span class="ex-title">Double every element in place</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn double_all(v: &amp;mut [i32])</code> that doubles each element. You will need <code>iter_mut()</code> and a dereference.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified: <code>[1, 2, 3]</code> → <code>[2, 4, 6]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">double_all</span>(v: &amp;<span class="k">mut</span> [<span class="ty">i32</span>]) {
+    <span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter_mut</span>() { *x *= <span class="nu">2</span>; }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why the <code>*</code></span>
+          <p><code>iter_mut()</code> yields <code>&amp;mut i32</code>, not <code>i32</code>. Assigning <em>through</em> a reference needs an explicit dereference — this is the main place you still have to write <code>*</code> yourself.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 3 ============ -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 03</span>
+    <h2>Fixing real borrow errors</h2>
+  </div>
+  <p class="set-note">Each of these is broken. Read the error, then fix it — preferring the cheapest fix that expresses your intent.</p>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">The accidental consumer</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This function eats its argument for no reason. Fix the signature.</p>
+      <div class="code is-bad">
+        <div class="code-label">Broken</div>
+<pre><code><span class="k">fn</span> <span class="fn">count</span>(v: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;) -&gt; <span class="ty">usize</span> { v.<span class="fn">len</span>() }</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>1</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">count</span>(v: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">usize</span> { v.<span class="fn">len</span>() }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The compiler told you</span>
+          <p>This is the exact case behind the note <em>"consider changing this parameter type … to borrow instead if owning the value isn't necessary."</em> If the body only reads, take a borrow.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span><span class="pill med">medium</span>
+      <span class="ex-title">E0502 — shorten the borrow</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make this compile without cloning and without removing the <code>push</code>.</p>
+      <div class="code is-bad">
+        <div class="code-label">Broken — E0502</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> first = &amp;v[<span class="nu">0</span>];
+v.<span class="fn">push</span>(<span class="nu">4</span>);
+<span class="fn">println!</span>(<span class="st">"{first}"</span>);</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[1, 2, 3, 4]</code></div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> first = v[<span class="nu">0</span>];      <span class="cm">// copy the i32 out — no live borrow</span>
+v.<span class="fn">push</span>(<span class="nu">4</span>);
+<span class="fn">println!</span>(<span class="st">"{first}"</span>);</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why this works</span>
+          <p><code>i32</code> is <code>Copy</code>, so dropping the <code>&amp;</code> copies the value out instead of borrowing the buffer. With no live borrow, <code>push</code> is free to reallocate. For a non-<code>Copy</code> element you would print before pushing instead.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span><span class="pill med">medium</span>
+      <span class="ex-title">The loop that ate the vector</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Collect the length of every name, keeping the original vector usable afterwards.</p>
+      <div class="code is-bad">
+        <div class="code-label">Broken — E0382</div>
+<pre><code><span class="k">for</span> n <span class="k">in</span> names { <span class="cm">/* ... */</span> }
+<span class="fn">println!</span>(<span class="st">"{names:?}"</span>);</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[2, 3]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">lengths</span>(names: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">usize</span>&gt; {
+    names.<span class="fn">iter</span>().<span class="fn">map</span>(|n| n.<span class="fn">len</span>()).<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">One character</span>
+          <p><code>for n in names</code> calls <code>into_iter()</code> and moves. <code>&amp;names</code> or <code>.iter()</code> borrows instead. The compiler even suggests the <code>&amp;</code> for you.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Let NLL do the work</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Read from a string via a reference, then mutate it — in one function, no blocks, no clones.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>ab</code></div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"a"</span>);
+<span class="k">let</span> r = &amp;s;
+<span class="k">let</span> n = r.<span class="fn">len</span>();   <span class="cm">// last use of r — borrow ends here</span>
+s.<span class="fn">push</span>(<span class="st">'b'</span>);       <span class="cm">// now legal</span></code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Non-lexical lifetimes</span>
+          <p>The borrow dies at its last <em>use</em>, not at the end of the block. Order your reads before your writes and most E0502s evaporate.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.5">
+    <div class="ex-head">
+      <span class="ex-id">3.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Read then append</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn duplicate_first(v: &amp;mut Vec&lt;i32&gt;)</code> that appends a copy of the first element. Watch the borrow overlap.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified: <code>[5, 6]</code> → <code>[5, 6, 5]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">duplicate_first</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) {
+    <span class="k">let</span> first = v[<span class="nu">0</span>];   <span class="cm">// copy out first, ending the read</span>
+    v.<span class="fn">push</span>(first);      <span class="cm">// then mutate</span>
+}</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The trap</span>
+          <p><code>v.push(v[0])</code> looks natural and does not compile: the argument borrows <code>v</code> while <code>push</code> already holds it mutably. Split it into two statements.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.6">
+    <div class="ex-head">
+      <span class="ex-id">3.6</span><span class="pill med">medium</span>
+      <span class="ex-title">Counting with the entry API</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn bump(m: &amp;mut HashMap&lt;String,i32&gt;, k: &amp;str)</code> that increments a counter, inserting 0 first if absent. Only allocate a <code>String</code> when you must.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some(2)</code> after two calls</div>
+<pre><code><span class="k">fn</span> <span class="fn">bump</span>(m: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt;, k: &amp;<span class="ty">str</span>) {
+    *m.<span class="fn">entry</span>(k.<span class="fn">to_string</span>()).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Ownership note</span>
+          <p>The map owns its keys, so <code>entry</code> needs an owned <code>String</code> — hence <code>to_string()</code>. Lookups (<code>get</code>, <code>contains_key</code>) take <code>&amp;str</code> and allocate nothing.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.7">
+    <div class="ex-head">
+      <span class="ex-id">3.7</span><span class="pill med">medium</span>
+      <span class="ex-title">Longest, without cloning</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the longest string in a slice as a borrow, not a clone.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("longest")</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">longest</span>(v: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">String</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">max_by_key</span>(|s| s.<span class="fn">len</span>())
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Zero allocations</span>
+          <p>The whole chain moves borrows around and allocates nothing. Returning <code>Option&lt;&amp;String&gt;</code> instead of <code>Option&lt;String&gt;</code> is what makes that possible.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.8">
+    <div class="ex-head">
+      <span class="ex-id">3.8</span><span class="pill hard">hard</span>
+      <span class="ex-title">Two mutable borrows that are legal</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Mutate the first and third elements of a 4-element vector through <em>two simultaneous</em> mutable references. E0499 says you cannot — find the method that makes it legal.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>(10, 20)</code></div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> d = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>];
+<span class="k">let</span> (l, r) = d.<span class="fn">split_at_mut</span>(<span class="nu">2</span>);
+l[<span class="nu">0</span>] = <span class="nu">10</span>;
+r[<span class="nu">0</span>] = <span class="nu">20</span>;
+<span class="cm">// d is now [10, 2, 20, 4]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The real rule</span>
+          <p>The restriction is on overlapping <em>regions</em>, not on names. <code>split_at_mut</code> proves to the compiler that the two halves are disjoint, so two live <code>&amp;mut</code> into one vector are fine.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 4 ============ -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 04</span>
+    <h2>Slices and string views</h2>
+  </div>
+  <p class="set-note">Borrowing a window into data somebody else owns.</p>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">First word</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the first word of a sentence as a <code>&amp;str</code> — no allocation. Handle the no-space case.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>the</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">first_word</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> {
+    s.<span class="fn">split</span>(<span class="st">' '</span>).<span class="fn">next</span>().<span class="fn">unwrap_or</span>(s)
+}</code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Last word</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Same, but the last word. Use <code>rfind</code> and slice from there.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>brown</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">last_word</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> {
+    <span class="k">match</span> s.<span class="fn">rfind</span>(<span class="st">' '</span>) {
+        <span class="ty">Some</span>(i) =&gt; &amp;s[i+<span class="nu">1</span>..],
+        <span class="ty">None</span> =&gt; s,
+    }
+}</code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Trim the ends</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a slice with the first and last elements removed. Short inputs must not panic.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[2, 3, 4]</code> from <code>[1..5]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">middle</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; &amp;[<span class="ty">i32</span>] {
+    <span class="k">if</span> v.<span class="fn">len</span>() &lt;= <span class="nu">2</span> { v } <span class="k">else</span> { &amp;v[<span class="nu">1</span>..v.<span class="fn">len</span>()-<span class="nu">1</span>] }
+}</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Guard first</span>
+          <p>Without the length check, a 1-element slice computes <code>&amp;v[1..0]</code> and panics. Slice ranges are checked at runtime, not by the borrow checker.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Reverse a string</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Reverse a <code>&amp;str</code>. This one <em>must</em> allocate — explain why a slice cannot do it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>olleh</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">reverse</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    s.<span class="fn">chars</span>().<span class="fn">rev</span>().<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why owned</span>
+          <p>A slice can only be a <em>window</em> onto existing bytes. The reversed characters do not exist anywhere in the input, so they need new storage — return <code>String</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.5">
+    <div class="ex-head">
+      <span class="ex-id">4.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">Take at most n</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the first <code>n</code> elements as a slice, never panicking when <code>n</code> is too large.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[1, 2, 3]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">take</span>(v: &amp;[<span class="ty">i32</span>], n: <span class="ty">usize</span>) -&gt; &amp;[<span class="ty">i32</span>] {
+    &amp;v[..n.<span class="fn">min</span>(v.<span class="fn">len</span>())]
+}</code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.6">
+    <div class="ex-head">
+      <span class="ex-id">4.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Palindrome check</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Ignoring punctuation and case, is the input a palindrome? Test with <code>"A man, a plan, a canal: Panama"</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>true</code> and <code>false</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">is_palindrome</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">bool</span> {
+    <span class="k">let</span> c: <span class="ty">String</span> = s.<span class="fn">chars</span>()
+        .<span class="fn">filter</span>(|c| c.<span class="fn">is_alphanumeric</span>())
+        .<span class="fn">collect</span>::&lt;<span class="ty">String</span>&gt;()
+        .<span class="fn">to_lowercase</span>();
+    c == c.<span class="fn">chars</span>().<span class="fn">rev</span>().<span class="fn">collect</span>::&lt;<span class="ty">String</span>&gt;()
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Two allocations, both needed</span>
+          <p>One for the cleaned string, one for its reverse. You could avoid the second by comparing iterators from both ends — worth trying once you have met <code>DoubleEndedIterator</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.7">
+    <div class="ex-head">
+      <span class="ex-id">4.7</span><span class="pill easy">easy</span>
+      <span class="ex-title">Join borrowed pieces</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Join <code>&amp;["a","b","c"]</code> into <code>"a-b-c"</code>. Note where ownership is created.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>a-b-c</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">join</span>(words: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">String</span> {
+    words.<span class="fn">join</span>(<span class="st">"-"</span>)
+}</code></pre>
+        </div>
+        <p>Borrowed slices in, one fresh <code>String</code> out — the standard shape for a function that builds something new.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 5 ============ -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 05</span>
+    <h2>Structs and methods</h2>
+  </div>
+  <p class="set-note">The three <code>self</code> forms, and choosing between them.</p>
+
+  <div class="code">
+    <div class="code-label">Used throughout this set</div>
+<pre><code><span class="at">#[derive(Debug, Clone, PartialEq)]</span>
+<span class="k">struct</span> <span class="ty">Task</span> { title: <span class="ty">String</span>, done: <span class="ty">bool</span>, priority: <span class="ty">u8</span> }</code></pre>
+  </div>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">A constructor that borrows</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>Task::new(title: &amp;str, priority: u8) -&gt; Self</code>. Why <code>&amp;str</code> rather than <code>String</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">new</span>(title: &amp;<span class="ty">str</span>, priority: <span class="ty">u8</span>) -&gt; <span class="ty">Self</span> {
+    <span class="ty">Task</span> { title: title.<span class="fn">to_string</span>(), done: <span class="k">false</span>, priority }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Who pays for the allocation</span>
+          <p>Either way one <code>String</code> gets allocated. With <code>&amp;str</code>, callers can pass a literal directly; with <code>String</code>, they must build one first even when they have a literal in hand.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">A getter that does not clone</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>title()</code> returning the title without allocating.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>write guide</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">title</span>(&amp;<span class="k">self</span>) -&gt; &amp;<span class="ty">str</span> { &amp;<span class="k">self</span>.title }</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The common mistake</span>
+          <p><code>fn title(&amp;self) -&gt; String { self.title.clone() }</code> allocates on every call. Return <code>&amp;str</code> and let the caller clone only if they need to.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Mutate in place</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>complete()</code> which sets <code>done = true</code>. Which <code>self</code> form?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>done=true</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">complete</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) { <span class="k">self</span>.done = <span class="k">true</span>; }</code></pre>
+        </div>
+        <p>The caller keeps their <code>Task</code> and sees the change. Anything else would force them to reassign.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Consume into a field</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a method that returns the owned title and destroys the task. Name it by convention.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>write guide</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">into_title</span>(<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="k">self</span>.title }</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Why no clone</span>
+          <p>Taking <code>self</code> by value means we own the whole struct, so the <code>String</code> can simply move out. The rest of the struct is dropped. The <code>into_</code> prefix warns callers at the call site.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.5">
+    <div class="ex-head">
+      <span class="ex-id">5.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">A predicate method</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>is_urgent()</code> — true when priority is 8 or above.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>true</code> for priority 9</div>
+<pre><code><span class="k">fn</span> <span class="fn">is_urgent</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">bool</span> { <span class="k">self</span>.priority &gt;= <span class="nu">8</span> }</code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.6">
+    <div class="ex-head">
+      <span class="ex-id">5.6</span><span class="pill med">medium</span>
+      <span class="ex-title">Filter to borrows</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>From <code>&amp;[Task]</code>, return every unfinished task — without cloning any of them.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["second"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">pending</span>(tasks: &amp;[<span class="ty">Task</span>]) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Task</span>&gt; {
+    tasks.<span class="fn">iter</span>().<span class="fn">filter</span>(|t| !t.done).<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The return type carries the decision</span>
+          <p><code>Vec&lt;&amp;Task&gt;</code> is a vector of borrows — cheap, and tied to the input's lifetime. <code>Vec&lt;Task&gt;</code> would force a clone per match.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.7">
+    <div class="ex-head">
+      <span class="ex-id">5.7</span><span class="pill med">medium</span>
+      <span class="ex-title">Consume a whole vector</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn <code>Vec&lt;Task&gt;</code> into <code>Vec&lt;String&gt;</code> of titles, with no cloning at all.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["write guide", "second"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">titles</span>(tasks: <span class="ty">Vec</span>&lt;<span class="ty">Task</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    tasks.<span class="fn">into_iter</span>().<span class="fn">map</span>(|t| t.title).<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Why <code>into_iter</code> matters</span>
+          <p>Taking the vector by value lets <code>into_iter()</code> yield owned <code>Task</code>s, so <code>t.title</code> moves out. With <code>.iter()</code> you would get <code>&amp;Task</code> and be forced to clone every title.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 6 ============ -->
+<section id="s6">
+  <div class="set-head">
+    <span class="set-num">SET 06</span>
+    <h2>Collections and ownership</h2>
+  </div>
+  <p class="set-note">Own on insert, borrow on read — and what it takes to get something back out.</p>
+
+  <article class="ex" data-ex="6.1">
+    <div class="ex-head">
+      <span class="ex-id">6.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Push an owned value</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn add(v: &amp;mut Vec&lt;String&gt;, s: String)</code>. Why must the second parameter be owned?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["a", "b"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">add</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;, s: <span class="ty">String</span>) { v.<span class="fn">push</span>(s); }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Storage requires ownership</span>
+          <p>The vector will outlive this call, so it cannot hold a borrow of something that might die first. Anything you <em>store</em> you must <em>own</em>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.2">
+    <div class="ex-head">
+      <span class="ex-id">6.2</span><span class="pill med">medium</span>
+      <span class="ex-title">Take one back out</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Remove the element at index <code>i</code> and return it as an owned <code>String</code>, or <code>None</code> if out of range.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("a")</code>, rest <code>["b"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">take_at</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;, i: <span class="ty">usize</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="k">if</span> i &lt; v.<span class="fn">len</span>() { <span class="ty">Some</span>(v.<span class="fn">remove</span>(i)) } <span class="k">else</span> { <span class="ty">None</span> }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">This is the answer to E0507</span>
+          <p><code>let s = v[0];</code> cannot move out of an index. <code>remove</code> can, because it also shrinks the vector — no gap is left behind. <code>swap_remove</code> is the O(1) version if order does not matter.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.3">
+    <div class="ex-head">
+      <span class="ex-id">6.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Group into a map</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function appending a value to <code>HashMap&lt;String, Vec&lt;String&gt;&gt;</code>, creating the vector if the key is new.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some(["apple", "pear"])</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">group</span>(m: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt;, k: &amp;<span class="ty">str</span>, val: &amp;<span class="ty">str</span>) {
+    m.<span class="fn">entry</span>(k.<span class="fn">to_string</span>())
+     .<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>)
+     .<span class="fn">push</span>(val.<span class="fn">to_string</span>());
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why <code>or_insert_with</code></span>
+          <p><code>or_insert(Vec::new())</code> builds a vector on every call, even when the key exists. <code>or_insert_with</code> takes a closure and only calls it when needed.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.4">
+    <div class="ex-head">
+      <span class="ex-id">6.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Sorted borrowed keys</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a map's keys in sorted order, without cloning them.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["a", "b"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">sorted_keys</span>(m: &amp;<span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">String</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> k: <span class="ty">Vec</span>&lt;&amp;<span class="ty">String</span>&gt; = m.<span class="fn">keys</span>().<span class="fn">collect</span>();
+    k.<span class="fn">sort</span>();
+    k
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Sorting borrows</span>
+          <p>You are sorting a vector of <em>references</em>. The map is untouched and nothing is allocated but the small vector of pointers. This is also how you get deterministic output from a <code>HashMap</code>, whose iteration order is deliberately arbitrary.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.5">
+    <div class="ex-head">
+      <span class="ex-id">6.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">Deliberate deep copy</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>&amp;[String]</code>, produce an owned <code>Vec&lt;String&gt;</code> the caller can keep independently.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["x"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">owned_copy</span>(v: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    v.<span class="fn">to_vec</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">A legitimate clone</span>
+          <p><code>to_vec()</code> clones every element. Here that is exactly right — the caller asked for an independent copy. Cloning is only a smell when it is silencing an error you did not understand.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.6">
+    <div class="ex-head">
+      <span class="ex-id">6.6</span><span class="pill med">medium</span>
+      <span class="ex-title">Consume into a map</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn <code>Vec&lt;i32&gt;</code> into <code>HashMap&lt;i32, i32&gt;</code> mapping each value to its square, consuming the vector.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[(2, 4), (3, 9)]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">squares</span>(v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">i32</span>, <span class="ty">i32</span>&gt; {
+    v.<span class="fn">into_iter</span>().<span class="fn">map</span>(|x| (x, x*x)).<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 7 ============ -->
+<section id="s7">
+  <div class="set-head">
+    <span class="set-num">SET 07</span>
+    <h2>Designing signatures</h2>
+  </div>
+  <p class="set-note">The judgement calls. For each one, decide before you write: read it, change it, or take it?</p>
+
+  <article class="ex" data-ex="7.1">
+    <div class="ex-head">
+      <span class="ex-id">7.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Two reads, one owned result</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Format a config name and a count into a summary string. Choose the cheapest parameter types.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>cfg x3</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">summary</span>(config: &amp;<span class="ty">str</span>, count: <span class="ty">usize</span>) -&gt; <span class="ty">String</span> {
+    <span class="fn">format!</span>(<span class="st">"{config} x{count}"</span>)
+}</code></pre>
+        </div>
+        <p>Borrow what you read, pass <code>Copy</code> scalars by value, return the thing you built. The default shape.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.2">
+    <div class="ex-head">
+      <span class="ex-id">7.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Append into a caller's buffer</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>write_line</code>, which appends a line plus a newline to a buffer the caller owns. Why is this better than returning a new <code>String</code> each time?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>"line1\nline2\n"</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">write_line</span>(buf: &amp;<span class="k">mut</span> <span class="ty">String</span>, line: &amp;<span class="ty">str</span>) {
+    buf.<span class="fn">push_str</span>(line);
+    buf.<span class="fn">push</span>(<span class="st">'\n'</span>);
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Reusing the allocation</span>
+          <p>Returning a fresh <code>String</code> per line means one allocation per line. Appending into a caller's buffer reuses capacity — the standard pattern for building output in a loop.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.3">
+    <div class="ex-head">
+      <span class="ex-id">7.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Statistics without consuming</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>(done, pending)</code> counts from <code>&amp;[Task]</code>. The caller must still own their tasks afterwards.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>(1, 1)</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">stats</span>(items: &amp;[<span class="ty">Task</span>]) -&gt; (<span class="ty">usize</span>, <span class="ty">usize</span>) {
+    <span class="k">let</span> done = items.<span class="fn">iter</span>().<span class="fn">filter</span>(|t| t.done).<span class="fn">count</span>();
+    (done, items.<span class="fn">len</span>() - done)
+}</code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.4">
+    <div class="ex-head">
+      <span class="ex-id">7.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Partition by consuming</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Consume <code>Vec&lt;Task&gt;</code> into <code>HashMap&lt;bool, Vec&lt;String&gt;&gt;</code> — titles grouped by done-ness, no clones anywhere.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>done=Some(["a"]) pending=Some(["b"])</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">partition</span>(items: <span class="ty">Vec</span>&lt;<span class="ty">Task</span>&gt;) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">bool</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt; {
+    <span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">bool</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> t <span class="k">in</span> items {                <span class="cm">// moves each Task out</span>
+        m.<span class="fn">entry</span>(t.done)
+         .<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>)
+         .<span class="fn">push</span>(t.title);          <span class="cm">// the String moves — no clone</span>
+    }
+    m
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Why the moving <code>for</code> is right here</span>
+          <p>This is the one place the consuming loop from the guide's Part 08 is exactly what you want. We own <code>items</code>, we are dismantling it, and each <code>t.title</code> moves straight into the map. Borrowing here would force a clone per task.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.5">
+    <div class="ex-head">
+      <span class="ex-id">7.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Choose the signature</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>No code — decide. For each, write <code>&amp;T</code>, <code>&amp;mut T</code>, or <code>T</code>:</p>
+      <div class="answer-lines">
+        <p>a) a function that logs a user's name</p>
+        <div class="line"></div>
+        <p>b) a function that stores a user in a database struct</p>
+        <div class="line"></div>
+        <p>c) a function that marks a user as verified</p>
+        <div class="line"></div>
+        <p>d) a function that returns a user's initials</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answers</div>
+<pre><code><span class="cm">// a) &amp;User      — only reads</span>
+<span class="cm">// b) User       — stores it, so must own it</span>
+<span class="cm">// c) &amp;mut User  — changes it, caller keeps it</span>
+<span class="cm">// d) &amp;User      — reads; returns a fresh String</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The question to ask</span>
+          <p>"What does this function need to <em>do</em> with the value?" Read → <code>&amp;T</code>. Change → <code>&amp;mut T</code>. Keep → <code>T</code>. Only (b) genuinely needs ownership.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.6">
+    <div class="ex-head">
+      <span class="ex-id">7.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Spot the unnecessary clone</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Three clones below. Which are unnecessary, and what replaces them?</p>
+      <div class="code is-bad">
+        <div class="code-label">Review this</div>
+<pre><code><span class="k">fn</span> <span class="fn">report</span>(tasks: &amp;<span class="ty">Vec</span>&lt;<span class="ty">Task</span>&gt;) -&gt; <span class="ty">String</span> {
+    <span class="k">let</span> all = tasks.<span class="fn">clone</span>();                       <span class="cm">// 1</span>
+    <span class="k">let</span> first = all[<span class="nu">0</span>].title.<span class="fn">clone</span>();              <span class="cm">// 2</span>
+    <span class="k">let</span> names: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; =
+        all.<span class="fn">iter</span>().<span class="fn">map</span>(|t| t.title.<span class="fn">clone</span>()).<span class="fn">collect</span>();  <span class="cm">// 3</span>
+    <span class="fn">format!</span>(<span class="st">"{first}: {}"</span>, names.<span class="fn">len</span>())
+}</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">All three go</div>
+<pre><code><span class="k">fn</span> <span class="fn">report</span>(tasks: &amp;[<span class="ty">Task</span>]) -&gt; <span class="ty">String</span> {
+    <span class="k">let</span> first = &amp;tasks[<span class="nu">0</span>].title;   <span class="cm">// borrow, do not clone</span>
+    <span class="fn">format!</span>(<span class="st">"{first}: {}"</span>, tasks.<span class="fn">len</span>())
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">What each one cost</span>
+          <p><strong>1</strong> cloned every task including every title — the worst. <strong>2</strong> cloned a string only to read it. <strong>3</strong> built an entire vector of strings just to call <code>.len()</code> on it. The parameter also becomes <code>&amp;[Task]</code> for flexibility.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.7">
+    <div class="ex-head">
+      <span class="ex-id">7.7</span><span class="pill hard">hard</span>
+      <span class="ex-title">When a clone is right</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function that returns a task's title <em>uppercased</em>, leaving the original untouched. Justify the allocation.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">shout_title</span>(t: &amp;<span class="ty">Task</span>) -&gt; <span class="ty">String</span> {
+    t.title.<span class="fn">to_uppercase</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Unavoidable, therefore fine</span>
+          <p>The uppercased text does not exist anywhere yet, so it needs new storage. This is not a clone-to-silence-the-borrow-checker — it is a genuinely new value. Note we still take <code>&amp;Task</code>: only the <em>result</em> is owned.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ CAPSTONE ============ -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone: a document buffer</h2>
+  </div>
+  <p class="set-note">Every method below is an ownership decision. Build it one part at a time — the signature is most of the exercise.</p>
+
+  <div class="code">
+    <div class="code-label">Given</div>
+<pre><code><span class="at">#[derive(Debug, Clone, PartialEq)]</span>
+<span class="k">struct</span> <span class="ty">Line</span> {
+    text: <span class="ty">String</span>,
+    tags: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;,
+}
+
+<span class="k">struct</span> <span class="ty">Document</span> {
+    title: <span class="ty">String</span>,
+    lines: <span class="ty">Vec</span>&lt;<span class="ty">Line</span>&gt;,
+}</code></pre>
+  </div>
+
+  <article class="ex" data-ex="cap.1">
+    <div class="ex-head">
+      <span class="ex-id">C.1</span><span class="pill med">medium</span>
+      <span class="ex-title">Construct and fill</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>new(title: &amp;str)</code> and <code>push_line(&amp;mut self, text: String)</code>. Explain why the two string parameters differ.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>title=Notes lines=3</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">new</span>(title: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Self</span> {
+    <span class="ty">Document</span> { title: title.<span class="fn">to_string</span>(), lines: <span class="ty">Vec</span>::<span class="fn">new</span>() }
+}
+
+<span class="k">fn</span> <span class="fn">push_line</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, text: <span class="ty">String</span>) {
+    <span class="k">self</span>.lines.<span class="fn">push</span>(<span class="ty">Line</span> { text, tags: <span class="ty">Vec</span>::<span class="fn">new</span>() });
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The difference</span>
+          <p><code>new</code> is called once, so <code>&amp;str</code> plus one <code>to_string()</code> is friendliest. <code>push_line</code> is called in a loop and stores what it receives, so taking <code>String</code> lets a caller who already owns one hand it over with no allocation at all.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.2">
+    <div class="ex-head">
+      <span class="ex-id">C.2</span><span class="pill med">medium</span>
+      <span class="ex-title">Read and edit</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>line(&amp;self, i) -&gt; Option&lt;&amp;str&gt;</code> and <code>edit_line(&amp;mut self, i, new_text: &amp;str) -&gt; bool</code>. Neither may allocate a new <code>Line</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("ownership is about who frees")</code> and <code>None</code> for index 9</div>
+<pre><code><span class="k">fn</span> <span class="fn">line</span>(&amp;<span class="k">self</span>, i: <span class="ty">usize</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">str</span>&gt; {
+    <span class="k">self</span>.lines.<span class="fn">get</span>(i).<span class="fn">map</span>(|l| l.text.<span class="fn">as_str</span>())
+}
+
+<span class="k">fn</span> <span class="fn">edit_line</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, i: <span class="ty">usize</span>, new_text: &amp;<span class="ty">str</span>) -&gt; <span class="ty">bool</span> {
+    <span class="k">match</span> <span class="k">self</span>.lines.<span class="fn">get_mut</span>(i) {
+        <span class="ty">Some</span>(l) =&gt; { l.text.<span class="fn">clear</span>(); l.text.<span class="fn">push_str</span>(new_text); <span class="k">true</span> }
+        <span class="ty">None</span> =&gt; <span class="k">false</span>,
+    }
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag"><code>get</code> and <code>get_mut</code></span>
+          <p>Indexing with <code>[i]</code> panics out of range. <code>get</code>/<code>get_mut</code> return <code>Option</code>, which is why both methods can report failure instead of crashing. Reusing the existing <code>String</code> via <code>clear</code> + <code>push_str</code> also keeps its allocated capacity.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.3">
+    <div class="ex-head">
+      <span class="ex-id">C.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Tag a line</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>tag_line(&amp;mut self, i, tag: &amp;str) -&gt; bool</code>, ignoring duplicate tags.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["core"]</code> after tagging twice</div>
+<pre><code><span class="k">fn</span> <span class="fn">tag_line</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, i: <span class="ty">usize</span>, tag: &amp;<span class="ty">str</span>) -&gt; <span class="ty">bool</span> {
+    <span class="k">match</span> <span class="k">self</span>.lines.<span class="fn">get_mut</span>(i) {
+        <span class="ty">Some</span>(l) =&gt; {
+            <span class="k">if</span> !l.tags.<span class="fn">iter</span>().<span class="fn">any</span>(|t| t == tag) {
+                l.tags.<span class="fn">push</span>(tag.<span class="fn">to_string</span>());
+            }
+            <span class="k">true</span>
+        }
+        <span class="ty">None</span> =&gt; <span class="k">false</span>,
+    }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Allocate only on success</span>
+          <p><code>tag.to_string()</code> sits <em>inside</em> the <code>if</code>, so a duplicate tag costs nothing. Comparing <code>t == tag</code> works because <code>String</code> compares directly against <code>&amp;str</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.4">
+    <div class="ex-head">
+      <span class="ex-id">C.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Query without cloning</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>lines_with_tag(&amp;self, tag) -&gt; Vec&lt;&amp;str&gt;</code> and <code>word_count(&amp;self) -&gt; usize</code>. No allocations except the result vector.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>core lines = 2</code>, <code>word count = 18</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">lines_with_tag</span>(&amp;<span class="k">self</span>, tag: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; {
+    <span class="k">self</span>.lines.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|l| l.tags.<span class="fn">iter</span>().<span class="fn">any</span>(|t| t == tag))
+        .<span class="fn">map</span>(|l| l.text.<span class="fn">as_str</span>())
+        .<span class="fn">collect</span>()
+}
+
+<span class="k">fn</span> <span class="fn">word_count</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">usize</span> {
+    <span class="k">self</span>.lines.<span class="fn">iter</span>()
+        .<span class="fn">map</span>(|l| l.text.<span class="fn">split_whitespace</span>().<span class="fn">count</span>())
+        .<span class="fn">sum</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Borrows all the way down</span>
+          <p>The returned <code>Vec&lt;&amp;str&gt;</code> holds views into the document's own buffers. The document stays fully intact and untouched, and only the small pointer vector is allocated.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.5">
+    <div class="ex-head">
+      <span class="ex-id">C.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Give a line back</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>remove_line(&amp;mut self, i) -&gt; Option&lt;String&gt;</code> — the caller ends up owning the removed text.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("scratch this line")</code>, remaining 2</div>
+<pre><code><span class="k">fn</span> <span class="fn">remove_line</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, i: <span class="ty">usize</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="k">if</span> i &lt; <span class="k">self</span>.lines.<span class="fn">len</span>() {
+        <span class="ty">Some</span>(<span class="k">self</span>.lines.<span class="fn">remove</span>(i).text)
+    } <span class="k">else</span> {
+        <span class="ty">None</span>
+    }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">A move out of a temporary</span>
+          <p><code>remove(i)</code> hands back an owned <code>Line</code>. Since we own that temporary, <code>.text</code> moves straight out of it and the discarded <code>tags</code> vector is dropped. No clone required.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.6">
+    <div class="ex-head">
+      <span class="ex-id">C.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Consume into an index</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>into_tag_index(self) -&gt; HashMap&lt;String, Vec&lt;String&gt;&gt;</code>, mapping each tag to the texts carrying it. One clone is unavoidable here — find it and explain it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>tags = ["core"]</code>, <code>core entries = 2</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">into_tag_index</span>(<span class="k">self</span>) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt; {
+    <span class="k">let</span> <span class="k">mut</span> idx: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> line <span class="k">in</span> <span class="k">self</span>.lines {          <span class="cm">// moves each Line out</span>
+        <span class="k">for</span> tag <span class="k">in</span> line.tags {         <span class="cm">// moves each tag String</span>
+            idx.<span class="fn">entry</span>(tag)
+               .<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>)
+               .<span class="fn">push</span>(line.text.<span class="fn">clone</span>());   <span class="cm">// ← the necessary clone</span>
+        }
+    }
+    idx
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why that clone is unavoidable</span>
+          <p>A line with two tags must appear under <em>both</em> keys — the same text in two places. One <code>String</code> cannot have two owners, so the second occurrence needs its own copy. The tags themselves move (no clone), and a line with exactly one tag still pays for one clone; avoiding even that would need <code>Rc&lt;String&gt;</code>, which is a later topic.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p><b>All 49 exercises and the 6-part capstone were compiled and run</b> on rustc 1.96.0, edition 2021. Every output shown is real program output.</p>
+    <p><b>Guide:</b> ownership_guide.html — 18 parts, with every compiler error shown in full.</p>
+    <p><b>Next.</b> Lifetimes, or error handling with <code>Result</code> and <code>?</code>. Both are ready once ownership is solid.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var TKEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(TKEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = currentIsDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(TKEY, next); } catch (e) {}
+    syncBtn();
+  });
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-ownership-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>
