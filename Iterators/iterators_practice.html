@@ -1,0 +1,2050 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iterators — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Shares the palette and identity of iterators_guide.html.
+   Denser register: this is a workbook, not a reference.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.progress { margin: 1.5rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill { height: 100%; width: 0%; background: var(--rust); transition: width 0.25s ease; }
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.15rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+.howto {
+  max-width: calc(var(--measure) + 10ch);
+  margin: 0 0 3.5rem; padding: 1.35rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust); border-radius: 2px;
+}
+.howto h2 {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.85rem; font-weight: 700;
+}
+.howto ol { margin: 0; padding-left: 1.3rem; font-size: 0.9688rem; }
+.howto li { margin-bottom: 0.45rem; }
+.howto li:last-child { margin-bottom: 0; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.set-head h2 {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-underline-offset: 2px; }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 3px; margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch); overflow: hidden;
+}
+.ex-head {
+  display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; gap: 0.7rem;
+  padding: 0.7rem 1rem; background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked { background: var(--oxide); border-color: var(--oxide); }
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-out { border-left-color: var(--oxide); }
+.code.is-bad { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint ----------------------------------------------------------- */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong); border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line { border-bottom: 1px solid var(--rule-strong); height: 1.5rem; }
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none; padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before { content: "▸"; color: var(--rust); font-size: 0.8rem; }
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+.set-note { max-width: var(--measure); margin: 0 0 1.5rem; font-size: 0.9688rem; color: var(--ink-soft); }
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">Iterators — Practice</p>
+  <p class="rail-sub">47 exercises<br>+ 6-part capstone</p>
+  <nav id="toc">
+    <a href="#s1"><span class="n">SET 1</span><span>Basics &amp; laziness</span></a>
+    <a href="#s2"><span class="n">SET 2</span><span>map &amp; filter</span></a>
+    <a href="#s3"><span class="n">SET 3</span><span>Take &amp; skip</span></a>
+    <a href="#s4"><span class="n">SET 4</span><span>Combining</span></a>
+    <a href="#s5"><span class="n">SET 5</span><span>Consumers</span></a>
+    <a href="#s6"><span class="n">SET 6</span><span>Searching</span></a>
+    <a href="#s7"><span class="n">SET 7</span><span>collect targets</span></a>
+    <a href="#s8"><span class="n">SET 8</span><span>Custom iterators</span></a>
+    <a href="#cap"><span class="n">FINAL</span><span>Capstone</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 0 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<!-- ====================== MAIN ====================== -->
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Practice workbook</p>
+  <h1>Iterators:<br><em>47 exercises</em></h1>
+  <p class="standfirst">Iterator chains are read far more often than they are written. These build the reflex — see the shape, know the adapter. Solutions stay hidden until you ask.</p>
+  <div class="masthead-meta">
+    <span><b>47</b> exercises + capstone</span>
+    <span><b>Guide:</b> iterators_guide.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Solutions</b> verified on rustc 1.96</span>
+  </div>
+</header>
+
+<div class="howto">
+  <h2>How to use this workbook</h2>
+  <ol>
+    <li>Write your attempt <strong>before</strong> opening the solution.</li>
+    <li>Compile and run: <code>rustc --edition 2021 practice.rs &amp;&amp; ./practice</code></li>
+    <li>If a chain does nothing, you forgot the <strong>consumer</strong>. If it will not compile, check what each adapter hands your closure — <code>filter</code> gives <code>&amp;&amp;T</code>, <code>map</code> gives <code>&amp;T</code>.</li>
+    <li>Stuck on types? Drop in <code>.inspect(|x| println!("{:?}", x))</code> mid-chain to see what is flowing through.</li>
+    <li>Tick the checkbox. Progress is saved in this browser.</li>
+  </ol>
+</div>
+
+<!-- ============ SET 1 ============ -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 01</span>
+    <h2>Basics and laziness</h2>
+  </div>
+  <p class="set-note">Before the adapters: what an iterator actually is, and the three ways to get one.</p>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Drive an iterator by hand</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>From <code>[1, 2, 3]</code>, call <code>.next()</code> four times and collect what comes back. Predict the fourth before running.</p>
+      <div class="answer-lines">
+        <p>Fourth call returns</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> <span class="k">mut</span> it = v.<span class="fn">iter</span>();
+
+it.<span class="fn">next</span>();   <span class="cm">// Some(1)</span>
+it.<span class="fn">next</span>();   <span class="cm">// Some(2)</span>
+it.<span class="fn">next</span>();   <span class="cm">// Some(3)</span>
+it.<span class="fn">next</span>();   <span class="cm">// None    — and stays None forever</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why it must be mut</span>
+          <p><code>next()</code> takes <code>&amp;mut self</code> — it advances an internal position. The iterator carries state even though <code>v</code> itself never changes.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Laziness in action</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>v.iter().map(|x| x * 2);</code> on its own line and compile it. What does the compiler say? Then make it actually produce <code>[2, 4, 6]</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="errblock">
+<pre><span class="code-id">warning</span>: unused `Map` that must be used
+  = note: iterators are lazy and do nothing unless consumed</pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">The fix</div>
+<pre><code><span class="k">fn</span> <span class="fn">doubled</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>).<span class="fn">collect</span>()
+}
+<span class="cm">// [2, 4, 6]</span></code></pre>
+        </div>
+        <p>Memorise that warning text. Adapters build a description; only a consumer runs it.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Sum without a loop</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Total a slice of <code>i32</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>()
+}
+<span class="cm">// [1,2,3] -&gt; 6</span></code></pre>
+        </div>
+        <p>The return type tells <code>sum()</code> what to build. Standing alone you would need <code>.sum::&lt;i32&gt;()</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.4">
+    <div class="ex-head">
+      <span class="ex-id">1.4</span><span class="pill med">med</span>
+      <span class="ex-title">Modify in place</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Add 100 to every element of a vector, in place. Which of the three iterators do you need?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">bump_all</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) {
+    <span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter_mut</span>() {
+        *x += <span class="nu">100</span>;      <span class="cm">// the * reaches through &amp;mut i32</span>
+    }
+}
+<span class="cm">// [1,2,3] -&gt; [101, 102, 103]</span></code></pre>
+        </div>
+        <p><code>.iter()</code> would give read-only <code>&amp;i32</code>; <code>.into_iter()</code> would consume the vector. <code>iter_mut</code> is the only one that lets you write through.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.5">
+    <div class="ex-head">
+      <span class="ex-id">1.5</span><span class="pill med">med</span>
+      <span class="ex-title">Consume to avoid cloning</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Take a <code>Vec&lt;String&gt;</code> <em>by value</em> and return them uppercased — with no <code>.clone()</code> anywhere.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">shout</span>(v: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    v.<span class="fn">into_iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">to_uppercase</span>()).<span class="fn">collect</span>()
+}
+<span class="cm">// ["ada", "ravi"] -&gt; ["ADA", "RAVI"]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">This is when into_iter is right</span>
+          <p>Each <code>String</code> is <em>moved</em> out — no allocation, no clone. With <code>.iter()</code> you would get <code>&amp;String</code> and need to clone to own the result. Taking by value signals "I am finished with this".</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 2 ============ -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 02</span>
+    <h2>map and filter</h2>
+  </div>
+  <p class="set-note">The two you will use most — and the reference levels that trip everyone up.</p>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Square everything</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return every element squared, leaving the input alone.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">squares</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * x).<span class="fn">collect</span>()
+}
+<span class="cm">// (1..=10) -&gt; [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span><span class="pill med">med</span>
+      <span class="ex-title">Keep the evens</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a <code>Vec&lt;i32&gt;</code> of only the even values. Count your ampersands carefully.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">evens</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">filter</span>(|&amp;&amp;x| x % <span class="nu">2</span> == <span class="nu">0</span>).<span class="fn">copied</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// (1..=10) -&gt; [2, 4, 6, 8, 10]</span></code></pre>
+        </div>
+        <div class="errblock">
+<pre><span class="code-id">error[E0369]</span>: cannot calculate the remainder of `&amp;&amp;{integer}`
+              divided by `{integer}`
+help: `%` can be used on `&amp;{integer}` if you dereference the left-hand side</pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why two ampersands</span>
+          <p><code>.iter()</code> yields <code>&amp;i32</code>, and <code>filter</code> lends the closure a reference <em>to that</em> — so you receive <code>&amp;&amp;i32</code>. Write <code>|&amp;&amp;x|</code> to strip both, or <code>|x| **x % 2 == 0</code>. Then <code>.copied()</code> converts the surviving <code>&amp;i32</code>s to owned values.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span><span class="pill med">med</span>
+      <span class="ex-title">Parse, skipping failures</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>["1", "x", "3"]</code> → <code>[1, 3]</code>. One adapter does both the filtering and the mapping.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">parse_ok</span>(v: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">filter_map</span>(|s| s.<span class="fn">parse</span>().<span class="fn">ok</span>()).<span class="fn">collect</span>()
+}
+<span class="cm">// [1, 3]</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Not filter + map</span>
+          <p><code>.filter(|s| s.parse::&lt;i32&gt;().is_ok()).map(|s| s.parse().unwrap())</code> parses everything <strong>twice</strong> and contains an <code>unwrap</code>. <code>filter_map</code> does it once, with none.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.4">
+    <div class="ex-head">
+      <span class="ex-id">2.4</span><span class="pill med">med</span>
+      <span class="ex-title">Filter then transform</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>From <code>["apple", "fig", "banana", "kiwi"]</code>, uppercase only the words longer than 3 characters.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">long_loud</span>(v: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    v.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|w| w.<span class="fn">len</span>() &gt; <span class="nu">3</span>)
+        .<span class="fn">map</span>(|w| w.<span class="fn">to_uppercase</span>())
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// ["APPLE", "BANANA", "KIWI"]</span></code></pre>
+        </div>
+        <p>Note that <code>.len()</code> works through both references without a star — method calls auto-dereference where arithmetic does not.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.5">
+    <div class="ex-head">
+      <span class="ex-id">2.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">Change the type</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn <code>[1, 2]</code> into <code>["#1", "#2"]</code> — numbers in, strings out.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">tag_them</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| <span class="fn">format!</span>(<span class="st">"#{x}"</span>)).<span class="fn">collect</span>()
+}
+<span class="cm">// ["#1", "#2"]</span></code></pre>
+        </div>
+        <p><code>map</code> can change the item type freely. Count in equals count out — that never changes.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.6">
+    <div class="ex-head">
+      <span class="ex-id">2.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Drop the Nones</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>[Some(1), None, Some(3)]</code> → <code>[1, 3]</code>. There is a one-word adapter for this.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">just_values</span>(v: &amp;[<span class="ty">Option</span>&lt;<span class="ty">i32</span>&gt;]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">flatten</span>().<span class="fn">copied</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// [1, 3]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Option is an iterator</span>
+          <p>An <code>Option</code> is an iterator over zero or one item — <code>Some(x)</code> yields one, <code>None</code> yields none. So <code>flatten</code> collapses them and the <code>None</code>s simply vanish. <code>.filter_map(|x| *x)</code> also works.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 3 ============ -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 03</span>
+    <h2>Taking and skipping</h2>
+  </div>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">First n</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the first <code>n</code> elements.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">first_n</span>(v: &amp;[<span class="ty">i32</span>], n: <span class="ty">usize</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">take</span>(n).<span class="fn">copied</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// (1..=10) take 3 -&gt; [1, 2, 3]</span></code></pre>
+        </div>
+        <p><code>take</code> asking for more than exists is fine — you get everything, with no panic.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Drop the first n</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return everything <em>after</em> the first <code>n</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">skip</span>(n).<span class="fn">copied</span>().<span class="fn">collect</span>()
+<span class="cm">// (1..=10) skip 7 -&gt; [8, 9, 10]</span></code></pre>
+        </div>
+        <p><code>.skip(1)</code> is the idiomatic way to ignore a CSV header row.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">take_while is not filter</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>On <code>[1, 2, 3, 10, 1]</code>, use <code>take_while(x &lt; 5)</code>. Predict the result — then predict what <code>filter(x &lt; 5)</code> would give instead.</p>
+      <div class="answer-lines">
+        <p>take_while gives</p>
+        <div class="line"></div>
+        <p style="margin-top:0.7rem">filter would give</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>,<span class="nu">10</span>,<span class="nu">1</span>].<span class="fn">iter</span>().<span class="fn">take_while</span>(|&amp;&amp;x| x &lt; <span class="nu">5</span>)
+<span class="cm">// [1, 2, 3]        STOPS at 10 — never sees the final 1</span>
+
+[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>,<span class="nu">10</span>,<span class="nu">1</span>].<span class="fn">iter</span>().<span class="fn">filter</span>(|&amp;&amp;x| x &lt; <span class="nu">5</span>)
+<span class="cm">// [1, 2, 3, 1]     checks EVERY item — keeps the final 1</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The difference</span>
+          <p><code>take_while</code> stops permanently at the first failure. <code>filter</code> tests everything. On sorted data they agree; on unsorted data they very much do not.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span><span class="pill med">med</span>
+      <span class="ex-title">skip_while</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Same input, <code>skip_while(x &lt; 5)</code>. Why does the trailing <code>1</code> come through?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>,<span class="nu">10</span>,<span class="nu">1</span>].<span class="fn">iter</span>().<span class="fn">skip_while</span>(|&amp;&amp;x| x &lt; <span class="nu">5</span>)
+<span class="cm">// [10, 1]</span></code></pre>
+        </div>
+        <p>Once the condition first fails (at <code>10</code>), <code>skip_while</code> stops testing entirely and passes <strong>everything</strong> remaining through — including values that would have failed. Useful for skipping a preamble.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.5">
+    <div class="ex-head">
+      <span class="ex-id">3.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">First n odd numbers, from infinity</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the first <code>n</code> odd numbers using the <strong>infinite</strong> range <code>(1..)</code>. Two adapters.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">odds</span>(n: <span class="ty">u32</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">u32</span>&gt; {
+    (<span class="nu">1</span>..).<span class="fn">step_by</span>(<span class="nu">2</span>).<span class="fn">take</span>(n <span class="k">as</span> <span class="ty">usize</span>).<span class="fn">collect</span>()
+}
+<span class="cm">// n=5 -&gt; [1, 3, 5, 7, 9]</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The take is mandatory</span>
+          <p>Without it, <code>collect()</code> on an infinite range runs until memory is exhausted. Laziness makes infinite sources <em>possible</em>; a bound makes them <em>safe</em>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.6">
+    <div class="ex-head">
+      <span class="ex-id">3.6</span><span class="pill easy">easy</span>
+      <span class="ex-title">Reverse</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a reversed copy without touching the original.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">rev</span>().<span class="fn">copied</span>().<span class="fn">collect</span>()
+<span class="cm">// [1,2,3] -&gt; [3, 2, 1]</span></code></pre>
+        </div>
+        <p><code>.rev()</code> needs <code>DoubleEndedIterator</code>. Vectors, slices, and ranges have it; a <code>HashMap</code> iterator does not — there is no "back" to something with no order.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 4 ============ -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 04</span>
+    <h2>Combining iterators</h2>
+  </div>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span><span class="pill med">med</span>
+      <span class="ex-title">zip truncates</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Zip <code>["a", "b", "c"]</code> with <code>[1, 2]</code>. How many pairs come out, and what happened to <code>"c"</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>a.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">zip</span>(b.<span class="fn">iter</span>().<span class="fn">copied</span>()).<span class="fn">collect</span>()
+<span class="cm">// [("a", 1), ("b", 2)]     — only 2 pairs</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Silent data loss</span>
+          <p><code>zip</code> stops at the shorter iterator. <code>"c"</code> is dropped with no error and no warning. If the lengths <em>should</em> match, check before zipping.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Concatenate</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Join <code>[1, 2]</code> and <code>[3, 4]</code> into one sequence.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>a.<span class="fn">iter</span>().<span class="fn">chain</span>(b.<span class="fn">iter</span>()).<span class="fn">copied</span>().<span class="fn">collect</span>()
+<span class="cm">// [1, 2, 3, 4]</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Number a list</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>["ada", "ravi"]</code> → <code>["1. ada", "2. ravi"]</code>. Note it starts at 1.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>()
+    .<span class="fn">enumerate</span>()
+    .<span class="fn">map</span>(|(i, s)| <span class="fn">format!</span>(<span class="st">"{}. {}"</span>, i + <span class="nu">1</span>, s))
+    .<span class="fn">collect</span>()
+<span class="cm">// ["1. ada", "2. ravi"]</span></code></pre>
+        </div>
+        <p><code>enumerate</code> is 0-based; the <code>+ 1</code> makes it human-facing. Destructure the tuple right in the closure parameter.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span><span class="pill med">med</span>
+      <span class="ex-title">Flatten nested vectors</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>[[1, 2], [3]]</code> → <code>[1, 2, 3]</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">flatten</span>().<span class="fn">copied</span>().<span class="fn">collect</span>()
+<span class="cm">// [1, 2, 3]</span></code></pre>
+        </div>
+        <p><code>flatten</code> removes exactly one level of nesting. Triple-nested needs it twice.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.5">
+    <div class="ex-head">
+      <span class="ex-id">4.5</span><span class="pill med">med</span>
+      <span class="ex-title">All characters from all strings</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>["hi", "yo"]</code> → <code>['h', 'i', 'y', 'o']</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">flat_map</span>(|s| s.<span class="fn">chars</span>()).<span class="fn">collect</span>()
+<span class="cm">// ['h', 'i', 'y', 'o']</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">flat_map = map + flatten</span>
+          <p>With plain <code>map</code> you would get an iterator of <code>Chars</code> iterators — nested. <code>flat_map</code> maps and flattens in one step, which is what you almost always want when each item expands into many.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.6">
+    <div class="ex-head">
+      <span class="ex-id">4.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Count words across lines</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>["hello world", "foo bar baz"]</code>, count the total words across all lines.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">word_count</span>(lines: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">usize</span> {
+    lines.<span class="fn">iter</span>()
+        .<span class="fn">flat_map</span>(|l| l.<span class="fn">split_whitespace</span>())
+        .<span class="fn">count</span>()
+}
+<span class="cm">// 5</span></code></pre>
+        </div>
+        <p>This is the real-world shape of <code>flat_map</code>: one line expands into many words, and you want them all in a single flat stream.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 5 ============ -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 05</span>
+    <h2>Consumers</h2>
+  </div>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Sum</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Total <code>(1..=10)</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">sum</span>()      <span class="cm">// 55</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span><span class="pill med">med</span>
+      <span class="ex-title">Factorial with product</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Compute 5! using <code>product</code>. Return <code>i64</code> to leave headroom.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">factorial</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i64</span> {
+    v.<span class="fn">iter</span>().<span class="fn">map</span>(|&amp;x| x <span class="k">as</span> <span class="ty">i64</span>).<span class="fn">product</span>()
+}
+<span class="cm">// [1,2,3,4,5] -&gt; 120</span></code></pre>
+        </div>
+        <p>The <code>map</code> widens each value before multiplying — factorials overflow <code>i32</code> quickly.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Min and max</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return both as <code>(Option&lt;i32&gt;, Option&lt;i32&gt;)</code>. Why <code>Option</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>(v.<span class="fn">iter</span>().<span class="fn">min</span>().<span class="fn">copied</span>(), v.<span class="fn">iter</span>().<span class="fn">max</span>().<span class="fn">copied</span>())
+<span class="cm">// (1..=10) -&gt; (Some(1), Some(10))</span></code></pre>
+        </div>
+        <p><code>Option</code> because an <strong>empty</strong> iterator has neither a minimum nor a maximum. The type forces you to handle that.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span><span class="pill med">med</span>
+      <span class="ex-title">Reimplement sum with fold</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>sum</code> yourself using <code>fold</code>, to see what it is underneath.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">fold</span>(<span class="nu">0</span>, |acc, x| acc + x)
+<span class="cm">// 55  — identical to .sum()</span>
+
+<span class="cm">//         ↑ start   ↑ running total  ↑ current item</span></code></pre>
+        </div>
+        <p><code>sum</code> is <code>fold(0, +)</code>; <code>product</code> is <code>fold(1, *)</code>; <code>count</code> is <code>fold(0, |a,_| a+1)</code>. Most consumers are folds in disguise.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.5">
+    <div class="ex-head">
+      <span class="ex-id">5.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">Build a string with fold</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Join <code>["a", "b", "c"]</code> into <code>"a-b-c"</code> using <code>fold</code> — no separator on the first item.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">fold</span>(<span class="ty">String</span>::<span class="fn">new</span>(), |<span class="k">mut</span> acc, s| {
+    <span class="k">if</span> !acc.<span class="fn">is_empty</span>() { acc.<span class="fn">push</span>(<span class="st">'-'</span>); }
+    acc.<span class="fn">push_str</span>(s);
+    acc                     <span class="cm">// must return the accumulator</span>
+})
+<span class="cm">// "a-b-c"</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The accumulator can be any type</span>
+          <p>Here it is a <code>String</code>, not a number. Note <code>|mut acc, s|</code> and the bare <code>acc</code> at the end — you must hand the accumulator back each time. For this specific job <code>.join("-")</code> is clearer, but the pattern generalises to anything.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.6">
+    <div class="ex-head">
+      <span class="ex-id">5.6</span><span class="pill med">med</span>
+      <span class="ex-title">Average, safely</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Mean as <code>f64</code>. Empty input gives <code>0.0</code>, not <code>NaN</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">mean</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">f64</span> {
+    <span class="k">if</span> v.<span class="fn">is_empty</span>() { <span class="k">return</span> <span class="nu">0.0</span>; }
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;() <span class="k">as</span> <span class="ty">f64</span> / v.<span class="fn">len</span>() <span class="k">as</span> <span class="ty">f64</span>
+}
+<span class="cm">// [1,2,3,4] -&gt; 2.5     [] -&gt; 0.0</span></code></pre>
+        </div>
+        <p>The turbofish on <code>sum::&lt;i32&gt;()</code> is needed because the <code>as f64</code> gives the compiler nothing to infer from.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.7">
+    <div class="ex-head">
+      <span class="ex-id">5.7</span><span class="pill hard">hard</span>
+      <span class="ex-title">Running totals</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>[1,2,3,4,5]</code> → <code>[1, 3, 6, 10, 15]</code>. <code>fold</code> gives only the final value — you need every step.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">scan</span>(<span class="nu">0</span>, |acc, x| {
+    *acc += x;
+    <span class="ty">Some</span>(*acc)          <span class="cm">// Some to continue, None to stop early</span>
+}).<span class="fn">collect</span>()
+<span class="cm">// [1, 3, 6, 10, 15]</span></code></pre>
+        </div>
+        <p><code>scan</code> is <code>fold</code> that yields every intermediate value. The state is <code>&amp;mut</code>, hence the stars, and returning <code>None</code> ends the iterator early.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 6 ============ -->
+<section id="s6">
+  <div class="set-head">
+    <span class="set-num">SET 06</span>
+    <h2>Searching and testing</h2>
+  </div>
+  <p class="set-note">All of these short-circuit — they stop as soon as the answer is known.</p>
+
+  <article class="ex" data-ex="6.1">
+    <div class="ex-head">
+      <span class="ex-id">6.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Does it contain?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return whether a value is present, using an iterator method.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">any</span>(|&amp;x| x == target)
+<span class="cm">// target 5 -&gt; true,  target 99 -&gt; false</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Not filter().count() &gt; 0</span>
+          <p>That scans everything. <code>any</code> stops at the first match — on a million items that is the difference between instant and slow.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.2">
+    <div class="ex-head">
+      <span class="ex-id">6.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Are they all positive?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>true</code> only if every element is greater than zero.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">all</span>(|&amp;x| x &gt; <span class="nu">0</span>)
+<span class="cm">// (1..=10) -&gt; true     [1, -1] -&gt; false</span></code></pre>
+        </div>
+        <p>On an <strong>empty</strong> iterator <code>all</code> returns <code>true</code> and <code>any</code> returns <code>false</code>. That is the mathematically standard convention, and it occasionally surprises people.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.3">
+    <div class="ex-head">
+      <span class="ex-id">6.3</span><span class="pill med">med</span>
+      <span class="ex-title">find vs position</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>On <code>(1..=10)</code>: get the first value greater than 5, and separately the index of the value 5. Note what each returns.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">find</span>(|&amp;&amp;x| x &gt; <span class="nu">5</span>).<span class="fn">copied</span>()    <span class="cm">// Some(6)  — the VALUE</span>
+v.<span class="fn">iter</span>().<span class="fn">position</span>(|&amp;x| x == <span class="nu">5</span>)          <span class="cm">// Some(4)  — the INDEX</span></code></pre>
+        </div>
+        <p><code>find</code> gives you the item, <code>position</code> gives you where it was. Note the different closure signatures: <code>find</code> gets <code>&amp;&amp;T</code>, <code>position</code> gets <code>&amp;T</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.4">
+    <div class="ex-head">
+      <span class="ex-id">6.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Index of a value</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the index of the first occurrence of a target, or <code>None</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">index_of</span>(v: &amp;[<span class="ty">i32</span>], t: <span class="ty">i32</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">usize</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">position</span>(|&amp;x| x == t)
+}
+<span class="cm">// value 5 in (1..=10) -&gt; Some(4)</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.5">
+    <div class="ex-head">
+      <span class="ex-id">6.5</span><span class="pill med">med</span>
+      <span class="ex-title">Longest string</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>From <code>["aa", "b", "ccc"]</code>, return the longest.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">max_by_key</span>(|s| s.<span class="fn">len</span>()).<span class="fn">copied</span>()
+<span class="cm">// Some("ccc")</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Ties</span>
+          <p><code>max_by_key</code> returns the <strong>last</strong> maximum on a tie; <code>min_by_key</code> returns the first. If that matters, sort with an explicit tie-break instead.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.6">
+    <div class="ex-head">
+      <span class="ex-id">6.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Smallest float</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Find the minimum of <code>[3.5, 1.2, 9.9]</code>. Plain <code>.min()</code> will not compile — why, and what is the fix?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">min_by</span>(|a, b| a.<span class="fn">partial_cmp</span>(b).<span class="fn">unwrap</span>())
+<span class="cm">// Some(1.2)</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The NaN problem again</span>
+          <p><code>.min()</code> requires <code>Ord</code>. <code>f64</code> only has <code>PartialOrd</code>, because <code>NaN</code> compares false against everything — including itself — so no total order exists. Same reason <code>.sort()</code> fails on floats. Use <code>.total_cmp()</code> instead of <code>partial_cmp().unwrap()</code> if <code>NaN</code> is genuinely possible.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 7 ============ -->
+<section id="s7">
+  <div class="set-head">
+    <span class="set-num">SET 07</span>
+    <h2>collect targets</h2>
+  </div>
+  <p class="set-note">The same call builds wildly different things, decided entirely by the type you ask for.</p>
+
+  <article class="ex" data-ex="7.1">
+    <div class="ex-head">
+      <span class="ex-id">7.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Collect into a HashSet</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Deduplicate <code>[3, 1, 3, 2]</code> by collecting into a set.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashSet</span>;
+
+<span class="k">fn</span> <span class="fn">unique</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// sorted for display: [1, 2, 3]</span></code></pre>
+        </div>
+        <p>The return type is the entire instruction — <code>collect</code> reads it and builds accordingly.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.2">
+    <div class="ex-head">
+      <span class="ex-id">7.2</span><span class="pill med">med</span>
+      <span class="ex-title">Collect into a HashMap</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Zip keys and values into a map in one expression.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>keys.<span class="fn">iter</span>().<span class="fn">copied</span>()
+    .<span class="fn">zip</span>(vals.<span class="fn">iter</span>().<span class="fn">copied</span>())
+    .<span class="fn">collect</span>()
+<span class="cm">// len = 2</span></code></pre>
+        </div>
+        <p>Any iterator of <code>(K, V)</code> pairs collects into a <code>HashMap</code> — or a <code>BTreeMap</code> if you ask for that instead.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.3">
+    <div class="ex-head">
+      <span class="ex-id">7.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Chars into a String</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>['h', 'i']</code> → <code>"hi"</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">to_text</span>(v: &amp;[<span class="ty">char</span>]) -&gt; <span class="ty">String</span> {
+    v.<span class="fn">iter</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// "hi"</span>
+
+<span class="cm">// This is how you reverse a string:</span>
+<span class="cm">// let r: String = "abc".chars().rev().collect();   // "cba"</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.4">
+    <div class="ex-head">
+      <span class="ex-id">7.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Collect into a Result</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Parse every string, failing entirely if <em>any</em> one fails. Contrast with exercise 2.3, which skipped failures.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">parse_all</span>(v: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, std::num::<span class="ty">ParseIntError</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;()).<span class="fn">collect</span>()
+}
+<span class="cm">// ["1","2"] -&gt; Ok([1, 2])</span>
+<span class="cm">// ["1","x"] -&gt; Err(...)   and it STOPPED at "x"</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">A real design decision</span>
+          <p>An iterator of <code>Result</code>s collects into a <code>Result</code> of a collection. <code>filter_map(.. .ok())</code> means "skip the bad ones"; this means "fail if any is bad". Both are one line — choosing between them is about how strict your program should be.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.5">
+    <div class="ex-head">
+      <span class="ex-id">7.5</span><span class="pill med">med</span>
+      <span class="ex-title">Partition</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Split <code>[1..6]</code> into evens and odds in a single pass.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">split_parity</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; (<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) {
+    v.<span class="fn">iter</span>().<span class="fn">partition</span>(|&amp;&amp;x| x % <span class="nu">2</span> == <span class="nu">0</span>)
+}
+<span class="cm">// ([2, 4, 6], [1, 3, 5])</span></code></pre>
+        </div>
+        <p>Matching items go left, the rest go right. Better than filtering twice — one pass, both halves.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.6">
+    <div class="ex-head">
+      <span class="ex-id">7.6</span><span class="pill med">med</span>
+      <span class="ex-title">Unzip</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>[(1,'a'), (2,'b')]</code> → <code>([1,2], ['a','b'])</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">split_pairs</span>(v: <span class="ty">Vec</span>&lt;(<span class="ty">i32</span>, <span class="ty">char</span>)&gt;) -&gt; (<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, <span class="ty">Vec</span>&lt;<span class="ty">char</span>&gt;) {
+    v.<span class="fn">into_iter</span>().<span class="fn">unzip</span>()
+}
+<span class="cm">// ([1, 2], ['a', 'b'])</span></code></pre>
+        </div>
+        <p>Exactly the inverse of <code>zip</code>.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 8 ============ -->
+<section id="s8">
+  <div class="set-head">
+    <span class="set-num">SET 08</span>
+    <h2>Writing your own iterators</h2>
+  </div>
+  <p class="set-note">Implement <code>next()</code>, inherit seventy-five methods.</p>
+
+  <article class="ex" data-ex="8.1">
+    <div class="ex-head">
+      <span class="ex-id">8.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">A countdown iterator</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>Countdown { n }</code> that yields <code>n, n-1, ... 1</code> then stops. Implement <code>Iterator</code> for it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">struct</span> <span class="ty">Countdown</span> { n: <span class="ty">u32</span> }
+
+<span class="k">impl</span> <span class="ty">Iterator</span> <span class="k">for</span> <span class="ty">Countdown</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">u32</span>;
+
+    <span class="k">fn</span> <span class="fn">next</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">u32</span>&gt; {
+        <span class="k">if</span> <span class="k">self</span>.n == <span class="nu">0</span> {
+            <span class="ty">None</span>
+        } <span class="k">else</span> {
+            <span class="k">self</span>.n -= <span class="nu">1</span>;
+            <span class="ty">Some</span>(<span class="k">self</span>.n + <span class="nu">1</span>)
+        }
+    }
+}
+
+<span class="ty">Countdown</span> { n: <span class="nu">5</span> }.<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()   <span class="cm">// [5, 4, 3, 2, 1]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">You now have everything</span>
+          <p>With <code>next()</code> written, <code>Countdown</code> gets <code>map</code>, <code>filter</code>, <code>zip</code>, <code>sum</code>, <code>take</code> and the rest for free — that is the required-method/default-method pattern from traits, at its most dramatic.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.2">
+    <div class="ex-head">
+      <span class="ex-id">8.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">An infinite iterator</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>Doubling</code>, starting at 1 and doubling forever. Take the first 8. What must never be missing from the call site?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">struct</span> <span class="ty">Doubling</span> { cur: <span class="ty">u64</span> }
+
+<span class="k">impl</span> <span class="ty">Iterator</span> <span class="k">for</span> <span class="ty">Doubling</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">u64</span>;
+    <span class="k">fn</span> <span class="fn">next</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">u64</span>&gt; {
+        <span class="k">let</span> r = <span class="k">self</span>.cur;
+        <span class="k">self</span>.cur *= <span class="nu">2</span>;
+        <span class="ty">Some</span>(r)              <span class="cm">// never None — infinite</span>
+    }
+}
+
+<span class="ty">Doubling</span> { cur: <span class="nu">1</span> }.<span class="fn">take</span>(<span class="nu">8</span>).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()
+<span class="cm">// [1, 2, 4, 8, 16, 32, 64, 128]</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The take is not optional</span>
+          <p>Without it, <code>collect()</code> loops until memory runs out. Any infinite iterator must meet a <code>take</code>, <code>take_while</code>, <code>find</code>, or <code>any</code> somewhere in the chain.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.3">
+    <div class="ex-head">
+      <span class="ex-id">8.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">IntoIterator for your own type</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>Bag { items: Vec&lt;String&gt; }</code>, implement <code>IntoIterator</code> twice — once for <code>Bag</code> (owned) and once for <code>&amp;Bag</code> (borrowed) — so both <code>for x in bag</code> and <code>for x in &amp;bag</code> work.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">struct</span> <span class="ty">Bag</span> { items: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; }
+
+<span class="cm">// BY VALUE — consumes the Bag</span>
+<span class="k">impl</span> <span class="ty">IntoIterator</span> <span class="k">for</span> <span class="ty">Bag</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">String</span>;
+    <span class="k">type</span> <span class="ty">IntoIter</span> = std::vec::<span class="ty">IntoIter</span>&lt;<span class="ty">String</span>&gt;;
+    <span class="k">fn</span> <span class="fn">into_iter</span>(<span class="k">self</span>) -&gt; <span class="ty">Self</span>::<span class="ty">IntoIter</span> {
+        <span class="k">self</span>.items.<span class="fn">into_iter</span>()
+    }
+}
+
+<span class="cm">// BY REFERENCE — what `for x in &amp;bag` uses</span>
+<span class="k">impl</span>&lt;<span class="ty">'a</span>&gt; <span class="ty">IntoIterator</span> <span class="k">for</span> &amp;<span class="ty">'a</span> <span class="ty">Bag</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = &amp;<span class="ty">'a</span> <span class="ty">String</span>;
+    <span class="k">type</span> <span class="ty">IntoIter</span> = std::slice::<span class="ty">Iter</span>&lt;<span class="ty">'a</span>, <span class="ty">String</span>&gt;;
+    <span class="k">fn</span> <span class="fn">into_iter</span>(<span class="k">self</span>) -&gt; <span class="ty">Self</span>::<span class="ty">IntoIter</span> {
+        <span class="k">self</span>.items.<span class="fn">iter</span>()
+    }
+}
+
+<span class="cm">// borrowed = ["x", "y"] — bag still usable</span>
+<span class="cm">// owned    = ["x", "y"] — bag consumed</span></code></pre>
+        </div>
+        <p>This is exactly how <code>Vec</code> supports all three <code>for</code> forms — three separate trait impls, nothing special-cased in the language.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.4">
+    <div class="ex-head">
+      <span class="ex-id">8.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Accept anything iterable</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a <code>total</code> function that accepts a <code>Vec</code>, a range, an array — anything yielding <code>i32</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>&lt;<span class="ty">I</span>&gt;(items: <span class="ty">I</span>) -&gt; <span class="ty">i32</span>
+<span class="k">where</span>
+    <span class="ty">I</span>: <span class="ty">IntoIterator</span>&lt;<span class="ty">Item</span> = <span class="ty">i32</span>&gt;,
+{
+    items.<span class="fn">into_iter</span>().<span class="fn">sum</span>()
+}
+
+<span class="fn">total</span>(<span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]);   <span class="cm">// 6</span>
+<span class="fn">total</span>(<span class="nu">1</span>..=<span class="nu">3</span>);           <span class="cm">// 6  — same function</span></code></pre>
+        </div>
+        <p>Note <code>Item = i32</code> with an equals sign — associated-type syntax. Taking <code>IntoIterator</code> is the most flexible parameter you can accept.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.5">
+    <div class="ex-head">
+      <span class="ex-id">8.5</span><span class="pill med">med</span>
+      <span class="ex-title">Generate without a struct</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Produce powers of 3 — <code>[1, 3, 9, 27, 81]</code> — using <code>std::iter::successors</code>, with no custom type.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">powers_of_three</span>(n: <span class="ty">usize</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">u32</span>&gt; {
+    std::iter::<span class="fn">successors</span>(<span class="ty">Some</span>(<span class="nu">1u32</span>), |&amp;x| <span class="ty">Some</span>(x * <span class="nu">3</span>))
+        .<span class="fn">take</span>(n)
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// [1, 3, 9, 27, 81]</span></code></pre>
+        </div>
+        <p>Each item is computed from the previous. For throwaway sequences this saves defining a struct; use a real <code>Iterator</code> impl when the type needs a name.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ CAPSTONE ============ -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone: a log analyser</h2>
+  </div>
+  <p class="set-note">Everything at once. Parse and analyse a log using only iterator chains — no manual index loops anywhere.</p>
+
+  <div class="code">
+    <div class="code-label">Given</div>
+<pre><code><span class="at">#[derive(Debug, Clone)]</span>
+<span class="k">struct</span> <span class="ty">LogLine</span> {
+    level:  <span class="ty">String</span>,   <span class="cm">// INFO / WARN / ERROR</span>
+    module: <span class="ty">String</span>,
+    ms:     <span class="ty">u32</span>,
+}
+
+<span class="cm">// Raw input — note the final line is malformed on purpose:</span>
+<span class="cm">// INFO  | auth | 12</span>
+<span class="cm">// ERROR | db   | 340</span>
+<span class="cm">// INFO  | api  | 8</span>
+<span class="cm">// ERROR | db   | 55</span>
+<span class="cm">// WARN  | api  | 200</span>
+<span class="cm">// bad line</span></code></pre>
+  </div>
+
+  <article class="ex" data-ex="cap.1">
+    <div class="ex-head">
+      <span class="ex-id">C.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">parse_log — skip malformed lines</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn the raw text into <code>Vec&lt;LogLine&gt;</code>, silently dropping any line that is not three <code>|</code>-separated fields with a numeric duration.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">parse_log</span>(raw: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">LogLine</span>&gt; {
+    raw.<span class="fn">lines</span>()
+        .<span class="fn">filter_map</span>(|l| {
+            <span class="k">let</span> parts: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = l.<span class="fn">split</span>(<span class="st">'|'</span>).<span class="fn">map</span>(|p| p.<span class="fn">trim</span>()).<span class="fn">collect</span>();
+            <span class="k">if</span> parts.<span class="fn">len</span>() != <span class="nu">3</span> { <span class="k">return</span> <span class="ty">None</span>; }
+            <span class="k">let</span> ms = parts[<span class="nu">2</span>].<span class="fn">parse</span>().<span class="fn">ok</span>()?;      <span class="cm">// ? inside the closure</span>
+            <span class="ty">Some</span>(<span class="ty">LogLine</span> {
+                level:  parts[<span class="nu">0</span>].<span class="fn">to_string</span>(),
+                module: parts[<span class="nu">1</span>].<span class="fn">to_string</span>(),
+                ms,
+            })
+        })
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// parsed = 5   (the "bad line" was dropped)</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why filter_map</span>
+          <p>Each line either produces a <code>LogLine</code> or nothing — exactly what <code>filter_map</code> is for. The <code>?</code> works inside the closure because the closure returns <code>Option</code>, so a failed parse becomes <code>None</code> and that line is skipped.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.2">
+    <div class="ex-head">
+      <span class="ex-id">C.2</span><span class="pill med">med</span>
+      <span class="ex-title">count_by_level</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>HashMap&lt;String, usize&gt;</code> counting lines per level.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">count_by_level</span>(logs: &amp;[<span class="ty">LogLine</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">usize</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> m = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> l <span class="k">in</span> logs {
+        *m.<span class="fn">entry</span>(l.level.<span class="fn">clone</span>()).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+    }
+    m
+}
+<span class="cm">// sorted: [("ERROR", 2), ("INFO", 2), ("WARN", 1)]</span></code></pre>
+        </div>
+        <p>The counting idiom from the HashMap topic, fed by an iterator. Sorted here only for display — map order is arbitrary.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.3">
+    <div class="ex-head">
+      <span class="ex-id">C.3</span><span class="pill med">med</span>
+      <span class="ex-title">slowest</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the slowest log line as <code>Option&lt;&amp;LogLine&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">slowest</span>(logs: &amp;[<span class="ty">LogLine</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">LogLine</span>&gt; {
+    logs.<span class="fn">iter</span>().<span class="fn">max_by_key</span>(|l| l.ms)
+}
+<span class="cm">// Some(("db", 340))</span></code></pre>
+        </div>
+        <p><code>ms</code> is <code>u32</code>, which implements <code>Ord</code>, so <code>max_by_key</code> works directly. Had it been <code>f64</code> you would need <code>max_by</code> with <code>partial_cmp</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.4">
+    <div class="ex-head">
+      <span class="ex-id">C.4</span><span class="pill med">med</span>
+      <span class="ex-title">total_ms_of a level</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum the durations of all lines at a given level. Filter, extract, add.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">total_ms_of</span>(logs: &amp;[<span class="ty">LogLine</span>], level: &amp;<span class="ty">str</span>) -&gt; <span class="ty">u32</span> {
+    logs.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|l| l.level == level)
+        .<span class="fn">map</span>(|l| l.ms)
+        .<span class="fn">sum</span>()
+}
+<span class="cm">// "ERROR" -&gt; 395     (340 + 55)</span></code></pre>
+        </div>
+        <p>The canonical three-stage chain: narrow the set, extract one field, reduce to a number.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.5">
+    <div class="ex-head">
+      <span class="ex-id">C.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">modules_touched</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return every distinct module name, sorted. Note that <code>db</code> and <code>api</code> each appear twice.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">modules_touched</span>(logs: &amp;[<span class="ty">LogLine</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="k">let</span> s: <span class="ty">HashSet</span>&lt;&amp;<span class="ty">str</span>&gt; = logs.<span class="fn">iter</span>()
+        .<span class="fn">map</span>(|l| l.module.<span class="fn">as_str</span>())
+        .<span class="fn">collect</span>();
+    <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = s.<span class="fn">into_iter</span>().<span class="fn">map</span>(|x| x.<span class="fn">to_string</span>()).<span class="fn">collect</span>();
+    v.<span class="fn">sort</span>();
+    v
+}
+<span class="cm">// ["api", "auth", "db"]</span></code></pre>
+        </div>
+        <p>Collecting into a <code>HashSet</code> deduplicates for free. The sort at the end is required — sets have no order.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.6">
+    <div class="ex-head">
+      <span class="ex-id">C.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">slow_errors — the full pipeline</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return formatted strings for every <code>ERROR</code> slower than a threshold: <code>"module (Nms)"</code>. Two conditions, then a format.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">slow_errors</span>(logs: &amp;[<span class="ty">LogLine</span>], threshold: <span class="ty">u32</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    logs.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|l| l.level == <span class="st">"ERROR"</span> &amp;&amp; l.ms &gt; threshold)
+        .<span class="fn">map</span>(|l| <span class="fn">format!</span>(<span class="st">"{} ({}ms)"</span>, l.module, l.ms))
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// threshold 100 -&gt; ["db (340ms)"]</span>
+<span class="cm">// the 55ms ERROR is below threshold; the 200ms WARN is the wrong level</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Reading it back</span>
+          <p>Take the logs, keep the slow errors, format each one, gather them up. Four lines that say exactly what they do — and the compiler turns them into a single pass with no intermediate allocation.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p><b>All 47 exercises and the 6-part capstone were compiled and run</b> on rustc 1.96.0, edition 2021. Every output shown is real program output.</p>
+    <p><b>If you finished these,</b> iterators are yours. The next topic is error handling — <code>Result</code>, <code>?</code>, and custom error types.</p>
+    <p>Companion reference: <b>iterators_guide.html</b></p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var TKEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(TKEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = currentIsDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(TKEY, next); } catch (e) {}
+    syncBtn();
+  });
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-iterators-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+
+</body>
+</html>

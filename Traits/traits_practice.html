@@ -1,0 +1,2248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traits in Rust — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Same iron-oxide palette as the guide — this is the workbook half of the
+   same publication, so it shares the identity but shifts register: denser,
+   more utilitarian, built for working through rather than reading.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;   /* difficulty: med */
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 15.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 82rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.35rem 3rem 1.6rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.6rem 1fr; gap: 0.3rem;
+  padding: 0.32rem 0.5rem 0.32rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+/* Progress meter in the rail */
+.progress {
+  margin: 1.5rem 0 0;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule);
+}
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill {
+  height: 100%; width: 0%;
+  background: var(--rust);
+  transition: width 0.25s ease;
+}
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-size: clamp(2.5rem, 5.5vw, 3.9rem); line-height: 1.03;
+  letter-spacing: -0.022em; font-weight: 600; margin: 0 0 1.1rem;
+  text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.58; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+
+/* ---- Workflow strip ------------------------------------------------- */
+
+.workflow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  margin: 0 0 2rem;
+  overflow: hidden;
+}
+.workflow-step { background: var(--surface); padding: 0.9rem 1rem; }
+.workflow-step .s {
+  font-family: var(--mono); font-size: 0.625rem; font-weight: 700;
+  letter-spacing: 0.12em; color: var(--rust);
+  display: block; margin-bottom: 0.35rem;
+}
+.workflow-step p {
+  margin: 0; font-size: 0.875rem; line-height: 1.45; color: var(--ink-soft);
+}
+.workflow-step code { font-size: 0.8em; white-space: nowrap; }
+
+/* ---- Sets ----------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr auto;
+  align-items: baseline; gap: 1rem;
+  padding-bottom: 0.8rem; border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust); white-space: nowrap;
+}
+.set-head h2 {
+  font-size: clamp(1.6rem, 3vw, 2.05rem); line-height: 1.14;
+  letter-spacing: -0.017em; font-weight: 600; margin: 0; text-wrap: balance;
+}
+.set-ref {
+  font-family: var(--mono); font-size: 0.6875rem;
+  color: var(--ink-faint); white-space: nowrap;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch);
+  overflow: hidden;
+}
+
+.ex-head {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 1rem;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+/* Done checkbox */
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none;
+  white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked {
+  background: var(--oxide); border-color: var(--oxide);
+}
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0;
+  font-size: inherit; white-space: pre;
+}
+.code.is-out  { border-left-color: var(--oxide); }
+.code.is-bad  { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint / expected ------------------------------------------------ */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* Blank answer lines for the "explain it yourself" exercises */
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong);
+  border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line {
+  border-bottom: 1px solid var(--rule-strong);
+  height: 1.5rem;
+}
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none;
+  padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before {
+  content: "▸"; color: var(--rust); font-size: 0.8rem;
+}
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+/* ---- Set intro / footer --------------------------------------------- */
+
+.set-note {
+  max-width: var(--measure); margin: 0 0 1.5rem;
+  font-size: 0.9688rem; color: var(--ink-soft);
+}
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<aside class="rail">
+  <p class="rail-brand">Practice Workbook</p>
+  <p class="rail-sub">Traits in Rust<br>32 exercises</p>
+  <nav id="toc">
+    <a href="#s1"><span class="n">SET 1</span><span>Basic syntax</span></a>
+    <a href="#s2"><span class="n">SET 2</span><span>Defaults</span></a>
+    <a href="#s3"><span class="n">SET 3</span><span>Parameters</span></a>
+    <a href="#s4"><span class="n">SET 4</span><span>Deriving</span></a>
+    <a href="#s5"><span class="n">SET 5</span><span>Std traits</span></a>
+    <a href="#s6"><span class="n">SET 6</span><span>Trait objects</span></a>
+    <a href="#s7"><span class="n">SET 7</span><span>Assoc. types</span></a>
+    <a href="#s8"><span class="n">SET 8</span><span>Operators</span></a>
+    <a href="#cap"><span class="n">FINAL</span><span>Capstone</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 32 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Workbook</p>
+  <h1>Traits: <em>32 exercises</em>, one compiler</h1>
+  <p class="standfirst">Attempt each exercise before opening the solution. The ten minutes you spend stuck on a compiler error will teach you more than the answer ever will — that error <em>is</em> the lesson.</p>
+
+  <div class="workflow">
+    <div class="workflow-step">
+      <span class="s">01 WRITE</span>
+      <p>Open <code>traits_practice.rs</code>, delete a <code>todo!()</code>, write real code.</p>
+    </div>
+    <div class="workflow-step">
+      <span class="s">02 COMPILE</span>
+      <p><code>rustc --edition 2021 traits_practice.rs -o practice</code></p>
+    </div>
+    <div class="workflow-step">
+      <span class="s">03 READ ERRORS</span>
+      <p>Rust's messages usually contain the literal fix. Read the <code>help:</code> line.</p>
+    </div>
+    <div class="workflow-step">
+      <span class="s">04 RUN, THEN CHECK</span>
+      <p><code>./practice</code> — compare output, then open the solution here.</p>
+    </div>
+  </div>
+
+  <p style="font-size:0.9375rem;color:var(--ink-soft);max-width:var(--measure);margin:0;">Tick each exercise off as you finish it — progress is saved in this browser. Exercises are unlocked one at a time in the <code>.rs</code> file: uncomment the matching lines in each <code>demo_setN()</code> as you go, so you only ever run code you have written.</p>
+</header>
+
+<!-- ==================== SET 1 ==================== -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 1</span>
+    <h2>Basic trait syntax</h2>
+    <span class="set-ref">guide · part 02</span>
+  </div>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Define a trait, implement it twice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Define a trait <code>Describe</code> with one required method <code>fn describe(&amp;self) -&gt; String;</code> then implement it for <code>Book</code> and <code>Movie</code>.</p>
+
+      <div class="code is-out">
+        <div class="code-label">Expected output</div>
+<pre><code>'Dune' is a book with 412 pages
+'Arrival' is a movie running 116 minutes</code></pre>
+      </div>
+
+      <div class="hint">
+        <span class="hint-tag">Hint</span>
+        <p>The trait body holds only a signature ending in <code>;</code> — no braces, no body.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">Describe</span> {
+    <span class="k">fn</span> <span class="fn">describe</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span>;
+}
+
+<span class="k">impl</span> <span class="ty">Describe</span> <span class="k">for</span> <span class="ty">Book</span> {
+    <span class="k">fn</span> <span class="fn">describe</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"'{}' is a book with {} pages"</span>, <span class="k">self</span>.title, <span class="k">self</span>.pages)
+    }
+}
+
+<span class="k">impl</span> <span class="ty">Describe</span> <span class="k">for</span> <span class="ty">Movie</span> {
+    <span class="k">fn</span> <span class="fn">describe</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"'{}' is a movie running {} minutes"</span>, <span class="k">self</span>.title, <span class="k">self</span>.minutes)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Add a third type without touching the trait</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>Describe</code> for <code>Song</code> as well.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Notice</span>
+        <p>You did not have to modify the trait or the other two impls. That is the <strong>open for extension</strong> property of traits — new types plug in without disturbing existing code.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Describe</span> <span class="k">for</span> <span class="ty">Song</span> {
+    <span class="k">fn</span> <span class="fn">describe</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"'{}' is a song lasting {} seconds"</span>, <span class="k">self</span>.title, <span class="k">self</span>.seconds)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Implement your trait for a type you did not define</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>Describe</code> for <code>i32</code>, so that <code>42.describe()</code> works and prints <code>I am the number 42</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Why this is legal</span>
+        <p>The <strong>orphan rule</strong> requires you to own the <em>trait</em> or the <em>type</em>. You own <code>Describe</code>, so implementing it for the standard library's <code>i32</code> is fine. Adding methods to primitive types is a genuine Rust superpower.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Describe</span> <span class="k">for</span> <span class="ty">i32</span> {
+    <span class="k">fn</span> <span class="fn">describe</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"I am the number {}"</span>, <span class="k">self</span>)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 2 ==================== -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 2</span>
+    <h2>Default methods</h2>
+    <span class="set-ref">guide · part 03</span>
+  </div>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Required methods plus a default</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Complete the <code>Shape2</code> trait with two <strong>required</strong> methods — <code>area()</code> and <code>name()</code> — and one <strong>default</strong> <code>summary()</code> returning e.g. <code>"Circle has area 78.54"</code>. Then implement it for <code>Circle2</code> and <code>Rectangle2</code>, writing <em>only</em> the two required methods.</p>
+
+      <div class="code is-out">
+        <div class="code-label">Expected output</div>
+<pre><code>Circle has area 78.54
+Rectangle has area 160.00</code></pre>
+      </div>
+
+      <div class="hint">
+        <span class="hint-tag">Hints</span>
+        <p><code>{:.2}</code> gives two decimal places. Circle area is <code>PI * r * r</code>, and PI lives at <code>std::f64::consts::PI</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">Shape2</span> {
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span>;
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span>;
+
+    <span class="k">fn</span> <span class="fn">summary</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"{} has area {:.2}"</span>, <span class="k">self</span>.<span class="fn">name</span>(), <span class="k">self</span>.<span class="fn">area</span>())
+    }
+}
+
+<span class="k">impl</span> <span class="ty">Shape2</span> <span class="k">for</span> <span class="ty">Circle2</span> {
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> { std::f64::consts::<span class="ty">PI</span> * <span class="k">self</span>.radius * <span class="k">self</span>.radius }
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Circle"</span>) }
+}
+
+<span class="k">impl</span> <span class="ty">Shape2</span> <span class="k">for</span> <span class="ty">Rectangle2</span> {
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> { <span class="k">self</span>.width * <span class="k">self</span>.height }
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Rectangle"</span>) }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">A second default method</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Add <code>fn is_large(&amp;self) -&gt; bool</code> returning <code>true</code> when the area exceeds <code>100.0</code>. Do not override it anywhere.</p>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code>    <span class="k">fn</span> <span class="fn">is_large</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">bool</span> {
+        <span class="k">self</span>.<span class="fn">area</span>() &gt; <span class="nu">100.0</span>
+    }</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Override a default method</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>Shape2</code> for <code>Square2</code>, but <strong>override</strong> <code>summary()</code> so it mentions the side length: <code>"Square (side 5) has area 25.00"</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Notice</span>
+        <p>You override <code>summary()</code> but still inherit the default <code>is_large()</code>. Overriding is per-method, not all-or-nothing.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Shape2</span> <span class="k">for</span> <span class="ty">Square2</span> {
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> { <span class="k">self</span>.side * <span class="k">self</span>.side }
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Square"</span>) }
+
+    <span class="cm">// OVERRIDE — the default cannot know about `side`</span>
+    <span class="k">fn</span> <span class="fn">summary</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"Square (side {}) has area {:.2}"</span>, <span class="k">self</span>.side, <span class="k">self</span>.<span class="fn">area</span>())
+    }
+}</code></pre>
+          </div>
+          <div class="code is-out">
+            <div class="code-label">Full expected output</div>
+<pre><code>Circle has area 78.54 | large: false
+Rectangle has area 160.00 | large: true
+Square (side 5) has area 25.00 | large: false</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 3 ==================== -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 3</span>
+    <h2>Traits as function parameters</h2>
+    <span class="set-ref">guide · part 04</span>
+  </div>
+  <p class="set-note">These reuse <code>Shape2</code> from Set 2 — finish that first.</p>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">The impl Trait parameter form</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function taking any <code>Shape2</code> and printing its summary, using the <code>&amp;impl Trait</code> form.</p>
+      <div class="code">
+        <div class="code-label">Signature</div>
+<pre><code><span class="k">fn</span> <span class="fn">print_area_a</span>(shape: &amp;<span class="k">impl</span> <span class="ty">Shape2</span>)</code></pre>
+      </div>
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">print_area_a</span>(shape: &amp;<span class="k">impl</span> <span class="ty">Shape2</span>) {
+    <span class="fn">println!</span>(<span class="st">"  {}"</span>, shape.<span class="fn">summary</span>());
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">The same thing with a trait bound</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Rewrite 3.1 as <code>fn print_area_b&lt;T: Shape2&gt;(shape: &amp;T)</code>. Confirm both compile and behave identically.</p>
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">print_area_b</span>&lt;<span class="ty">T</span>: <span class="ty">Shape2</span>&gt;(shape: &amp;<span class="ty">T</span>) {
+    <span class="fn">println!</span>(<span class="st">"  {}"</span>, shape.<span class="fn">summary</span>());
+}</code></pre>
+          </div>
+          <p>Identical behavior. The difference only appears with multiple parameters — see 3.5.</p>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Generic over a slice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum the areas of every shape: <code>fn total_area&lt;T: Shape2&gt;(shapes: &amp;[T]) -&gt; f64</code>.</p>
+
+      <div class="hint is-trap">
+        <span class="hint-tag">Note the limitation</span>
+        <p><code>&amp;[T]</code> means every element is the <em>same</em> type. You can pass a <code>Vec&lt;Circle2&gt;</code>, but not a mix of circles and rectangles. Set 6 fixes exactly this.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">total_area</span>&lt;<span class="ty">T</span>: <span class="ty">Shape2</span>&gt;(shapes: &amp;[<span class="ty">T</span>]) -&gt; <span class="ty">f64</span> {
+    shapes.<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">area</span>()).<span class="fn">sum</span>()
+}
+
+<span class="cm">// The explicit loop is equally correct:</span>
+<span class="cm">//   let mut sum = 0.0;</span>
+<span class="cm">//   for s in shapes { sum += s.area(); }</span>
+<span class="cm">//   sum</span></code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Returning Option&lt;&amp;T&gt;</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a reference to the largest-area shape, or <code>None</code> for an empty slice: <code>fn largest_shape&lt;T: Shape2&gt;(shapes: &amp;[T]) -&gt; Option&lt;&amp;T&gt;</code>.</p>
+
+      <div class="hint">
+        <span class="hint-tag">Hint</span>
+        <p>Get an iterator with <code>.iter()</code>, then use <code>?</code> on <code>iter.next()</code> to bail out early when empty: <code>let mut best = iter.next()?;</code> Then loop over the rest.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">largest_shape</span>&lt;<span class="ty">T</span>: <span class="ty">Shape2</span>&gt;(shapes: &amp;[<span class="ty">T</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">T</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> iter = shapes.<span class="fn">iter</span>();
+    <span class="k">let</span> <span class="k">mut</span> best = iter.<span class="fn">next</span>()?;      <span class="cm">// `?` returns None if empty</span>
+
+    <span class="k">for</span> s <span class="k">in</span> iter {
+        <span class="k">if</span> s.<span class="fn">area</span>() &gt; best.<span class="fn">area</span>() {
+            best = s;
+        }
+    }
+    <span class="ty">Some</span>(best)
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.5">
+    <div class="ex-head">
+      <span class="ex-id">3.5</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Two type parameters</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Compare the areas of two shapes that may be <em>different</em> types: <code>fn compare_areas&lt;T: Shape2, U: Shape2&gt;(a: &amp;T, b: &amp;U) -&gt; String</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Why two parameters</span>
+        <p>With <code>&lt;T: Shape2&gt;(a: &amp;T, b: &amp;T)</code> both arguments would be forced to the <em>same</em> type, so you could not compare a <code>Circle2</code> with a <code>Rectangle2</code>. Two parameters lift that restriction.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">compare_areas</span>&lt;<span class="ty">T</span>: <span class="ty">Shape2</span>, <span class="ty">U</span>: <span class="ty">Shape2</span>&gt;(a: &amp;<span class="ty">T</span>, b: &amp;<span class="ty">U</span>) -&gt; <span class="ty">String</span> {
+    <span class="k">if</span> a.<span class="fn">area</span>() &gt; b.<span class="fn">area</span>() {
+        <span class="fn">format!</span>(<span class="st">"{} is larger"</span>, a.<span class="fn">name</span>())
+    } <span class="k">else</span> <span class="k">if</span> b.<span class="fn">area</span>() &gt; a.<span class="fn">area</span>() {
+        <span class="fn">format!</span>(<span class="st">"{} is larger"</span>, b.<span class="fn">name</span>())
+    } <span class="k">else</span> {
+        <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"They are equal"</span>)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 4 ==================== -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 4</span>
+    <h2>Deriving traits</h2>
+    <span class="set-ref">guide · part 05</span>
+  </div>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Derive comparison — and meet the f64 gotcha</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Give <code>Temperature</code> a derive attribute for <code>Debug, Clone, Copy, PartialEq, PartialOrd</code>. Then compare two, and sort a <code>Vec</code> of them.</p>
+
+      <div class="hint is-trap">
+        <span class="hint-tag">The gotcha</span>
+        <p>You <strong>cannot</strong> derive <code>Ord</code> for a struct holding <code>f64</code>, so plain <code>.sort()</code> will not compile. Why: <code>f64</code> has <code>NaN</code>, which is not equal to itself, nor less nor greater than anything. That breaks the <em>total</em> ordering <code>Ord</code> demands, so <code>f64</code> implements only <code>PartialOrd</code>.</p>
+        <p>The fix: <code>temps.sort_by(|a, b| a.partial_cmp(b).unwrap());</code></p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="at">#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]</span>
+<span class="k">struct</span> <span class="ty">Temperature</span> { celsius: <span class="ty">f64</span> }
+
+<span class="cm">// then, at the call site:</span>
+temps.<span class="fn">sort_by</span>(|x, y| x.<span class="fn">partial_cmp</span>(y).<span class="fn">unwrap</span>());   <span class="cm">// NOT .sort()</span></code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Default plus struct update syntax</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make <code>Config</code> derive <code>Debug</code> and <code>Default</code>. Create one with <code>Config::default()</code>, and one with <code>Config { port: 8080, ..Default::default() }</code>.</p>
+
+      <div class="hint">
+        <span class="hint-tag">Note</span>
+        <p>Derived <code>Default</code> uses each field's own default: <code>String</code> → <code>""</code>, <code>u16</code> → <code>0</code>, <code>bool</code> → <code>false</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="at">#[derive(Debug, Default)]</span>
+<span class="k">struct</span> <span class="ty">Config</span> { host: <span class="ty">String</span>, port: <span class="ty">u16</span>, debug: <span class="ty">bool</span> }</code></pre>
+          </div>
+          <div class="code is-out">
+            <div class="code-label">Expected output</div>
+<pre><code>default : Config { host: "", port: 0, debug: false }
+updated : Config { host: "", port: 8080, debug: false }</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">A deliberate failure — Copy and the String field</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Uncomment <code>#[derive(Copy, Clone)]</code> on the struct holding a <code>String</code>, compile, read the error, then write the reason <em>in your own words</em> before re-commenting.</p>
+
+      <div class="errblock">
+<pre><span class="code-id">error[E0204]</span>: the trait `Copy` cannot be implemented for this type
+ |  s: String,
+ |  --------- this field does not implement `Copy`</pre>
+      </div>
+
+      <div class="answer-lines">
+        <p>Your answer — why can a struct holding a String never be Copy?</p>
+        <div class="line"></div>
+        <div class="line"></div>
+      </div>
+
+      <details class="sol">
+        <summary>Show answer</summary>
+        <div class="sol-body">
+          <p><code>String</code> <strong>owns a heap allocation</strong>. <code>Copy</code> means "duplicate this value by copying its bits." Bit-copying a <code>String</code> would produce two <code>String</code> values whose internal pointers reference the <em>same</em> heap buffer. When both go out of scope, both would free that buffer — a <strong>double free</strong>, which is memory corruption.</p>
+          <p>Rust rejects it at compile time. <code>Clone</code> is allowed because <code>.clone()</code> is explicit and actually duplicates the heap data.</p>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Ordering depends on field order</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Derive whatever <code>Card</code> needs so <code>vec![...].sort()</code> works and orders by <strong>rank first, then suit</strong>.</p>
+
+      <div class="hint">
+        <span class="hint-tag">Hint</span>
+        <p><code>.sort()</code> requires <code>Ord</code>, which requires <code>Eq</code> + <code>PartialOrd</code>, which requires <code>PartialEq</code>. So: <code>Debug, PartialEq, Eq, PartialOrd, Ord</code>.</p>
+      </div>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Key insight</span>
+        <p>Derived ordering is <strong>lexicographic by field order</strong> — it compares the first field, and only on a tie moves to the second. Since <code>rank</code> is declared before <code>suit</code>, you get rank-then-suit for free. <em>Swap the two field declarations and the sort order changes.</em></p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="at">#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]</span>
+<span class="k">struct</span> <span class="ty">Card</span> {
+    rank: <span class="ty">u8</span>,    <span class="cm">// compared FIRST</span>
+    suit: <span class="ty">char</span>,  <span class="cm">// then this, only on a rank tie</span>
+}</code></pre>
+          </div>
+          <div class="code is-out">
+            <div class="code-label">Expected output</div>
+<pre><code>[Card { rank: 2, suit: 'S' },
+ Card { rank: 10, suit: 'C' },
+ Card { rank: 10, suit: 'H' }]
+        ^ on the 10–10 tie, 'C' &lt; 'H' decides</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 5 ==================== -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 5</span>
+    <h2>Standard library traits</h2>
+    <span class="set-ref">guide · part 06</span>
+  </div>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Implement Display</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>std::fmt::Display</code> for <code>Circle5</code> and <code>Rectangle5</code> so they print <code>Circle(r=5)</code> and <code>Rect(20x8)</code>.</p>
+
+      <div class="code">
+        <div class="code-label">The signature is always exactly this — memorize the shape</div>
+<pre><code><span class="k">fn</span> <span class="fn">fmt</span>(&amp;<span class="k">self</span>, f: &amp;<span class="k">mut</span> fmt::<span class="ty">Formatter</span>) -&gt; fmt::<span class="ty">Result</span> {
+    <span class="fn">write!</span>(f, <span class="st">"..."</span>, ...)
+}</code></pre>
+      </div>
+
+      <div class="hint is-trap">
+        <span class="hint-tag">Trap</span>
+        <p><strong>No semicolon</strong> after <code>write!</code> — it is the tail expression whose <code>Result</code> is returned. Adding <code>;</code> returns <code>()</code> and fails to compile.</p>
+      </div>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Free bonus</span>
+        <p>Implementing <code>Display</code> gives you <code>.to_string()</code> free, via the blanket impl <code>impl&lt;T: Display&gt; ToString for T</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> fmt::<span class="ty">Display</span> <span class="k">for</span> <span class="ty">Circle5</span> {
+    <span class="k">fn</span> <span class="fn">fmt</span>(&amp;<span class="k">self</span>, f: &amp;<span class="k">mut</span> fmt::<span class="ty">Formatter</span>) -&gt; fmt::<span class="ty">Result</span> {
+        <span class="fn">write!</span>(f, <span class="st">"Circle(r={})"</span>, <span class="k">self</span>.radius)
+    }
+}
+
+<span class="k">impl</span> fmt::<span class="ty">Display</span> <span class="k">for</span> <span class="ty">Rectangle5</span> {
+    <span class="k">fn</span> <span class="fn">fmt</span>(&amp;<span class="k">self</span>, f: &amp;<span class="k">mut</span> fmt::<span class="ty">Formatter</span>) -&gt; fmt::<span class="ty">Result</span> {
+        <span class="fn">write!</span>(f, <span class="st">"Rect({}x{})"</span>, <span class="k">self</span>.width, <span class="k">self</span>.height)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Implement From, get Into free</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>From&lt;Meters&gt; for Feet</code> (1 m = 3.28084 ft). Then convert <em>both</em> ways: <code>Feet::from(Meters(100.0))</code> and <code>let f: Feet = Meters(1.0).into();</code></p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Rule</span>
+        <p>Implement <code>From</code>. <strong>Never implement <code>Into</code></strong> — the blanket impl <code>impl&lt;T, U: From&lt;T&gt;&gt; Into&lt;U&gt; for T</code> gives it to you.</p>
+      </div>
+
+      <div class="hint">
+        <span class="hint-tag">Hint</span>
+        <p>These are tuple structs — access the inner value with <code>.0</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">From</span>&lt;<span class="ty">Meters</span>&gt; <span class="k">for</span> <span class="ty">Feet</span> {
+    <span class="k">fn</span> <span class="fn">from</span>(m: <span class="ty">Meters</span>) -&gt; <span class="ty">Self</span> {
+        <span class="ty">Feet</span>(m.<span class="nu">0</span> * <span class="nu">3.28084</span>)
+    }
+}</code></pre>
+          </div>
+          <div class="code is-out">
+            <div class="code-label">Expected output</div>
+<pre><code>100 m = 328.08 ft
+1 m   = 3.28 ft</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Display for an enum</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>Display</code> for <code>Status</code> printing the lowercase name: <code>Active</code> → <code>"active"</code>, and so on.</p>
+
+      <div class="hint">
+        <span class="hint-tag">Hint</span>
+        <p><code>match</code> is an <em>expression</em>, so you can bind its result: <code>let s = match self { ... };</code> then <code>write!(f, "{}", s)</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> fmt::<span class="ty">Display</span> <span class="k">for</span> <span class="ty">Status</span> {
+    <span class="k">fn</span> <span class="fn">fmt</span>(&amp;<span class="k">self</span>, f: &amp;<span class="k">mut</span> fmt::<span class="ty">Formatter</span>) -&gt; fmt::<span class="ty">Result</span> {
+        <span class="k">let</span> s = <span class="k">match</span> <span class="k">self</span> {
+            <span class="ty">Status</span>::<span class="ty">Active</span>   =&gt; <span class="st">"active"</span>,
+            <span class="ty">Status</span>::<span class="ty">Inactive</span> =&gt; <span class="st">"inactive"</span>,
+            <span class="ty">Status</span>::<span class="ty">Banned</span>   =&gt; <span class="st">"banned"</span>,
+        };
+        <span class="fn">write!</span>(f, <span class="st">"{}"</span>, s)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Write a custom infinite iterator</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make <code>Fibonacci</code> yield Fibonacci numbers forever. Implement <code>Iterator</code> with <code>type Item = u64;</code> and <code>fn next(&amp;mut self) -&gt; Option&lt;u64&gt;</code>. Then print the first ten with <code>.take(10).collect()</code>.</p>
+
+      <div class="code is-out">
+        <div class="code-label">Expected output</div>
+<pre><code>[0, 1, 1, 2, 3, 5, 8, 13, 21, 34]</code></pre>
+      </div>
+
+      <div class="hint">
+        <span class="hint-tag">The algorithm inside next()</span>
+        <p>1. Remember the current value — this is what you return.<br>
+           2. <code>curr</code> becomes <code>next</code>.<br>
+           3. <code>next</code> becomes old <code>curr</code> + old <code>next</code>.<br>
+           4. Return <code>Some(remembered)</code> — never <code>None</code>, it is infinite.</p>
+      </div>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Why infinite is safe</span>
+        <p>Iterators are <strong>lazy</strong> — nothing is computed until something consumes them. Just always bound with <code>.take(n)</code>. And the payoff: one method gives you <code>.take()</code>, <code>.map()</code>, <code>.filter()</code>, <code>.collect()</code>, <code>.sum()</code>, for-loop support — around seventy methods, all defaults on <code>Iterator</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Iterator</span> <span class="k">for</span> <span class="ty">Fibonacci</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">u64</span>;
+
+    <span class="k">fn</span> <span class="fn">next</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">u64</span>&gt; {
+        <span class="k">let</span> current = <span class="k">self</span>.curr;             <span class="cm">// 1. remember</span>
+        <span class="k">self</span>.curr = <span class="k">self</span>.next;               <span class="cm">// 2. shift</span>
+        <span class="k">self</span>.next = current + <span class="k">self</span>.next;     <span class="cm">// 3. advance</span>
+        <span class="ty">Some</span>(current)                        <span class="cm">// 4. never None</span>
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.5">
+    <div class="ex-head">
+      <span class="ex-id">5.5</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Hand-written Default</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Implement <code>Default</code> for <code>GameSettings</code> by hand: difficulty <code>"normal"</code>, sound <code>true</code>, volume <code>70</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Why not derive?</span>
+        <p>Derive would give <code>""</code> / <code>false</code> / <code>0</code>, which are wrong here. <strong>Derive when zero/empty is right; hand-write when the meaningful default is something else.</strong></p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Default</span> <span class="k">for</span> <span class="ty">GameSettings</span> {
+    <span class="k">fn</span> <span class="fn">default</span>() -&gt; <span class="ty">Self</span> {
+        <span class="ty">GameSettings</span> {
+            difficulty: <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"normal"</span>),
+            sound: <span class="k">true</span>,
+            volume: <span class="nu">70</span>,
+        }
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 6 ==================== -->
+<section id="s6">
+  <div class="set-head">
+    <span class="set-num">SET 6</span>
+    <h2>Trait objects &amp; dynamic dispatch</h2>
+    <span class="set-ref">guide · part 08</span>
+  </div>
+
+  <article class="ex" data-ex="6.1">
+    <div class="ex-head">
+      <span class="ex-id">6.1</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Build a genuinely mixed collection</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><strong>(a)</strong> Implement <code>Shape6</code> for <code>Circle6</code>, <code>Rectangle6</code> and <code>Square6</code>. <strong>(b)</strong> Build a <code>Vec&lt;Box&lt;dyn Shape6&gt;&gt;</code> holding one of each, loop over it, print each summary and sum the areas.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">This is the whole point</span>
+        <p>A plain <code>Vec</code> cannot hold different concrete types — <code>vec![circle, rectangle]</code> is <code>E0308: mismatched types</code>. A <code>Vec</code> of trait objects can.</p>
+        <p><strong>Why <code>Box</code> is needed:</strong> <code>dyn Shape6</code> is <em>unsized</em> — <code>Circle6</code> and <code>Rectangle6</code> have different sizes, so the compiler cannot reserve a fixed slot. A pointer has a known size.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Shape6</span> <span class="k">for</span> <span class="ty">Circle6</span> {
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> { std::f64::consts::<span class="ty">PI</span> * <span class="k">self</span>.radius * <span class="k">self</span>.radius }
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Circle"</span>) }
+}
+<span class="cm">// Rectangle6 and Square6 follow the same shape</span>
+
+<span class="k">let</span> shapes: <span class="ty">Vec</span>&lt;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">Shape6</span>&gt;&gt; = <span class="fn">vec!</span>[
+    <span class="ty">Box</span>::<span class="fn">new</span>(<span class="ty">Circle6</span> { radius: <span class="nu">3.0</span> }),
+    <span class="ty">Box</span>::<span class="fn">new</span>(<span class="ty">Rectangle6</span> { width: <span class="nu">4.0</span>, height: <span class="nu">5.0</span> }),
+    <span class="ty">Box</span>::<span class="fn">new</span>(<span class="ty">Square6</span> { side: <span class="nu">2.0</span> }),
+];</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.2">
+    <div class="ex-head">
+      <span class="ex-id">6.2</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Functions over a slice of trait objects</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn describe_all(shapes: &amp;[Box&lt;dyn Shape6&gt;])</code> and <code>fn total_dyn(shapes: &amp;[Box&lt;dyn Shape6&gt;]) -&gt; f64</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Compare with 3.3</span>
+        <p>The <strong>generic</strong> version requires every element to be the same type, and the compiler generates one specialized copy per type used. The <strong>dyn</strong> version accepts a mix, and exactly one copy of the function exists, dispatching through a vtable at runtime.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">describe_all</span>(shapes: &amp;[<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">Shape6</span>&gt;]) {
+    <span class="k">for</span> s <span class="k">in</span> shapes {
+        <span class="fn">println!</span>(<span class="st">"    {}"</span>, s.<span class="fn">summary</span>());
+    }
+}
+
+<span class="k">fn</span> <span class="fn">total_dyn</span>(shapes: &amp;[<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">Shape6</span>&gt;]) -&gt; <span class="ty">f64</span> {
+    shapes.<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">area</span>()).<span class="fn">sum</span>()
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.3">
+    <div class="ex-head">
+      <span class="ex-id">6.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">A tiny plugin system</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Define <code>trait Plugin { fn name(&amp;self) -&gt; String; fn run(&amp;self); }</code>, implement it for <code>Logger</code>, <code>Formatter</code> and <code>Validator</code>, store all three in a <code>Vec&lt;Box&lt;dyn Plugin&gt;&gt;</code> and execute them in a loop.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Why this needs trait objects</span>
+        <p>The <em>set</em> of plugins is decided at <strong>runtime</strong> — in real code, from a config file or CLI flag. Generics resolve at <em>compile</em> time, so they cannot express "whatever plugins were configured."</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">Plugin</span> {
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span>;
+    <span class="k">fn</span> <span class="fn">run</span>(&amp;<span class="k">self</span>);
+}
+
+<span class="k">impl</span> <span class="ty">Plugin</span> <span class="k">for</span> <span class="ty">Logger</span> {
+    <span class="k">fn</span> <span class="fn">name</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Logger"</span>) }
+    <span class="k">fn</span> <span class="fn">run</span>(&amp;<span class="k">self</span>) { <span class="fn">println!</span>(<span class="st">"      [Logger] writing logs..."</span>); }
+}
+<span class="cm">// Formatter and Validator follow the same shape</span>
+
+<span class="k">let</span> plugins: <span class="ty">Vec</span>&lt;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">Plugin</span>&gt;&gt; = <span class="fn">vec!</span>[
+    <span class="ty">Box</span>::<span class="fn">new</span>(<span class="ty">Logger</span>), <span class="ty">Box</span>::<span class="fn">new</span>(<span class="ty">Formatter</span>), <span class="ty">Box</span>::<span class="fn">new</span>(<span class="ty">Validator</span>),
+];</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.4">
+    <div class="ex-head">
+      <span class="ex-id">6.4</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Closures as trait objects</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Build a <code>Vec&lt;Box&lt;dyn Fn(i32) -&gt; i32&gt;&gt;</code> holding a doubler, a squarer and an incrementer. Apply each to <code>5</code>.</p>
+
+      <div class="code is-out">
+        <div class="code-label">Expected output</div>
+<pre><code>op0(5) = 10
+op1(5) = 25
+op2(5) = 6</code></pre>
+      </div>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Key insight</span>
+        <p><code>Fn(i32) -&gt; i32</code> <strong>is a trait.</strong> Every closure has its own anonymous, unnameable type, so a <code>Vec</code> of different closures <em>requires</em> trait objects — there is no concrete type name you could write instead.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">let</span> ops: <span class="ty">Vec</span>&lt;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">Fn</span>(<span class="ty">i32</span>) -&gt; <span class="ty">i32</span>&gt;&gt; = <span class="fn">vec!</span>[
+    <span class="ty">Box</span>::<span class="fn">new</span>(|x| x * <span class="nu">2</span>),
+    <span class="ty">Box</span>::<span class="fn">new</span>(|x| x * x),
+    <span class="ty">Box</span>::<span class="fn">new</span>(|x| x + <span class="nu">1</span>),
+];
+
+<span class="k">for</span> (i, op) <span class="k">in</span> ops.<span class="fn">iter</span>().<span class="fn">enumerate</span>() {
+    <span class="fn">println!</span>(<span class="st">"    op{}(5) = {}"</span>, i, <span class="fn">op</span>(<span class="nu">5</span>));
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.5">
+    <div class="ex-head">
+      <span class="ex-id">6.5</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Object safety — make it fail, understand why</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Uncomment the <code>trait Bad</code> with <code>fn clone_me(&amp;self) -&gt; Self;</code> and the <code>let x: Box&lt;dyn Bad&gt;</code> line. Compile, read the error, write the reason in your own words.</p>
+
+      <div class="errblock">
+<pre><span class="code-id">error[E0038]</span>: the trait `Bad` cannot be made into an object
+  = note: method `clone_me` references the `Self` type
+          in its return type</pre>
+      </div>
+
+      <div class="answer-lines">
+        <p>Your answer — why does returning Self break trait objects?</p>
+        <div class="line"></div>
+        <div class="line"></div>
+      </div>
+
+      <details class="sol">
+        <summary>Show answer</summary>
+        <div class="sol-body">
+          <p>Through a <code>Box&lt;dyn Bad&gt;</code> the <strong>concrete type is erased</strong> — all that remains at runtime is a data pointer plus a vtable pointer. A method returning <code>Self</code> would have to return a value whose type, size and alignment the caller cannot know, since different implementors return different types. The caller would not know how much stack space to reserve, so the compiler rejects <code>dyn Bad</code> entirely, up front.</p>
+          <p><strong>The fix</strong> if you ever need this: add <code>where Self: Sized</code> to the offending method, excluding it from the vtable and keeping the rest usable.</p>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 7 ==================== -->
+<section id="s7">
+  <div class="set-head">
+    <span class="set-num">SET 7</span>
+    <h2>Associated types</h2>
+    <span class="set-ref">guide · part 10</span>
+  </div>
+
+  <article class="ex" data-ex="7.1">
+    <div class="ex-head">
+      <span class="ex-id">7.1</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">A trait with an associated type</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Complete <code>trait Collection</code> with <code>type Item;</code>, <code>fn add(&amp;mut self, item: Self::Item);</code> and <code>fn len(&amp;self) -&gt; usize;</code>. Implement for <code>NumberList</code> (<code>Item = i32</code>) and <code>WordList</code> (<code>Item = String</code>).</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Why an associated type, not a generic parameter?</span>
+        <p>With <code>trait Collection&lt;T&gt;</code> a single type could implement it <em>many</em> times — <code>Collection&lt;i32&gt;</code> and <code>Collection&lt;String&gt;</code> — making <code>list.add(x)</code> ambiguous. With an associated type each implementor picks exactly one <code>Item</code>, so calls are unambiguous.</p>
+        <p><strong>The rule:</strong> one natural choice per type → associated type (like <code>Iterator</code>). Many valid choices → generic parameter (like <code>From&lt;T&gt;</code>).</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">Collection</span> {
+    <span class="k">type</span> <span class="ty">Item</span>;
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, item: <span class="ty">Self</span>::<span class="ty">Item</span>);
+    <span class="k">fn</span> <span class="fn">len</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">usize</span>;
+}
+
+<span class="k">impl</span> <span class="ty">Collection</span> <span class="k">for</span> <span class="ty">NumberList</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">i32</span>;
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, item: <span class="ty">i32</span>) { <span class="k">self</span>.nums.<span class="fn">push</span>(item); }
+    <span class="k">fn</span> <span class="fn">len</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">usize</span> { <span class="k">self</span>.nums.<span class="fn">len</span>() }
+}
+
+<span class="k">impl</span> <span class="ty">Collection</span> <span class="k">for</span> <span class="ty">WordList</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">String</span>;
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, item: <span class="ty">String</span>) { <span class="k">self</span>.words.<span class="fn">push</span>(item); }
+    <span class="k">fn</span> <span class="fn">len</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">usize</span> { <span class="k">self</span>.words.<span class="fn">len</span>() }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.2">
+    <div class="ex-head">
+      <span class="ex-id">7.2</span>
+      <span class="pill easy">easy</span>
+      <span class="ex-title">Generic over any Collection</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn describe&lt;C: Collection&gt;(c: &amp;C) -&gt; String</code> returning <code>"Collection with N items"</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Notice</span>
+        <p>This works for both <code>NumberList</code> and <code>WordList</code> even though their <code>Item</code> types differ — you never mention <code>Item</code> at all.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">describe</span>&lt;<span class="ty">C</span>: <span class="ty">Collection</span>&gt;(c: &amp;<span class="ty">C</span>) -&gt; <span class="ty">String</span> {
+    <span class="fn">format!</span>(<span class="st">"Collection with {} items"</span>, c.<span class="fn">len</span>())
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.3">
+    <div class="ex-head">
+      <span class="ex-id">7.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Pinning an associated type</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>fn sum_iter&lt;I: Iterator&lt;Item = i32&gt;&gt;(iter: I) -&gt; i32</code>. Call it with <code>vec![1,2,3].into_iter()</code> (→ 6) and with <code>1..=10</code> (→ 55).</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Read the bound as</span>
+        <p>"<code>I</code> is any <code>Iterator</code> whose <code>Item</code> is exactly <code>i32</code>." Ranges and vec iterators are completely different types, but both satisfy it.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">sum_iter</span>&lt;<span class="ty">I</span>: <span class="ty">Iterator</span>&lt;<span class="ty">Item</span> = <span class="ty">i32</span>&gt;&gt;(iter: <span class="ty">I</span>) -&gt; <span class="ty">i32</span> {
+    iter.<span class="fn">sum</span>()
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.4">
+    <div class="ex-head">
+      <span class="ex-id">7.4</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">An associated Output type</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Define <code>trait Transform { type Output; fn transform(&amp;self) -&gt; Self::Output; }</code>. Implement for <code>Doubler(i32)</code> with <code>Output = i32</code>, and <code>Stringify(i32)</code> with <code>Output = String</code>.</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Key insight</span>
+        <p>The same trait, the same method name, but each implementor returns a <strong>different type</strong>. That is impossible with a plain return type — it is exactly what associated types are for.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">Transform</span> {
+    <span class="k">type</span> <span class="ty">Output</span>;
+    <span class="k">fn</span> <span class="fn">transform</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Self</span>::<span class="ty">Output</span>;
+}
+
+<span class="k">impl</span> <span class="ty">Transform</span> <span class="k">for</span> <span class="ty">Doubler</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">i32</span>;
+    <span class="k">fn</span> <span class="fn">transform</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">i32</span> { <span class="k">self</span>.<span class="nu">0</span> * <span class="nu">2</span> }
+}
+
+<span class="k">impl</span> <span class="ty">Transform</span> <span class="k">for</span> <span class="ty">Stringify</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">String</span>;
+    <span class="k">fn</span> <span class="fn">transform</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="fn">format!</span>(<span class="st">"Number: {}"</span>, <span class="k">self</span>.<span class="nu">0</span>) }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== SET 8 ==================== -->
+<section id="s8">
+  <div class="set-head">
+    <span class="set-num">SET 8</span>
+    <h2>Operators &amp; extension traits</h2>
+    <span class="set-ref">guide · parts 12, 14</span>
+  </div>
+
+  <article class="ex" data-ex="8.1">
+    <div class="ex-head">
+      <span class="ex-id">8.1</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Operator overloading with real carry logic</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><strong>(a)</strong> <code>impl Add for Money</code>, handling the paise carry: 100 paise = 1 rupee, so 75 + 50 paise must become 1 rupee 25 paise — <em>not</em> 125 paise. <strong>(b)</strong> <code>impl Display</code> printing <code>Rs.123.45</code>.</p>
+
+      <div class="code is-out">
+        <div class="code-label">Expected output</div>
+<pre><code>Rs.10.75 + Rs.5.50 = Rs.16.25</code></pre>
+      </div>
+
+      <div class="hint">
+        <span class="hint-tag">Hints</span>
+        <p><strong>Carry:</strong> <code>rupees = self.rupees + other.rupees + total_paise / 100</code><br>
+        <strong>Remainder:</strong> <code>paise = total_paise % 100</code><br>
+        <strong>Padding:</strong> <code>{:02}</code> prints 5 as <code>05</code>, needed for e.g. <code>Rs.10.05</code></p>
+      </div>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Note</span>
+        <p><code>type Output = Money;</code> inside the impl is an <strong>associated type</strong> (Set 7) declaring what <code>Money + Money</code> evaluates to.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Add</span> <span class="k">for</span> <span class="ty">Money</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">Money</span>;
+
+    <span class="k">fn</span> <span class="fn">add</span>(<span class="k">self</span>, other: <span class="ty">Money</span>) -&gt; <span class="ty">Money</span> {
+        <span class="k">let</span> total_paise = <span class="k">self</span>.paise + other.paise;
+        <span class="ty">Money</span> {
+            rupees: <span class="k">self</span>.rupees + other.rupees + total_paise / <span class="nu">100</span>,  <span class="cm">// carry</span>
+            paise:  total_paise % <span class="nu">100</span>,                              <span class="cm">// rest</span>
+        }
+    }
+}
+
+<span class="k">impl</span> fmt::<span class="ty">Display</span> <span class="k">for</span> <span class="ty">Money</span> {
+    <span class="k">fn</span> <span class="fn">fmt</span>(&amp;<span class="k">self</span>, f: &amp;<span class="k">mut</span> fmt::<span class="ty">Formatter</span>) -&gt; fmt::<span class="ty">Result</span> {
+        <span class="fn">write!</span>(f, <span class="st">"Rs.{}.{:02}"</span>, <span class="k">self</span>.rupees, <span class="k">self</span>.paise)
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.2">
+    <div class="ex-head">
+      <span class="ex-id">8.2</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">Sub, Neg, and a mixed-type Mul</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>For <code>Vector2D</code> implement <code>Sub</code> (component-wise), <code>Neg</code> (negate both), and <code>Mul&lt;f64&gt;</code> (scale by a plain number).</p>
+
+      <div class="hint is-why">
+        <span class="hint-tag">On Mul&lt;f64&gt;</span>
+        <p><code>Add</code> and <code>Mul</code> have a generic parameter defaulting to <code>Self</code>: <code>trait Mul&lt;Rhs = Self&gt;</code>. Writing <code>impl Mul&lt;f64&gt; for Vector2D</code> sets <code>Rhs = f64</code>, so the right-hand side of <code>*</code> is a plain number rather than another vector.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Sub</span> <span class="k">for</span> <span class="ty">Vector2D</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">Vector2D</span>;
+    <span class="k">fn</span> <span class="fn">sub</span>(<span class="k">self</span>, o: <span class="ty">Vector2D</span>) -&gt; <span class="ty">Vector2D</span> {
+        <span class="ty">Vector2D</span> { x: <span class="k">self</span>.x - o.x, y: <span class="k">self</span>.y - o.y }
+    }
+}
+
+<span class="k">impl</span> <span class="ty">Neg</span> <span class="k">for</span> <span class="ty">Vector2D</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">Vector2D</span>;
+    <span class="k">fn</span> <span class="fn">neg</span>(<span class="k">self</span>) -&gt; <span class="ty">Vector2D</span> {
+        <span class="ty">Vector2D</span> { x: -<span class="k">self</span>.x, y: -<span class="k">self</span>.y }
+    }
+}
+
+<span class="k">impl</span> <span class="ty">Mul</span>&lt;<span class="ty">f64</span>&gt; <span class="k">for</span> <span class="ty">Vector2D</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">Vector2D</span>;
+    <span class="k">fn</span> <span class="fn">mul</span>(<span class="k">self</span>, s: <span class="ty">f64</span>) -&gt; <span class="ty">Vector2D</span> {
+        <span class="ty">Vector2D</span> { x: <span class="k">self</span>.x * s, y: <span class="k">self</span>.y * s }
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.3">
+    <div class="ex-head">
+      <span class="ex-id">8.3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">AddAssign, reusing your Add impl</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>impl AddAssign for Money</code> so that <code>wallet += payment</code> works.</p>
+
+      <div class="hint">
+        <span class="hint-tag">Hint</span>
+        <p>Do <strong>not</strong> duplicate the carry logic. Reuse <code>Add</code>: <code>*self = *self + other;</code> This works because <code>Money</code> is <code>Copy</code>. Without <code>Copy</code> you would write the field updates by hand.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">AddAssign</span> <span class="k">for</span> <span class="ty">Money</span> {
+    <span class="k">fn</span> <span class="fn">add_assign</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, other: <span class="ty">Money</span>) {
+        *<span class="k">self</span> = *<span class="k">self</span> + other;   <span class="cm">// reuse Add; works because Money is Copy</span>
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.4">
+    <div class="ex-head">
+      <span class="ex-id">8.4</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Mul for 2×2 matrix multiplication</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>impl Mul for Matrix2x2</code>.</p>
+
+      <div class="code">
+        <div class="code-label">The math</div>
+<pre><code>| a b |   | a' b' |     new.a = a*a' + b*c'    new.b = a*b' + b*d'
+| c d | * | c' d' |  =  new.c = c*a' + d*c'    new.d = c*b' + d*d'</code></pre>
+      </div>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Your correctness check</span>
+        <p>Multiplying by the <strong>identity</strong> matrix <code>{a:1, b:0, c:0, d:1}</code> must return the original matrix unchanged.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Mul</span> <span class="k">for</span> <span class="ty">Matrix2x2</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">Matrix2x2</span>;
+    <span class="k">fn</span> <span class="fn">mul</span>(<span class="k">self</span>, o: <span class="ty">Matrix2x2</span>) -&gt; <span class="ty">Matrix2x2</span> {
+        <span class="ty">Matrix2x2</span> {
+            a: <span class="k">self</span>.a * o.a + <span class="k">self</span>.b * o.c,
+            b: <span class="k">self</span>.a * o.b + <span class="k">self</span>.b * o.d,
+            c: <span class="k">self</span>.c * o.a + <span class="k">self</span>.d * o.c,
+            d: <span class="k">self</span>.c * o.b + <span class="k">self</span>.d * o.d,
+        }
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.5">
+    <div class="ex-head">
+      <span class="ex-id">8.5</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">A generic extension trait on Vec&lt;T&gt;</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Define <code>trait VecExt&lt;T&gt;</code> with <code>second()</code> and <code>second_last()</code>, both returning <code>Option&lt;&amp;T&gt;</code>, and implement for <code>Vec&lt;T&gt;</code> — for any <code>T</code>.</p>
+
+      <div class="code is-out">
+        <div class="code-label">Expected output — note the None cases must not panic</div>
+<pre><code>vec![1,2,3].second()      -&gt; Some(2)
+vec![1].second()          -&gt; None
+vec![1,2,3].second_last() -&gt; Some(2)
+vec![1].second_last()     -&gt; None</code></pre>
+      </div>
+
+      <div class="hint is-trap">
+        <span class="hint-tag">Two traps</span>
+        <p>Use <code>.get(i)</code>, which returns <code>Option</code> — never index with <code>[i]</code>, which <strong>panics</strong> out of bounds.</p>
+        <p>For <code>second_last</code>, <code>self.len() - 2</code> <strong>underflows</strong> when <code>len &lt; 2</code> — <code>len()</code> is <code>usize</code>, so <code>1 - 2</code> panics in debug. Use <code>.checked_sub(2)</code>, which returns <code>Option</code>, then chain <code>.and_then(|i| self.get(i))</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">VecExt</span>&lt;<span class="ty">T</span>&gt; {
+    <span class="k">fn</span> <span class="fn">second</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">T</span>&gt;;
+    <span class="k">fn</span> <span class="fn">second_last</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">T</span>&gt;;
+}
+
+<span class="k">impl</span>&lt;<span class="ty">T</span>&gt; <span class="ty">VecExt</span>&lt;<span class="ty">T</span>&gt; <span class="k">for</span> <span class="ty">Vec</span>&lt;<span class="ty">T</span>&gt; {
+    <span class="k">fn</span> <span class="fn">second</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">T</span>&gt; {
+        <span class="k">self</span>.<span class="fn">get</span>(<span class="nu">1</span>)                       <span class="cm">// .get() never panics</span>
+    }
+
+    <span class="k">fn</span> <span class="fn">second_last</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">T</span>&gt; {
+        <span class="cm">// checked_sub avoids usize underflow when len &lt; 2</span>
+        <span class="k">self</span>.<span class="fn">len</span>().<span class="fn">checked_sub</span>(<span class="nu">2</span>).<span class="fn">and_then</span>(|i| <span class="k">self</span>.<span class="fn">get</span>(i))
+    }
+}</code></pre>
+          </div>
+          <div class="hint is-why" style="margin-top:0.9rem;">
+            <span class="hint-tag">Why this is legal</span>
+            <p>The orphan rule needs you to own the trait <em>or</em> the type. You own <code>VecExt</code>, so implementing it for the standard library's <code>Vec</code> is fine.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+</section>
+
+<!-- ==================== CAPSTONE ==================== -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone — everything combined</h2>
+    <span class="set-ref">guide · part 18</span>
+  </div>
+
+  <p class="set-note">Do this last, after every other set. Build a <strong>shape drawing and reporting system</strong> exercising the whole lesson.</p>
+
+  <article class="ex" data-ex="c1">
+    <div class="ex-head">
+      <span class="ex-id">C1–C3</span>
+      <span class="pill med">med</span>
+      <span class="ex-title">The trait, three shapes, and Display</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Requirements</p>
+      <ul>
+        <li><strong>C1.</strong> <code>trait DrawableC</code> with required <code>draw()</code>, <code>area()</code>, <code>perimeter()</code>, plus a <strong>default</strong> <code>report()</code> combining all three.</li>
+        <li><strong>C2.</strong> Implement for <code>CircleC</code>, <code>RectangleC</code>, <code>TriangleC</code>. Triangle area uses <strong>Heron's formula</strong>: <code>s = perimeter / 2</code>, then <code>area = sqrt(s(s−a)(s−b)(s−c))</code>.</li>
+        <li><strong>C3.</strong> Implement <code>Display</code> for all three — delegate to <code>draw()</code> to avoid duplication.</li>
+      </ul>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Correctness check</span>
+        <p>A 3-4-5 triangle must have area exactly <strong>6.00</strong> and perimeter <strong>12.00</strong>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">trait</span> <span class="ty">DrawableC</span> {
+    <span class="k">fn</span> <span class="fn">draw</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span>;
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span>;
+    <span class="k">fn</span> <span class="fn">perimeter</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span>;
+
+    <span class="k">fn</span> <span class="fn">report</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"{:&lt;18} area: {:&gt;8.2}   perimeter: {:&gt;8.2}"</span>,
+                <span class="k">self</span>.<span class="fn">draw</span>(), <span class="k">self</span>.<span class="fn">area</span>(), <span class="k">self</span>.<span class="fn">perimeter</span>())
+    }
+}
+
+<span class="k">impl</span> <span class="ty">DrawableC</span> <span class="k">for</span> <span class="ty">TriangleC</span> {
+    <span class="k">fn</span> <span class="fn">draw</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> {
+        <span class="fn">format!</span>(<span class="st">"Tri({},{},{})"</span>, <span class="k">self</span>.a, <span class="k">self</span>.b, <span class="k">self</span>.c)
+    }
+
+    <span class="k">fn</span> <span class="fn">area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> {
+        <span class="k">let</span> s = <span class="k">self</span>.<span class="fn">perimeter</span>() / <span class="nu">2.0</span>;              <span class="cm">// Heron's formula</span>
+        (s * (s - <span class="k">self</span>.a) * (s - <span class="k">self</span>.b) * (s - <span class="k">self</span>.c)).<span class="fn">sqrt</span>()
+    }
+
+    <span class="k">fn</span> <span class="fn">perimeter</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> { <span class="k">self</span>.a + <span class="k">self</span>.b + <span class="k">self</span>.c }
+}
+
+<span class="k">impl</span> fmt::<span class="ty">Display</span> <span class="k">for</span> <span class="ty">CircleC</span> {
+    <span class="k">fn</span> <span class="fn">fmt</span>(&amp;<span class="k">self</span>, f: &amp;<span class="k">mut</span> fmt::<span class="ty">Formatter</span>) -&gt; fmt::<span class="ty">Result</span> {
+        <span class="fn">write!</span>(f, <span class="st">"{}"</span>, <span class="k">self</span>.<span class="fn">draw</span>())
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="c2">
+    <div class="ex-head">
+      <span class="ex-id">C4–C5</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Canvas with trait objects, and generic compare</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Requirements</p>
+      <ul>
+        <li><strong>C4.</strong> <code>struct CanvasC { shapes: Vec&lt;Box&lt;dyn DrawableC&gt;&gt; }</code> with <code>add()</code> (returns <code>&amp;mut Self</code> for chaining), <code>total_area()</code>, and <code>largest()</code> returning <code>Option&lt;&amp;Box&lt;dyn DrawableC&gt;&gt;</code>.</li>
+        <li><strong>C5.</strong> <code>fn compareC&lt;A: DrawableC, B: DrawableC&gt;(a: &amp;A, b: &amp;B) -&gt; String</code>.</li>
+      </ul>
+
+      <div class="hint is-trap">
+        <span class="hint-tag">Trap</span>
+        <p><code>max_by</code> needs an <code>Ordering</code>, but <code>f64</code> is only <code>PartialOrd</code> (because of <code>NaN</code>). Use <code>a.area().partial_cmp(&amp;b.area()).unwrap()</code>.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">CanvasC</span> {
+    <span class="k">fn</span> <span class="fn">new</span>() -&gt; <span class="ty">Self</span> { <span class="ty">CanvasC</span> { shapes: <span class="ty">Vec</span>::<span class="fn">new</span>() } }
+
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, shape: <span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">DrawableC</span>&gt;) -&gt; &amp;<span class="k">mut</span> <span class="ty">Self</span> {
+        <span class="k">self</span>.shapes.<span class="fn">push</span>(shape);
+        <span class="k">self</span>                                   <span class="cm">// enables chaining</span>
+    }
+
+    <span class="k">fn</span> <span class="fn">total_area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> {
+        <span class="k">self</span>.shapes.<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">area</span>()).<span class="fn">sum</span>()
+    }
+
+    <span class="k">fn</span> <span class="fn">largest</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">DrawableC</span>&gt;&gt; {
+        <span class="k">self</span>.shapes.<span class="fn">iter</span>()
+            .<span class="fn">max_by</span>(|a, b| a.<span class="fn">area</span>().<span class="fn">partial_cmp</span>(&amp;b.<span class="fn">area</span>()).<span class="fn">unwrap</span>())
+    }
+}</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="c3">
+    <div class="ex-head">
+      <span class="ex-id">C6–C8</span>
+      <span class="pill hard">hard</span>
+      <span class="ex-title">Operator, supertrait, extension trait</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Requirements</p>
+      <ul>
+        <li><strong>C6.</strong> <code>impl Add for CircleC</code> producing a circle whose <em>area</em> is the sum of both: since πr₁² + πr₂² = πR², you get <code>R = sqrt(r₁² + r₂²)</code>.</li>
+        <li><strong>C7.</strong> <code>trait ScalableC: DrawableC</code> (a supertrait) with <code>fn scale(&amp;self, factor: f64) -&gt; Self where Self: Sized;</code></li>
+        <li><strong>C8.</strong> An extension trait on <code>[Box&lt;dyn DrawableC&gt;]</code> adding <code>fn sorted_by_area(&amp;self) -&gt; Vec&lt;&amp;Box&lt;dyn DrawableC&gt;&gt;</code>.</li>
+      </ul>
+
+      <div class="hint is-why">
+        <span class="hint-tag">Correctness check</span>
+        <p><em>r</em>=3 plus <em>r</em>=4 must give exactly <strong><em>r</em>=5</strong>, since 9 + 16 = 25.</p>
+      </div>
+
+      <div class="hint is-trap">
+        <span class="hint-tag">Why the Sized bound is required</span>
+        <p><code>scale()</code> returns <code>Self</code>. Without <code>where Self: Sized</code> the trait could never be object safe — see exercise 6.5.</p>
+      </div>
+
+      <details class="sol">
+        <summary>Show solution</summary>
+        <div class="sol-body">
+          <div class="code">
+<pre><code><span class="k">impl</span> <span class="ty">Add</span> <span class="k">for</span> <span class="ty">CircleC</span> {
+    <span class="k">type</span> <span class="ty">Output</span> = <span class="ty">CircleC</span>;
+    <span class="k">fn</span> <span class="fn">add</span>(<span class="k">self</span>, other: <span class="ty">CircleC</span>) -&gt; <span class="ty">CircleC</span> {
+        <span class="cm">// pi*r1^2 + pi*r2^2 = pi*R^2  ->  R = sqrt(r1^2 + r2^2)</span>
+        <span class="ty">CircleC</span> { radius: (<span class="k">self</span>.radius.<span class="fn">powi</span>(<span class="nu">2</span>) + other.radius.<span class="fn">powi</span>(<span class="nu">2</span>)).<span class="fn">sqrt</span>() }
+    }
+}
+
+<span class="k">trait</span> <span class="ty">ScalableC</span>: <span class="ty">DrawableC</span> {
+    <span class="k">fn</span> <span class="fn">scale</span>(&amp;<span class="k">self</span>, factor: <span class="ty">f64</span>) -&gt; <span class="ty">Self</span> <span class="k">where</span> <span class="ty">Self</span>: <span class="ty">Sized</span>;
+}
+
+<span class="k">impl</span> <span class="ty">ScalableC</span> <span class="k">for</span> <span class="ty">CircleC</span> {
+    <span class="k">fn</span> <span class="fn">scale</span>(&amp;<span class="k">self</span>, factor: <span class="ty">f64</span>) -&gt; <span class="ty">CircleC</span> {
+        <span class="ty">CircleC</span> { radius: <span class="k">self</span>.radius * factor }
+    }
+}
+
+<span class="k">trait</span> <span class="ty">DrawableSliceExt</span> {
+    <span class="k">fn</span> <span class="fn">sorted_by_area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">DrawableC</span>&gt;&gt;;
+}
+
+<span class="k">impl</span> <span class="ty">DrawableSliceExt</span> <span class="k">for</span> [<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">DrawableC</span>&gt;] {
+    <span class="k">fn</span> <span class="fn">sorted_by_area</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">DrawableC</span>&gt;&gt; {
+        <span class="cm">// collect REFERENCES so nothing is moved or cloned</span>
+        <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;&amp;<span class="ty">Box</span>&lt;<span class="k">dyn</span> <span class="ty">DrawableC</span>&gt;&gt; = <span class="k">self</span>.<span class="fn">iter</span>().<span class="fn">collect</span>();
+        v.<span class="fn">sort_by</span>(|a, b| a.<span class="fn">area</span>().<span class="fn">partial_cmp</span>(&amp;b.<span class="fn">area</span>()).<span class="fn">unwrap</span>());
+        v
+    }
+}</code></pre>
+          </div>
+
+          <div class="code is-out">
+            <div class="code-label">Full expected capstone output</div>
+<pre><code>Circle(r=3)        area:    28.27   perimeter:    18.85
+Rect(4x5)          area:    20.00   perimeter:    18.00
+Tri(3,4,5)         area:     6.00   perimeter:    12.00
+
+r=3 + r=4 = Circle(r=5)        &lt;- exactly 5, since 9 + 16 = 25
+scaled 2x : Circle(r=6)  area: 113.10
+total area: 54.27
+largest   : Circle(r=3)
+sorted    : 6.00 Tri / 20.00 Rect / 28.27 Circle</code></pre>
+          </div>
+        </div>
+      </details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p>Companion files: <code>traits_guide.html</code> — the reference, same material as prose. <code>traits_complete_guide.rs</code> — annotated runnable Rust. <code>traits_practice.rs</code> — these exercises as compilable stubs.</p>
+    <p>Compile with <code>rustc --edition 2021 traits_practice.rs -o practice &amp;&amp; ./practice</code></p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    root.setAttribute('data-theme', currentIsDark() ? 'light' : 'dark');
+    syncBtn();
+  });
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncBtn);
+  }
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-traits-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+
+  // Exercise 1.1-8.5 plus 3 capstone cards; total is however many cards exist.
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    // The workbook counts 32 exercises; cards group the capstone, so report
+    // card-level progress honestly rather than inventing a number.
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var active = null;
+
+  function setActive(id) {
+    if (active === id) return;
+    links.forEach(function (a) { a.classList.remove('is-active'); });
+    if (map[id]) { map[id].classList.add('is-active'); active = id; }
+  }
+
+  var observer = new IntersectionObserver(function (entries) {
+    var visible = entries.filter(function (e) { return e.isIntersecting; });
+    if (!visible.length) return;
+    visible.sort(function (a, b) {
+      return a.boundingClientRect.top - b.boundingClientRect.top;
+    });
+    setActive(visible[0].target.id);
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { observer.observe(s); });
+})();
+</script>
+
+</body>
+</html>

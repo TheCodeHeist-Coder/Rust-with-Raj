@@ -1,0 +1,1727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Iterators in Rust — The Complete Guide</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.75rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 1.85rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem; padding-left: 0.35rem;
+  font-size: 0.625rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.6vw, 3.9rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif); font-size: 1.28rem; line-height: 1.28;
+  font-weight: 700; letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem; max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono); font-size: 0.75rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.5rem 1rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 1.05rem 1.15rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); font-weight: 700; }
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure); margin: 1.5rem 0;
+  padding: 1rem 1.15rem; border-radius: 2px;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  font-size: 0.9688rem; line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block; font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto; margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; background: var(--surface); }
+th, td {
+  text-align: left; padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+th {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure --------------------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0; max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 2px; overflow-x: auto;
+}
+.figure pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; color: var(--ink-soft); white-space: pre;
+}
+.figcap {
+  font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-faint);
+  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1.15rem 1.3rem; margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto; white-space: pre; color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split ---------------------------------------------------------- */
+
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem; margin: 1.5rem 0; max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0; max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember); border-radius: 2px;
+  padding: 0.95rem 1.1rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.7813rem;
+  line-height: 1.6; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Keyline -------------------------------------------------------- */
+
+.keyline {
+  max-width: var(--measure); margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.45;
+  font-style: italic; color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">Iterators in Rust</p>
+  <p class="rail-sub">Complete guide<br>20 parts</p>
+  <nav id="toc">
+    <div class="rail-group">Foundations</div>
+    <a href="#p1"><span class="n">01</span><span>What an iterator is</span></a>
+    <a href="#p2"><span class="n">02</span><span>The Iterator trait</span></a>
+    <a href="#p3"><span class="n">03</span><span>Laziness</span></a>
+    <a href="#p4"><span class="n">04</span><span>The three iterators</span></a>
+
+    <div class="rail-group">Adapters</div>
+    <a href="#p5"><span class="n">05</span><span>map &amp; filter</span></a>
+    <a href="#p6"><span class="n">06</span><span>Taking &amp; skipping</span></a>
+    <a href="#p7"><span class="n">07</span><span>Combining</span></a>
+    <a href="#p8"><span class="n">08</span><span>Flattening</span></a>
+    <a href="#p9"><span class="n">09</span><span>Stateful adapters</span></a>
+
+    <div class="rail-group">Consumers</div>
+    <a href="#p10"><span class="n">10</span><span>Reducing to a value</span></a>
+    <a href="#p11"><span class="n">11</span><span>Searching &amp; testing</span></a>
+    <a href="#p12"><span class="n">12</span><span>collect in depth</span></a>
+
+    <div class="rail-group">Building your own</div>
+    <a href="#p13"><span class="n">13</span><span>Custom iterators</span></a>
+    <a href="#p14"><span class="n">14</span><span>IntoIterator</span></a>
+    <a href="#p15"><span class="n">15</span><span>Generator functions</span></a>
+
+    <div class="rail-group">Deeper</div>
+    <a href="#p16"><span class="n">16</span><span>Zero-cost abstraction</span></a>
+    <a href="#p17"><span class="n">17</span><span>Iterator families</span></a>
+
+    <div class="rail-group">In practice</div>
+    <a href="#p18"><span class="n">18</span><span>Real-world recipes</span></a>
+    <a href="#p19"><span class="n">19</span><span>Common errors</span></a>
+    <a href="#p20"><span class="n">20</span><span>Cheat sheet</span></a>
+  </nav>
+</aside>
+
+<!-- ====================== MAIN ====================== -->
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Learning notes</p>
+  <h1>Iterators:<br>describe <em>what</em>, not how</h1>
+  <p class="standfirst">A loop says "start at zero, check the bound, increment, index in." An iterator says "for each of these, keep the even ones, double them." Same machine code — but one of them you can read.</p>
+  <div class="masthead-meta">
+    <span><b>20</b> parts</span>
+    <span><b>Companion:</b> iterators_practice.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>The mental model — what an iterator actually is</h2>
+  </div>
+
+  <p>You have already used iterators in every topic so far — <code>.iter()</code>, <code>.map()</code>, <code>.collect()</code>. This guide is where they stop being magic.</p>
+
+  <div class="keyline">An iterator is a thing that produces one value at a time, on request, until it runs out.</div>
+
+  <p>That is genuinely all. Not a collection, not a list — a <em>producer</em>. You ask "next?" and it hands you <code>Some(value)</code>, or <code>None</code> when it is finished.</p>
+
+  <div class="code">
+    <div class="code-label">Driving one by hand — verified output</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> <span class="k">mut</span> it = v.<span class="fn">iter</span>();
+
+it.<span class="fn">next</span>();   <span class="cm">// Some(1)</span>
+it.<span class="fn">next</span>();   <span class="cm">// Some(2)</span>
+it.<span class="fn">next</span>();   <span class="cm">// Some(3)</span>
+it.<span class="fn">next</span>();   <span class="cm">// None    — exhausted, and stays None forever</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why <code>mut</code></span>
+    <p>Calling <code>next()</code> <strong>changes</strong> the iterator — it advances an internal position. That is why <code>it</code> must be <code>mut</code>, even though <code>v</code> is not. An iterator carries state; a collection is just data.</p>
+  </div>
+
+  <h3>Where <code>for</code> loops come from</h3>
+  <p>A <code>for</code> loop is not a primitive in Rust. It is syntax sugar that the compiler expands into exactly the loop you would write by hand:</p>
+
+  <div class="split">
+    <div class="code">
+      <div class="code-label">What you write</div>
+<pre><code><span class="k">for</span> x <span class="k">in</span> &amp;v {
+    <span class="fn">println!</span>(<span class="st">"{}"</span>, x);
+}</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-label">What it becomes</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> it = v.<span class="fn">iter</span>();
+<span class="k">while</span> <span class="k">let</span> <span class="ty">Some</span>(x) = it.<span class="fn">next</span>() {
+    <span class="fn">println!</span>(<span class="st">"{}"</span>, x);
+}</code></pre>
+    </div>
+  </div>
+
+  <p>Every <code>for</code> loop you have ever written in Rust was calling <code>next()</code> in a loop until it got <code>None</code>. Understanding that one fact makes everything else in this guide follow naturally.</p>
+
+  <h3>The three-stage shape</h3>
+  <p>Nearly all iterator code has the same anatomy. Learn to see it and long chains stop being intimidating:</p>
+
+  <div class="figure">
+<pre>  SOURCE          ADAPTERS  (zero or more)        CONSUMER
+     │                    │                           │
+     ▼                    ▼                           ▼
+  v.iter()   .filter(..).map(..).take(..)        .collect()
+
+  makes an      transform it — each returns      finally runs
+  iterator      ANOTHER iterator, lazily          it, produces
+                                                  a real value
+
+  ─────────────── nothing happens ──────────────►│ everything
+                    until here                    happens here</pre>
+    <p class="figcap">Source → adapters → consumer. If a chain does nothing, you forgot the consumer. If it will not compile, the type usually broke at one specific adapter.</p>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Why bother</span>
+    <p>Three reasons, in order of importance. <strong>Readability</strong> — the chain states intent, not mechanics. <strong>Safety</strong> — no index arithmetic means no off-by-one and no out-of-bounds. <strong>Speed</strong> — it compiles to the same machine code as the hand-written loop, which is Part 16.</p>
+  </div>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2>The Iterator trait</h2>
+  </div>
+
+  <p>Iterators are not built into the language. They are a <strong>trait</strong> — your traits topic doing real work — and the whole thing rests on one required method.</p>
+
+  <div class="code">
+    <div class="code-label">The trait, simplified</div>
+<pre><code><span class="k">trait</span> <span class="ty">Iterator</span> {
+    <span class="k">type</span> <span class="ty">Item</span>;                              <span class="cm">// associated type</span>
+
+    <span class="k">fn</span> <span class="fn">next</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">Self</span>::<span class="ty">Item</span>&gt;;  <span class="cm">// the ONE required method</span>
+
+    <span class="cm">// ...and about 75 DEFAULT methods, all built on next():</span>
+    <span class="cm">// map, filter, take, sum, collect, fold, any, find, zip, ...</span>
+}</code></pre>
+  </div>
+
+  <div class="keyline">Implement one method — <code>next()</code> — and you inherit seventy-five others for free.</div>
+
+  <p>This is the "required method + default methods" pattern from your traits topic, used at its most dramatic. <code>map</code>, <code>filter</code>, <code>sum</code>, <code>collect</code> — none of them are special. They are default methods written in terms of <code>next()</code>, and they work on <em>anything</em> that implements the trait.</p>
+
+  <div class="note">
+    <span class="note-tag">Item is an associated type</span>
+    <p><code>type Item;</code> is an associated type, not a generic parameter. It means each iterator has <strong>exactly one</strong> item type — a <code>Vec&lt;i32&gt;</code> iterator yields <code>&amp;i32</code> and nothing else. Contrast with <code>From&lt;T&gt;</code>, where a type can implement many versions. This is why you write <code>Iterator&lt;Item = u32&gt;</code> with an <code>=</code> rather than <code>Iterator&lt;u32&gt;</code>.</p>
+  </div>
+
+  <h3>Two traits, easily confused</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Trait</th><th>Means</th><th>Key method</th></tr></thead>
+      <tbody>
+        <tr><td><code>Iterator</code></td><td>"I <em>am</em> an iterator"</td><td><code>next()</code></td></tr>
+        <tr><td><code>IntoIterator</code></td><td>"I can <em>become</em> an iterator"</td><td><code>into_iter()</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><code>Vec</code> is not an iterator — you cannot call <code>next()</code> on it. But it implements <code>IntoIterator</code>, so a <code>for</code> loop can turn it into one. That distinction is what Part 14 is about.</p>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>Laziness — the idea everything depends on</h2>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The rule</span>
+    <p>Adapters do <strong>nothing</strong> when you call them. They build a description. Only a <em>consumer</em> makes anything actually run.</p>
+  </div>
+
+  <div class="code is-bad">
+    <div class="code-label">This does nothing at all</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>);      <span class="cm">// the closure NEVER runs</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">warning</span>: unused `Map` that must be used
+ --&gt; src/main.rs:3:5
+  |
+3 |     v.iter().map(|x| x * 2);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: iterators are lazy and do nothing unless consumed</pre>
+  </div>
+
+  <p>Rust warns you, and the warning text is worth memorising: <em>iterators are lazy and do nothing unless consumed.</em> The <code>map</code> call returned a <code>Map</code> struct that remembers "I will double things, when someone asks."</p>
+
+  <div class="code is-good">
+    <div class="code-label">Add a consumer and it runs</div>
+<pre><code><span class="k">let</span> doubled: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>).<span class="fn">collect</span>();
+<span class="cm">// [2, 4, 6]</span></code></pre>
+  </div>
+
+  <h3>What laziness buys you</h3>
+
+  <div class="code">
+    <div class="code-label">Work that is never done</div>
+<pre><code><span class="k">let</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = (<span class="nu">1</span>..=<span class="nu">1_000_000</span>).<span class="fn">collect</span>();
+
+<span class="k">let</span> first = v.<span class="fn">iter</span>()
+    .<span class="fn">map</span>(|x| <span class="fn">expensive</span>(x))   <span class="cm">// looks like a million calls</span>
+    .<span class="fn">find</span>(|x| *x &gt; <span class="nu">10</span>);      <span class="cm">// ...but stops at the first match</span>
+
+<span class="cm">// expensive() runs only until find() is satisfied — maybe twice.</span></code></pre>
+  </div>
+
+  <p>An eager language would build a million-element intermediate list, then search it. Rust pulls values through the chain one at a time, so work past the answer is never done at all.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">And infinity becomes usable</span>
+    <p>Laziness is what lets an <strong>infinite</strong> iterator be practical. <code>(1..).map(|x| x * x).take(5)</code> is finite and instant, because <code>take(5)</code> stops asking. Eager evaluation would hang forever. See Part 13's Fibonacci example.</p>
+  </div>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2>The three iterators — iter, iter_mut, into_iter</h2>
+  </div>
+
+  <p>You met these with vectors. Restating them here because every single adapter inherits its ownership behaviour from this choice.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Call</th><th>Yields</th><th>Collection afterwards</th></tr></thead>
+      <tbody>
+        <tr><td><code>.iter()</code></td><td><code>&amp;T</code></td><td>Untouched — you only read</td></tr>
+        <tr><td><code>.iter_mut()</code></td><td><code>&amp;mut T</code></td><td>Still yours, possibly modified</td></tr>
+        <tr><td><code>.into_iter()</code></td><td><code>T</code></td><td><strong>Gone</strong> — consumed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-label">All three</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+
+<span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter</span>() { }        <span class="cm">// x: &amp;i32     — read only</span>
+<span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter_mut</span>() { *x += <span class="nu">100</span>; }   <span class="cm">// [101, 102, 103]</span>
+<span class="k">for</span> x <span class="k">in</span> v.<span class="fn">into_iter</span>() { }   <span class="cm">// x: i32      — v is gone after this</span>
+
+<span class="cm">// The shorthand you will actually write:</span>
+<span class="k">for</span> x <span class="k">in</span> &amp;v       { }   <span class="cm">// = v.iter()</span>
+<span class="k">for</span> x <span class="k">in</span> &amp;<span class="k">mut</span> v   { }   <span class="cm">// = v.iter_mut()</span>
+<span class="k">for</span> x <span class="k">in</span> v        { }   <span class="cm">// = v.into_iter()   ← CONSUMES</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The default</span>
+    <p>Reach for <code>.iter()</code> unless you have a reason not to. Use <code>.into_iter()</code> when you genuinely want to <em>move</em> values out — which is the right call when you are transforming a collection you are finished with, since it avoids cloning.</p>
+  </div>
+
+  <h3>The reference levels that confuse everyone</h3>
+
+  <div class="code">
+    <div class="code-label">Counting ampersands</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+
+<span class="cm">// .iter() yields &amp;i32.</span>
+<span class="cm">// map's closure receives the item directly:  &amp;i32</span>
+v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>)              <span class="cm">// x: &amp;i32   — deref is automatic here</span>
+
+<span class="cm">// filter's closure receives a REFERENCE TO the item: &amp;&amp;i32</span>
+v.<span class="fn">iter</span>().<span class="fn">filter</span>(|x| **x &gt; <span class="nu">1</span>)         <span class="cm">// two stars</span>
+v.<span class="fn">iter</span>().<span class="fn">filter</span>(|&amp;&amp;x| x &gt; <span class="nu">1</span>)         <span class="cm">// or destructure — cleaner</span>
+
+<span class="cm">// .copied() or .cloned() flattens &amp;T into T</span>
+v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">filter</span>(|x| *x &gt; <span class="nu">1</span>)  <span class="cm">// one star</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why filter has an extra level</span>
+    <p><code>filter</code> must not consume the item — it only decides whether to pass it along. So it lends the closure a reference instead of handing it over, giving you <code>&amp;&amp;i32</code>. <code>map</code> transforms and takes ownership of the item, so you get <code>&amp;i32</code> directly. This asymmetry is the single most common source of iterator type errors.</p>
+  </div>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2>map and filter — the two you will use most</h2>
+  </div>
+
+  <h3><code>map</code> — transform every item</h3>
+
+  <div class="code">
+    <div class="code-label">One in, one out</div>
+<pre><code><span class="k">let</span> n: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = (<span class="nu">1</span>..=<span class="nu">10</span>).<span class="fn">collect</span>();
+
+n.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * x).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()
+<span class="cm">// [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]</span>
+
+<span class="cm">// The output type can differ from the input type:</span>
+n.<span class="fn">iter</span>().<span class="fn">map</span>(|x| <span class="fn">format!</span>(<span class="st">"#{x}"</span>)).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt;()
+<span class="cm">// ["#1", "#2", ...]   — i32 in, String out</span></code></pre>
+  </div>
+
+  <p>Item count never changes. Ten in, ten out — always.</p>
+
+  <h3><code>filter</code> — keep some items</h3>
+
+  <div class="code">
+    <div class="code-label">Some in, fewer out</div>
+<pre><code>n.<span class="fn">iter</span>().<span class="fn">filter</span>(|&amp;&amp;x| x % <span class="nu">2</span> == <span class="nu">0</span>).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()
+<span class="cm">// [2, 4, 6, 8, 10]</span></code></pre>
+  </div>
+
+  <p>Item type never changes; the count shrinks. <code>filter</code> keeps items where the closure returns <code>true</code>.</p>
+
+  <h3><code>filter_map</code> — both at once</h3>
+
+  <div class="code is-good">
+    <div class="code-label">The parsing idiom</div>
+<pre><code><span class="cm">// Return Some(v) to keep and transform, None to drop.</span>
+[<span class="st">"1"</span>, <span class="st">"x"</span>, <span class="st">"3"</span>].<span class="fn">iter</span>()
+    .<span class="fn">filter_map</span>(|s| s.<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;().<span class="fn">ok</span>())
+    .<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()
+<span class="cm">// [1, 3]   — "x" failed to parse and was silently dropped</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Prefer filter_map over filter + map</span>
+    <p>Writing <code>.filter(|s| s.parse::&lt;i32&gt;().is_ok()).map(|s| s.parse::&lt;i32&gt;().unwrap())</code> parses everything <em>twice</em> and contains an <code>unwrap</code>. <code>filter_map</code> does it once, with no unwrap. Whenever a test and a transformation are the same operation, this is the adapter.</p>
+  </div>
+
+  <h3>Chaining — the actual payoff</h3>
+
+  <div class="split">
+    <div class="code">
+      <div class="code-label">Loop</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> out = <span class="ty">Vec</span>::<span class="fn">new</span>();
+<span class="k">for</span> w <span class="k">in</span> &amp;words {
+    <span class="k">if</span> w.<span class="fn">len</span>() &gt; <span class="nu">3</span> {
+        out.<span class="fn">push</span>(w.<span class="fn">to_uppercase</span>());
+    }
+}</code></pre>
+    </div>
+    <div class="code is-good">
+      <div class="code-label">Chain</div>
+<pre><code><span class="k">let</span> out: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = words.<span class="fn">iter</span>()
+    .<span class="fn">filter</span>(|w| w.<span class="fn">len</span>() &gt; <span class="nu">3</span>)
+    .<span class="fn">map</span>(|w| w.<span class="fn">to_uppercase</span>())
+    .<span class="fn">collect</span>();</code></pre>
+    </div>
+  </div>
+
+  <p>Both give <code>["APPLE", "BANANA", "KIWI"]</code> from <code>["apple", "fig", "banana", "kiwi"]</code>. The chain reads as a sentence: take the words, keep the long ones, uppercase them, gather up.</p>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2>Taking and skipping</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Position-based — verified on (1..=10)</div>
+<pre><code>.<span class="fn">take</span>(<span class="nu">3</span>)        <span class="cm">// [1, 2, 3]        first n</span>
+.<span class="fn">skip</span>(<span class="nu">7</span>)        <span class="cm">// [8, 9, 10]       drop first n</span>
+.<span class="fn">step_by</span>(<span class="nu">3</span>)     <span class="cm">// [1, 4, 7, 10]    every nth, starting at the first</span>
+.<span class="fn">rev</span>()          <span class="cm">// [10, 9, 8, ...]  backwards (needs DoubleEndedIterator)</span>
+.<span class="fn">last</span>()         <span class="cm">// Some(10)         consumes everything to reach the end</span>
+.<span class="fn">nth</span>(<span class="nu">2</span>)         <span class="cm">// Some(3)          0-indexed, consumes as it goes</span></code></pre>
+  </div>
+
+  <h3>Condition-based</h3>
+
+  <div class="code">
+    <div class="code-label">take_while and skip_while — verified on [1,2,3,10,1]</div>
+<pre><code>.<span class="fn">take_while</span>(|&amp;&amp;x| x &lt; <span class="nu">5</span>)   <span class="cm">// [1, 2, 3]     STOPS at the first failure</span>
+.<span class="fn">skip_while</span>(|&amp;&amp;x| x &lt; <span class="nu">5</span>)   <span class="cm">// [10, 1]       skips until first failure, then</span>
+                              <span class="cm">//               takes EVERYTHING — note the</span>
+                              <span class="cm">//               trailing 1 comes through</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">take_while is not filter</span>
+    <p><code>filter</code> checks every item and keeps all that pass. <code>take_while</code> <strong>stops permanently</strong> at the first failure. On <code>[1, 2, 3, 10, 1]</code>, filtering <code>x &lt; 5</code> gives <code>[1,2,3,1]</code> but <code>take_while</code> gives <code>[1,2,3]</code> — the final <code>1</code> is never reached.</p>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">The pairing that makes infinity work</span>
+    <p><code>take</code> and <code>take_while</code> are how you consume an <strong>infinite</strong> iterator. <code>(1..).take(5)</code> is finite. Without one of them, a consumer on an infinite source hangs forever.</p>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Combining iterators</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">zip, chain, enumerate — verified</div>
+<pre><code><span class="cm">// ZIP — walk two together, yielding pairs</span>
+[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>].<span class="fn">iter</span>().<span class="fn">zip</span>([<span class="st">"a"</span>,<span class="st">"b"</span>].<span class="fn">iter</span>())
+<span class="cm">// [(1, "a"), (2, "b")]   ← STOPS at the shorter one. The 3 is lost.</span>
+
+<span class="cm">// CHAIN — run one, then the other</span>
+[<span class="nu">1</span>,<span class="nu">2</span>].<span class="fn">iter</span>().<span class="fn">chain</span>([<span class="nu">3</span>,<span class="nu">4</span>].<span class="fn">iter</span>())
+<span class="cm">// [1, 2, 3, 4]</span>
+
+<span class="cm">// ENUMERATE — pair each item with its index</span>
+[<span class="st">"a"</span>,<span class="st">"b"</span>].<span class="fn">iter</span>().<span class="fn">enumerate</span>()
+<span class="cm">// [(0, "a"), (1, "b")]</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">zip truncates silently</span>
+    <p>Zipping a 3-element and a 2-element iterator gives 2 pairs, with no error or warning. If the lengths <em>should</em> match, check before zipping — otherwise you lose data quietly.</p>
+  </div>
+
+  <h3>enumerate is not always the answer</h3>
+
+  <div class="split">
+    <div class="code is-bad">
+      <div class="code-label">Indexing needlessly</div>
+<pre><code><span class="k">for</span> (i, _) <span class="k">in</span> v.<span class="fn">iter</span>().<span class="fn">enumerate</span>() {
+    <span class="fn">println!</span>(<span class="st">"{}"</span>, v[i]);
+}</code></pre>
+    </div>
+    <div class="code is-good">
+      <div class="code-label">Just iterate</div>
+<pre><code><span class="k">for</span> x <span class="k">in</span> &amp;v {
+    <span class="fn">println!</span>(<span class="st">"{}"</span>, x);
+}</code></pre>
+    </div>
+  </div>
+
+  <p>Use <code>enumerate</code> when you genuinely need the position — numbering output, or reporting which line failed. Not as a habit carried over from C-style loops.</p>
+
+  <h3>Zipping to build a map</h3>
+
+  <div class="code">
+    <div class="code-label">A pattern you met in the HashMap topic</div>
+<pre><code><span class="k">let</span> names = <span class="fn">vec!</span>[<span class="st">"x"</span>, <span class="st">"y"</span>, <span class="st">"z"</span>];
+<span class="k">let</span> vals  = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+
+<span class="k">let</span> m: <span class="ty">HashMap</span>&lt;_, _&gt; = names.<span class="fn">iter</span>().<span class="fn">zip</span>(vals.<span class="fn">iter</span>()).<span class="fn">collect</span>();</code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2>Flattening nested structures</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">flatten and flat_map — verified</div>
+<pre><code><span class="cm">// FLATTEN — remove one level of nesting</span>
+<span class="fn">vec!</span>[<span class="fn">vec!</span>[<span class="nu">1</span>,<span class="nu">2</span>], <span class="fn">vec!</span>[<span class="nu">3</span>]].<span class="fn">into_iter</span>().<span class="fn">flatten</span>()
+<span class="cm">// [1, 2, 3]</span>
+
+<span class="cm">// FLAT_MAP — map to an iterator, then flatten. One step.</span>
+[<span class="st">"hi"</span>, <span class="st">"yo"</span>].<span class="fn">iter</span>().<span class="fn">flat_map</span>(|s| s.<span class="fn">chars</span>())
+<span class="cm">// ['h', 'i', 'y', 'o']</span>
+
+<span class="cm">// flat_map(f) is exactly map(f).flatten()</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">flatten also unwraps Options</span>
+    <p><code>Option</code> and <code>Result</code> are iterators over zero or one item, so <code>flatten</code> drops the empty ones:</p>
+    <div class="code" style="margin-top:0.7rem">
+<pre><code><span class="fn">vec!</span>[<span class="ty">Some</span>(<span class="nu">1</span>), <span class="ty">None</span>, <span class="ty">Some</span>(<span class="nu">3</span>)].<span class="fn">into_iter</span>().<span class="fn">flatten</span>()
+<span class="cm">// [1, 3]  — a neat way to discard the Nones</span></code></pre>
+    </div>
+  </div>
+
+  <h3>A realistic use</h3>
+
+  <div class="code">
+    <div class="code-label">Every word across many lines</div>
+<pre><code><span class="k">let</span> lines = <span class="fn">vec!</span>[<span class="st">"hello world"</span>, <span class="st">"foo bar"</span>];
+
+<span class="k">let</span> words: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = lines.<span class="fn">iter</span>()
+    .<span class="fn">flat_map</span>(|line| line.<span class="fn">split_whitespace</span>())
+    .<span class="fn">collect</span>();
+<span class="cm">// ["hello", "world", "foo", "bar"]</span>
+
+<span class="cm">// With map() you would get Vec&lt;Vec&lt;&amp;str&gt;&gt; — nested, not flat.</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>Stateful and utility adapters</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">scan, peekable, inspect, cycle — verified</div>
+<pre><code><span class="cm">// SCAN — like fold, but yields every intermediate value.</span>
+<span class="cm">// Running totals:</span>
+(<span class="nu">1</span>..=<span class="nu">5</span>).<span class="fn">scan</span>(<span class="nu">0</span>, |acc, x| { *acc += x; <span class="ty">Some</span>(*acc) })
+<span class="cm">// [1, 3, 6, 10, 15]</span>
+
+<span class="cm">// PEEKABLE — look at the next item without consuming it</span>
+<span class="k">let</span> <span class="k">mut</span> p = [<span class="nu">1</span>, <span class="nu">2</span>].<span class="fn">iter</span>().<span class="fn">peekable</span>();
+p.<span class="fn">peek</span>();    <span class="cm">// Some(1)  — still there</span>
+p.<span class="fn">next</span>();    <span class="cm">// Some(1)  — now consumed</span>
+
+<span class="cm">// INSPECT — peek at values passing through. For DEBUGGING.</span>
+(<span class="nu">1</span>..=<span class="nu">3</span>).<span class="fn">inspect</span>(|x| <span class="fn">println!</span>(<span class="st">"saw {x}"</span>)).<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;()
+<span class="cm">// prints saw 1, saw 2, saw 3 — then returns 6</span>
+
+<span class="cm">// CYCLE — repeat forever. ALWAYS pair with take().</span>
+[<span class="nu">1</span>, <span class="nu">2</span>].<span class="fn">iter</span>().<span class="fn">cycle</span>().<span class="fn">take</span>(<span class="nu">5</span>)
+<span class="cm">// [1, 2, 1, 2, 1]</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">inspect is the iterator debugger</span>
+    <p>When a chain gives the wrong answer, drop <code>.inspect(|x| println!("{:?}", x))</code> between two adapters to see exactly what is flowing through at that point. It passes items along unchanged, so it never alters behaviour. Remove it when you are done.</p>
+  </div>
+
+  <h3><code>by_ref</code> — using an iterator in two parts</h3>
+
+  <div class="code">
+    <div class="code-label">Take some now, the rest later</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+<span class="k">let</span> <span class="k">mut</span> it = v.<span class="fn">iter</span>();
+
+<span class="k">let</span> first2: <span class="ty">Vec</span>&lt;_&gt; = it.<span class="fn">by_ref</span>().<span class="fn">take</span>(<span class="nu">2</span>).<span class="fn">collect</span>();  <span class="cm">// [1, 2]</span>
+<span class="k">let</span> rest:   <span class="ty">Vec</span>&lt;_&gt; = it.<span class="fn">collect</span>();                  <span class="cm">// [3, 4, 5]</span></code></pre>
+  </div>
+
+  <p>Without <code>by_ref</code>, <code>take(2)</code> would consume the whole iterator and <code>it</code> would be unusable. <code>by_ref</code> lends it instead — useful for parsing a header before the body.</p>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>Consumers — reducing to a single value</h2>
+  </div>
+
+  <p>A consumer ends the chain and produces something real. This is where the work happens.</p>
+
+  <div class="code">
+    <div class="code-label">The common ones — verified on (1..=10)</div>
+<pre><code>.<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;()      <span class="cm">// 55</span>
+.<span class="fn">product</span>::&lt;<span class="ty">i64</span>&gt;()  <span class="cm">// 120 on (1..=5)</span>
+.<span class="fn">count</span>()           <span class="cm">// 10</span>
+.<span class="fn">min</span>() / .<span class="fn">max</span>()   <span class="cm">// Some(1) / Some(10)   — Option, because empty has neither</span>
+.<span class="fn">last</span>()            <span class="cm">// Some(10)</span></code></pre>
+  </div>
+
+  <h3><code>fold</code> — the one they are all built from</h3>
+
+  <div class="code">
+    <div class="code-label">Start with a value, combine each item into it</div>
+<pre><code>(<span class="nu">1</span>..=<span class="nu">10</span>).<span class="fn">fold</span>(<span class="nu">0</span>, |acc, x| acc + x)      <span class="cm">// 55 — this IS sum()</span>
+(<span class="nu">1</span>..=<span class="nu">5</span>).<span class="fn">fold</span>(<span class="nu">1</span>, |acc, x| acc * x)       <span class="cm">// 120 — this IS product()</span>
+
+<span class="cm">//        ↑ starting value</span>
+<span class="cm">//            ↑ accumulator so far</span>
+<span class="cm">//                 ↑ current item</span></code></pre>
+  </div>
+
+  <p><code>fold</code> is completely general — the accumulator can be any type, not just a number:</p>
+
+  <div class="code">
+    <div class="code-label">Building a String with fold — verified</div>
+<pre><code>[<span class="st">"a"</span>, <span class="st">"b"</span>, <span class="st">"c"</span>].<span class="fn">iter</span>().<span class="fn">fold</span>(<span class="ty">String</span>::<span class="fn">new</span>(), |<span class="k">mut</span> acc, s| {
+    <span class="k">if</span> !acc.<span class="fn">is_empty</span>() { acc.<span class="fn">push</span>(<span class="st">'-'</span>); }
+    acc.<span class="fn">push_str</span>(s);
+    acc
+})
+<span class="cm">// "a-b-c"    (though .join("-") is clearer for this specific case)</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">fold vs reduce</span>
+    <p><code>fold</code> takes an explicit starting value and always returns a value. <code>reduce</code> uses the first item as the start and returns <code>Option</code> — because an empty iterator has nothing to start from. Use <code>reduce</code> when the accumulator is the same type as the items and you have no natural zero.</p>
+  </div>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>Searching and testing</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">All short-circuit — verified on (1..=10)</div>
+<pre><code>.<span class="fn">any</span>(|&amp;x| x &gt; <span class="nu">9</span>)       <span class="cm">// true    — stops at the first match</span>
+.<span class="fn">all</span>(|&amp;x| x &gt; <span class="nu">0</span>)       <span class="cm">// true    — stops at the first failure</span>
+.<span class="fn">find</span>(|&amp;&amp;x| x &gt; <span class="nu">5</span>)     <span class="cm">// Some(6) — the VALUE</span>
+.<span class="fn">position</span>(|&amp;x| x == <span class="nu">5</span>) <span class="cm">// Some(4) — the INDEX</span>
+.<span class="fn">nth</span>(<span class="nu">2</span>)               <span class="cm">// Some(3) — 0-indexed</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Short-circuiting is free performance</span>
+    <p><code>any</code> on a million-item iterator stops the instant it finds a match — it does not check the rest. Same for <code>all</code>, <code>find</code>, and <code>position</code>. Writing <code>.filter(..).count() &gt; 0</code> instead of <code>.any(..)</code> throws that away and scans everything.</p>
+  </div>
+
+  <h3>Comparing by a computed key</h3>
+
+  <div class="code">
+    <div class="code-label">max_by_key and max_by — verified</div>
+<pre><code><span class="cm">// By a derived value — clearest when there is an obvious key</span>
+[<span class="st">"aa"</span>, <span class="st">"b"</span>, <span class="st">"ccc"</span>].<span class="fn">iter</span>().<span class="fn">max_by_key</span>(|s| s.<span class="fn">len</span>())
+<span class="cm">// Some("ccc")</span>
+
+<span class="cm">// By explicit comparison — REQUIRED for floats, which have no Ord</span>
+[<span class="nu">3.5</span>, <span class="nu">1.2</span>].<span class="fn">iter</span>().<span class="fn">cloned</span>()
+    .<span class="fn">min_by</span>(|a, b| a.<span class="fn">partial_cmp</span>(b).<span class="fn">unwrap</span>())
+<span class="cm">// Some(1.2)</span></code></pre>
+  </div>
+
+  <p>The float case is the same <code>Ord</code>-versus-<code>PartialOrd</code> issue you met when sorting: <code>NaN</code> makes a total order impossible, so <code>max()</code> is unavailable and <code>max_by</code> with <code>partial_cmp</code> is the way through.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Ties</span>
+    <p>On ties, <code>max_by_key</code> returns the <strong>last</strong> maximum and <code>min_by_key</code> the <strong>first</strong>. If that distinction matters, sort with an explicit tie-break instead.</p>
+  </div>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>collect in depth</h2>
+  </div>
+
+  <p><code>collect</code> is the most flexible consumer, and the one that most often needs a type annotation. It builds whatever you ask for.</p>
+
+  <div class="code">
+    <div class="code-label">Two ways to say what you want</div>
+<pre><code><span class="k">let</span> a: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">collect</span>();       <span class="cm">// annotate the binding</span>
+<span class="k">let</span> b = v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt;();     <span class="cm">// turbofish</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0283]</span>: type annotations needed
+  |
+3 |     let doubled = v.iter().map(|x| x * 2).collect();
+  |         ^^^^^^^                           ------- type must be known at this point
+  |
+  = note: the type must implement `FromIterator&lt;i32&gt;`
+help: consider giving `doubled` an explicit type
+  |
+3 |     let doubled: Vec&lt;_&gt; = v.iter().map(|x| x * 2).collect();
+  |                ++++++++</pre>
+  </div>
+
+  <p>If you see that, you left out the annotation. <code>collect</code> genuinely cannot guess whether you want a <code>Vec</code>, a <code>HashSet</code>, or a <code>String</code>.</p>
+
+  <h3>What you can collect into</h3>
+
+  <div class="code">
+    <div class="code-label">Same call, many destinations — all verified</div>
+<pre><code><span class="k">let</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;          = ...<span class="fn">collect</span>();   <span class="cm">// most common</span>
+<span class="k">let</span> s: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt;      = ...<span class="fn">collect</span>();   <span class="cm">// dedupes</span>
+<span class="k">let</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>&gt;     = ...<span class="fn">collect</span>();   <span class="cm">// from (K,V) pairs</span>
+<span class="k">let</span> b: <span class="ty">BTreeMap</span>&lt;<span class="ty">K</span>, <span class="ty">V</span>&gt;    = ...<span class="fn">collect</span>();   <span class="cm">// sorted</span>
+<span class="k">let</span> t: <span class="ty">String</span>            = <span class="fn">vec!</span>[<span class="st">'h'</span>,<span class="st">'i'</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+<span class="cm">// "hi"</span></code></pre>
+  </div>
+
+  <h3>The clever ones: Result and Option</h3>
+
+  <div class="code is-good">
+    <div class="code-label">All-or-nothing — verified</div>
+<pre><code><span class="cm">// An iterator of Results can collect into a Result of a collection.</span>
+<span class="k">let</span> ok: <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, _&gt; =
+    [<span class="st">"1"</span>, <span class="st">"2"</span>].<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;()).<span class="fn">collect</span>();
+<span class="cm">// Ok([1, 2])</span>
+
+<span class="k">let</span> bad: <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, _&gt; =
+    [<span class="st">"1"</span>, <span class="st">"x"</span>].<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;()).<span class="fn">collect</span>();
+<span class="cm">// Err(ParseIntError)  — and it STOPPED at "x"</span>
+
+<span class="cm">// Same trick with Option:</span>
+<span class="k">let</span> o: <span class="ty">Option</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; = <span class="fn">vec!</span>[<span class="ty">Some</span>(<span class="nu">1</span>), <span class="ty">Some</span>(<span class="nu">2</span>)].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+<span class="cm">// Some([1, 2])</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">A real design decision</span>
+    <p><code>filter_map(.. .ok())</code> means "<em>skip</em> the bad ones". <code>collect::&lt;Result&lt;Vec&lt;_&gt;, _&gt;&gt;()</code> means "<em>fail entirely</em> if any is bad". Both are one line. Choosing between them is a genuine decision about how strict your program should be — not a style preference.</p>
+  </div>
+
+  <h3>partition and unzip</h3>
+
+  <div class="code">
+    <div class="code-label">Splitting into two — verified</div>
+<pre><code><span class="cm">// PARTITION — split by a test</span>
+<span class="k">let</span> (even, odd): (<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) = (<span class="nu">1</span>..=<span class="nu">6</span>).<span class="fn">partition</span>(|x| x % <span class="nu">2</span> == <span class="nu">0</span>);
+<span class="cm">// ([2, 4, 6], [1, 3, 5])</span>
+
+<span class="cm">// UNZIP — the opposite of zip</span>
+<span class="k">let</span> (nums, chars): (<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, <span class="ty">Vec</span>&lt;<span class="ty">char</span>&gt;) =
+    <span class="fn">vec!</span>[(<span class="nu">1</span>,<span class="st">'a'</span>), (<span class="nu">2</span>,<span class="st">'b'</span>)].<span class="fn">into_iter</span>().<span class="fn">unzip</span>();
+<span class="cm">// ([1, 2], ['a', 'b'])</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>Writing your own iterator</h2>
+  </div>
+
+  <p>Implement <code>next()</code>, get seventy-five methods free. Here is the whole thing:</p>
+
+  <div class="code is-good">
+    <div class="code-label">A counter — verified</div>
+<pre><code><span class="k">struct</span> <span class="ty">Counter</span> { n: <span class="ty">u32</span> }
+
+<span class="k">impl</span> <span class="ty">Iterator</span> <span class="k">for</span> <span class="ty">Counter</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">u32</span>;            <span class="cm">// what it produces</span>
+
+    <span class="k">fn</span> <span class="fn">next</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">u32</span>&gt; {
+        <span class="k">if</span> <span class="k">self</span>.n &lt; <span class="nu">5</span> {
+            <span class="k">self</span>.n += <span class="nu">1</span>;
+            <span class="ty">Some</span>(<span class="k">self</span>.n)
+        } <span class="k">else</span> {
+            <span class="ty">None</span>                    <span class="cm">// None means: finished</span>
+        }
+    }
+}
+
+<span class="ty">Counter</span> { n: <span class="nu">0</span> }.<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()   <span class="cm">// [1, 2, 3, 4, 5]</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Everything works immediately</span>
+    <p>You wrote <code>next()</code>. You now have <code>map</code>, <code>filter</code>, <code>zip</code>, <code>sum</code>, <code>take</code> and the rest on your own type, for free:</p>
+    <div class="code" style="margin-top:0.7rem">
+<pre><code><span class="ty">Counter</span>{n:<span class="nu">0</span>}.<span class="fn">zip</span>(<span class="ty">Counter</span>{n:<span class="nu">0</span>}.<span class="fn">skip</span>(<span class="nu">1</span>))
+    .<span class="fn">map</span>(|(a,b)| a * b)
+    .<span class="fn">filter</span>(|x| x % <span class="nu">3</span> == <span class="nu">0</span>)
+    .<span class="fn">sum</span>::&lt;<span class="ty">u32</span>&gt;()      <span class="cm">// 18  — verified</span></code></pre>
+    </div>
+  </div>
+
+  <h3>An infinite iterator</h3>
+
+  <div class="code">
+    <div class="code-label">Fibonacci — never returns None</div>
+<pre><code><span class="k">struct</span> <span class="ty">Fib</span> { a: <span class="ty">u64</span>, b: <span class="ty">u64</span> }
+
+<span class="k">impl</span> <span class="ty">Iterator</span> <span class="k">for</span> <span class="ty">Fib</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">u64</span>;
+    <span class="k">fn</span> <span class="fn">next</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">u64</span>&gt; {
+        <span class="k">let</span> r = <span class="k">self</span>.a;
+        <span class="k">self</span>.a = <span class="k">self</span>.b;
+        <span class="k">self</span>.b = r + <span class="k">self</span>.b;
+        <span class="ty">Some</span>(r)              <span class="cm">// ALWAYS Some — infinite</span>
+    }
+}
+
+<span class="ty">Fib</span> { a: <span class="nu">0</span>, b: <span class="nu">1</span> }.<span class="fn">take</span>(<span class="nu">10</span>).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()
+<span class="cm">// [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Infinite needs a limit</span>
+    <p><code>Fib{a:0,b:1}.collect::&lt;Vec&lt;_&gt;&gt;()</code> would loop until memory ran out. Any infinite iterator must meet a <code>take</code>, <code>take_while</code>, <code>find</code>, or <code>any</code> somewhere in the chain. Laziness makes infinite sources <em>possible</em>; a bound makes them <em>safe</em>.</p>
+  </div>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>IntoIterator — making your type work in a for loop</h2>
+  </div>
+
+  <p><code>Iterator</code> means "I produce values". <code>IntoIterator</code> means "I can be turned into something that does". The <code>for</code> loop calls <code>into_iter()</code> on whatever you give it.</p>
+
+  <div class="code">
+    <div class="code-label">A custom collection, both ways — verified</div>
+<pre><code><span class="k">struct</span> <span class="ty">Stack</span> { items: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; }
+
+<span class="cm">// BY VALUE — consumes the Stack, yields owned i32</span>
+<span class="k">impl</span> <span class="ty">IntoIterator</span> <span class="k">for</span> <span class="ty">Stack</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = <span class="ty">i32</span>;
+    <span class="k">type</span> <span class="ty">IntoIter</span> = std::vec::<span class="ty">IntoIter</span>&lt;<span class="ty">i32</span>&gt;;
+    <span class="k">fn</span> <span class="fn">into_iter</span>(<span class="k">self</span>) -&gt; <span class="ty">Self</span>::<span class="ty">IntoIter</span> {
+        <span class="k">self</span>.items.<span class="fn">into_iter</span>()
+    }
+}
+
+<span class="cm">// BY REFERENCE — borrows, yields &amp;i32. This is what `for x in &amp;stack` uses.</span>
+<span class="k">impl</span>&lt;<span class="ty">'a</span>&gt; <span class="ty">IntoIterator</span> <span class="k">for</span> &amp;<span class="ty">'a</span> <span class="ty">Stack</span> {
+    <span class="k">type</span> <span class="ty">Item</span> = &amp;<span class="ty">'a</span> <span class="ty">i32</span>;
+    <span class="k">type</span> <span class="ty">IntoIter</span> = std::slice::<span class="ty">Iter</span>&lt;<span class="ty">'a</span>, <span class="ty">i32</span>&gt;;
+    <span class="k">fn</span> <span class="fn">into_iter</span>(<span class="k">self</span>) -&gt; <span class="ty">Self</span>::<span class="ty">IntoIter</span> {
+        <span class="k">self</span>.items.<span class="fn">iter</span>()
+    }
+}
+
+<span class="k">let</span> st = <span class="ty">Stack</span> { items: <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>] };
+<span class="k">for</span> x <span class="k">in</span> &amp;st { }              <span class="cm">// borrows — st still usable</span>
+<span class="k">let</span> owned: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = st.<span class="fn">into_iter</span>().<span class="fn">collect</span>();  <span class="cm">// consumes</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">This is why the three forms exist</span>
+    <p><code>Vec</code> has three <code>IntoIterator</code> impls: one for <code>Vec&lt;T&gt;</code> (yields <code>T</code>), one for <code>&amp;Vec&lt;T&gt;</code> (yields <code>&amp;T</code>), one for <code>&amp;mut Vec&lt;T&gt;</code> (yields <code>&amp;mut T</code>). That is the entire mechanism behind <code>for x in v</code> versus <code>for x in &amp;v</code>. Nothing special-cased — just three trait impls.</p>
+  </div>
+
+  <h3>Accepting any iterable in a function</h3>
+
+  <div class="code is-good">
+    <div class="code-label">The flexible signature</div>
+<pre><code><span class="cm">// Accepts Vec, arrays, ranges, HashSets — anything iterable.</span>
+<span class="k">fn</span> <span class="fn">total</span>&lt;<span class="ty">I</span>&gt;(items: <span class="ty">I</span>) -&gt; <span class="ty">i32</span>
+<span class="k">where</span>
+    <span class="ty">I</span>: <span class="ty">IntoIterator</span>&lt;<span class="ty">Item</span> = <span class="ty">i32</span>&gt;,
+{
+    items.<span class="fn">into_iter</span>().<span class="fn">sum</span>()
+}
+
+<span class="fn">total</span>(<span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]);   <span class="cm">// ✓</span>
+<span class="fn">total</span>(<span class="nu">1</span>..=<span class="nu">3</span>);           <span class="cm">// ✓</span></code></pre>
+  </div>
+
+  <p>Note <code>Item = i32</code> with an equals sign — that is the associated-type syntax from Part 2. Take <code>IntoIterator</code> in a parameter when you want maximum flexibility; take <code>impl Iterator</code> when the caller should already have an iterator.</p>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Generator functions — iterators from nothing</h2>
+  </div>
+
+  <p>Sometimes you want an iterator that is not backed by a collection at all. <code>std::iter</code> has builders for that.</p>
+
+  <div class="code">
+    <div class="code-label">All verified</div>
+<pre><code><span class="k">use</span> std::iter;
+
+<span class="cm">// SUCCESSORS — each item computed from the previous one</span>
+iter::<span class="fn">successors</span>(<span class="ty">Some</span>(<span class="nu">1u32</span>), |&amp;x| <span class="ty">Some</span>(x * <span class="nu">2</span>)).<span class="fn">take</span>(<span class="nu">6</span>)
+<span class="cm">// [1, 2, 4, 8, 16, 32]</span>
+
+<span class="cm">// REPEAT — the same value forever</span>
+iter::<span class="fn">repeat</span>(<span class="nu">7</span>).<span class="fn">take</span>(<span class="nu">3</span>)              <span class="cm">// [7, 7, 7]</span>
+
+<span class="cm">// ONCE / EMPTY — exactly one item, or none</span>
+iter::<span class="fn">once</span>(<span class="nu">1</span>).<span class="fn">chain</span>(iter::<span class="fn">empty</span>())    <span class="cm">// [1]</span>
+
+<span class="cm">// FROM_FN — call a closure until it returns None</span>
+<span class="k">let</span> <span class="k">mut</span> k = <span class="nu">0</span>;
+iter::<span class="fn">from_fn</span>(|| {
+    k += <span class="nu">1</span>;
+    <span class="k">if</span> k &lt;= <span class="nu">3</span> { <span class="ty">Some</span>(k) } <span class="k">else</span> { <span class="ty">None</span> }
+})
+<span class="cm">// [1, 2, 3]</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">from_fn beats a custom struct for one-offs</span>
+    <p>For a throwaway sequence, <code>iter::from_fn</code> saves you defining a struct and an <code>impl</code> block. Reach for a real <code>Iterator</code> impl (Part 13) when the type is part of your API or needs a name.</p>
+  </div>
+
+  <h3>Ranges are iterators too</h3>
+
+  <div class="code">
+    <div class="code-label">The source you have used since day one</div>
+<pre><code><span class="nu">1</span>..<span class="nu">10</span>       <span class="cm">// 1 to 9         exclusive</span>
+<span class="nu">1</span>..=<span class="nu">10</span>      <span class="cm">// 1 to 10        inclusive</span>
+(<span class="nu">1</span>..).<span class="fn">take</span>(<span class="nu">5</span>) <span class="cm">// [1,2,3,4,5]    INFINITE range, bounded</span>
+(<span class="nu">1</span>..=<span class="nu">10</span>).<span class="fn">rev</span>()          <span class="cm">// counts down</span>
+(<span class="nu">0</span>..<span class="nu">20</span>).<span class="fn">step_by</span>(<span class="nu">5</span>)      <span class="cm">// [0, 5, 10, 15]</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Zero-cost abstraction — why chains are not slow</h2>
+  </div>
+
+  <p>The natural worry: surely all those closures and intermediate structs cost something? They do not.</p>
+
+  <div class="split">
+    <div class="code">
+      <div class="code-label">Chain</div>
+<pre><code><span class="k">let</span> s: <span class="ty">i32</span> = (<span class="nu">1</span>..=<span class="nu">10</span>)
+    .<span class="fn">filter</span>(|x| x % <span class="nu">2</span> == <span class="nu">0</span>)
+    .<span class="fn">map</span>(|x| x * x)
+    .<span class="fn">sum</span>();</code></pre>
+    </div>
+    <div class="code">
+      <div class="code-label">Hand-written</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> s = <span class="nu">0</span>;
+<span class="k">for</span> x <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">10</span> {
+    <span class="k">if</span> x % <span class="nu">2</span> == <span class="nu">0</span> { s += x * x; }
+}</code></pre>
+    </div>
+  </div>
+
+  <p>Both give <strong>220</strong>, and both compile to essentially identical machine code. Here is why:</p>
+
+  <div class="figure">
+<pre>No intermediate collections are built.
+
+  filter → map → sum does NOT mean:
+     build filtered vec  →  build mapped vec  →  add it up
+
+  It means ONE pass, pulling one value at a time:
+     1 → rejected
+     2 → kept → 4  → added
+     3 → rejected
+     4 → kept → 16 → added
+     ...
+
+Each adapter is a zero-sized struct wrapping the previous one.
+Monomorphization + inlining collapse the whole tower into one loop.</pre>
+    <p class="figcap">The same monomorphization you learned with generics. Each closure gets its own concrete type, so the compiler can inline everything and erase the abstraction entirely.</p>
+  </div>
+
+  <div class="keyline">You pay nothing for the readability. The chain is not a slower way to write the loop — it is the same loop, written more clearly.</div>
+
+  <div class="note">
+    <span class="note-tag">size_hint — a small optimisation you get free</span>
+    <p>Iterators report how many items they expect. <code>v.iter()</code> on a 5-element vec reports <code>(5, Some(5))</code> — exact. After <code>.filter(..)</code> it becomes <code>(0, Some(5))</code> — between 0 and 5, since filtering may drop items. <code>collect</code> uses this to pre-allocate the right capacity, avoiding reallocations. Both values verified.</p>
+  </div>
+</section>
+
+<!-- ============ PART 17 ============ -->
+<section id="p17">
+  <div class="part-head">
+    <span class="part-num">PART 17</span>
+    <h2>Iterator families — the specialised traits</h2>
+  </div>
+
+  <p>Some adapters need more than <code>next()</code>. Those requirements are extra traits, and knowing them explains several otherwise-confusing errors.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Trait</th><th>Adds</th><th>Enables</th></tr></thead>
+      <tbody>
+        <tr><td><code>Iterator</code></td><td><code>next()</code></td><td>Everything basic</td></tr>
+        <tr><td><code>DoubleEndedIterator</code></td><td><code>next_back()</code></td><td><code>.rev()</code>, <code>.rfind()</code>, <code>.rposition()</code></td></tr>
+        <tr><td><code>ExactSizeIterator</code></td><td><code>len()</code></td><td>Knowing the count without consuming</td></tr>
+        <tr><td><code>FusedIterator</code></td><td>a guarantee</td><td>Promises <code>None</code> stays <code>None</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Double-ended in action — verified</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+<span class="k">let</span> <span class="k">mut</span> it = v.<span class="fn">iter</span>();
+
+it.<span class="fn">next</span>();        <span class="cm">// Some(1)  — from the front</span>
+it.<span class="fn">next_back</span>();   <span class="cm">// Some(5)  — from the back, same iterator</span>
+
+v.<span class="fn">iter</span>().<span class="fn">rfind</span>(|&amp;&amp;x| x &lt; <span class="nu">4</span>)   <span class="cm">// Some(3) — searches BACKWARDS</span>
+v.<span class="fn">iter</span>().<span class="fn">len</span>()                   <span class="cm">// 5       — ExactSizeIterator</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why .rev() sometimes fails to compile</span>
+    <p><code>.rev()</code> requires <code>DoubleEndedIterator</code>. Vectors, slices, arrays, and ranges have it. A <code>HashMap</code> iterator does <strong>not</strong> — there is no "back" to a structure with no order. If <code>.rev()</code> will not compile, that is the reason: collect to a <code>Vec</code> and sort first.</p>
+  </div>
+</section>
+
+<!-- ============ PART 18 ============ -->
+<section id="p18">
+  <div class="part-head">
+    <span class="part-num">PART 18</span>
+    <h2>Real-world recipes</h2>
+  </div>
+
+  <p>Patterns worth recognising on sight. Every one was verified.</p>
+
+  <h4>Text processing</h4>
+  <div class="code">
+    <div class="code-label">Strings are full of iterators</div>
+<pre><code><span class="k">let</span> text = <span class="st">"hello world foo"</span>;
+
+text.<span class="fn">chars</span>().<span class="fn">count</span>()                     <span class="cm">// 15</span>
+text.<span class="fn">split_whitespace</span>().<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()  <span class="cm">// ["hello","world","foo"]</span>
+<span class="st">"a\nb"</span>.<span class="fn">lines</span>().<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()        <span class="cm">// ["a", "b"]</span>
+<span class="st">"hi"</span>.<span class="fn">bytes</span>().<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()         <span class="cm">// [104, 105]</span>
+<span class="st">"hi"</span>.<span class="fn">char_indices</span>().<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()  <span class="cm">// [(0,'h'), (1,'i')]</span>
+
+<span class="cm">// Reverse a string</span>
+<span class="k">let</span> r: <span class="ty">String</span> = <span class="st">"abc"</span>.<span class="fn">chars</span>().<span class="fn">rev</span>().<span class="fn">collect</span>();   <span class="cm">// "cba"</span></code></pre>
+  </div>
+
+  <h4>Word frequency — everything at once</h4>
+  <div class="code">
+    <div class="code-label">Iterators + HashMap</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="k">let</span> <span class="k">mut</span> counts: <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+<span class="k">for</span> w <span class="k">in</span> text.<span class="fn">split_whitespace</span>() {
+    *counts.<span class="fn">entry</span>(w).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+}
+
+<span class="cm">// Then sort for display — map order is arbitrary</span>
+<span class="k">let</span> <span class="k">mut</span> pairs: <span class="ty">Vec</span>&lt;_&gt; = counts.<span class="fn">iter</span>().<span class="fn">collect</span>();
+pairs.<span class="fn">sort_by</span>(|a, b| b.<span class="nu">1</span>.<span class="fn">cmp</span>(a.<span class="nu">1</span>));</code></pre>
+  </div>
+
+  <h4>Sum of squares of evens</h4>
+  <div class="code">
+    <div class="code-label">The canonical chain</div>
+<pre><code><span class="k">let</span> s: <span class="ty">i32</span> = (<span class="nu">1</span>..=<span class="nu">10</span>).<span class="fn">filter</span>(|x| x % <span class="nu">2</span> == <span class="nu">0</span>).<span class="fn">map</span>(|x| x * x).<span class="fn">sum</span>();
+<span class="cm">// 220</span></code></pre>
+  </div>
+
+  <h4>Parsing input safely</h4>
+  <div class="code">
+    <div class="code-label">Two strictness levels</div>
+<pre><code><span class="cm">// Lenient — skip anything unparseable</span>
+<span class="k">let</span> nums: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = input.<span class="fn">split</span>(<span class="st">','</span>)
+    .<span class="fn">filter_map</span>(|s| s.<span class="fn">trim</span>().<span class="fn">parse</span>().<span class="fn">ok</span>())
+    .<span class="fn">collect</span>();
+
+<span class="cm">// Strict — fail the whole thing if any item is bad</span>
+<span class="k">let</span> nums: <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, _&gt; = input.<span class="fn">split</span>(<span class="st">','</span>)
+    .<span class="fn">map</span>(|s| s.<span class="fn">trim</span>().<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;())
+    .<span class="fn">collect</span>();</code></pre>
+  </div>
+
+  <h4>Deduplicating while keeping order</h4>
+  <div class="code">
+    <div class="code-label">HashSet as a filter</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashSet</span>;
+
+<span class="k">let</span> <span class="k">mut</span> seen = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+<span class="k">let</span> unique: <span class="ty">Vec</span>&lt;_&gt; = items.<span class="fn">iter</span>()
+    .<span class="fn">filter</span>(|x| seen.<span class="fn">insert</span>(**x))   <span class="cm">// true only the first time</span>
+    .<span class="fn">collect</span>();</code></pre>
+  </div>
+
+  <h4>Statistics in one pass each</h4>
+  <div class="code">
+    <div class="code-label">Common summaries</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">4</span>, <span class="nu">1</span>, <span class="nu">5</span>];
+
+<span class="k">let</span> sum:  <span class="ty">i32</span> = v.<span class="fn">iter</span>().<span class="fn">sum</span>();
+<span class="k">let</span> mean: <span class="ty">f64</span> = sum <span class="k">as</span> <span class="ty">f64</span> / v.<span class="fn">len</span>() <span class="k">as</span> <span class="ty">f64</span>;
+<span class="k">let</span> max = v.<span class="fn">iter</span>().<span class="fn">max</span>();
+<span class="k">let</span> above_mean = v.<span class="fn">iter</span>().<span class="fn">filter</span>(|&amp;&amp;x| (x <span class="k">as</span> <span class="ty">f64</span>) &gt; mean).<span class="fn">count</span>();</code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 19 ============ -->
+<section id="p19">
+  <div class="part-head">
+    <span class="part-num">PART 19</span>
+    <h2>Common errors</h2>
+  </div>
+
+  <p>All real compiler output.</p>
+
+  <h3>Warning — unused iterator</h3>
+  <div class="errblock">
+<pre><span class="code-id">warning</span>: unused `Map` that must be used
+  = note: iterators are lazy and do nothing unless consumed</pre>
+  </div>
+  <p><strong>Cause:</strong> a chain with no consumer.<br>
+  <strong>Fix:</strong> add <code>.collect()</code>, <code>.sum()</code>, <code>.for_each(..)</code>, or a <code>for</code> loop.</p>
+
+  <h3>E0283 — type annotations needed</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0283]</span>: type annotations needed
+  = note: the type must implement `FromIterator&lt;i32&gt;`
+help: consider giving `doubled` an explicit type</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>collect()</code> with nothing indicating the target type.<br>
+  <strong>Fix:</strong> annotate the binding, or use the turbofish <code>.collect::&lt;Vec&lt;_&gt;&gt;()</code>.</p>
+
+  <h3>E0369 — arithmetic on a double reference</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0369]</span>: cannot calculate the remainder of `&amp;&amp;{integer}` divided by `{integer}`
+ --&gt; src/main.rs:3:44
+  |
+3 |     let total: i32 = v.iter().filter(|x| x % 2 == 0).sum();
+  |                                          - ^ - {integer}
+  |                                          |
+  |                                          &amp;&amp;{integer}
+help: `%` can be used on `&amp;{integer}` if you dereference the left-hand side
+  |
+3 |     ...filter(|x| *x % 2 == 0)...</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>filter</code> gives the closure <code>&amp;&amp;T</code>, and you used it as a number.<br>
+  <strong>Fix:</strong> <code>|&amp;&amp;x| x % 2 == 0</code> or <code>|x| **x % 2 == 0</code>. See Part 4.</p>
+
+  <h3>E0382 — iterator used after being consumed</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: use of moved value: `it`
+note: `collect` takes ownership of the receiver `self`, which moves `it`</pre>
+  </div>
+  <p><strong>Cause:</strong> consumers take <code>self</code>, so an iterator is used up once.<br>
+  <strong>Fix:</strong> build a fresh iterator, or use <code>.by_ref()</code> to lend it. See Part 9.</p>
+
+  <h3>E0382 — collection moved by into_iter</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `words`
+note: `into_iter` takes ownership of the receiver `self`, which moves `words`
+help: you can `clone` the value and consume it</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>into_iter()</code> (or bare <code>for x in v</code>) consumed the collection, then you used it again.<br>
+  <strong>Fix:</strong> use <code>.iter()</code> / <code>for x in &amp;v</code>. See Part 4.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">A pattern in these errors</span>
+    <p>Four of the five are ownership or reference-level problems, not logic problems. When an iterator chain will not compile, check <em>what each adapter hands your closure</em> before questioning the logic — it is nearly always a missing <code>&amp;</code>, a missing <code>*</code>, or an <code>.iter()</code> that should have been <code>.into_iter()</code>.</p>
+  </div>
+</section>
+
+<!-- ============ PART 20 ============ -->
+<section id="p20">
+  <div class="part-head">
+    <span class="part-num">PART 20</span>
+    <h2>Cheat sheet</h2>
+  </div>
+
+  <h4>Sources</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">v.iter()</td><td>Yields <code>&amp;T</code></td></tr>
+        <tr><td class="col-mono">v.iter_mut()</td><td>Yields <code>&amp;mut T</code></td></tr>
+        <tr><td class="col-mono">v.into_iter()</td><td>Yields <code>T</code>, consumes</td></tr>
+        <tr><td class="col-mono">1..10 / 1..=10</td><td>Range</td></tr>
+        <tr><td class="col-mono">s.chars() / s.split_whitespace() / s.lines()</td><td>String iterators</td></tr>
+        <tr><td class="col-mono">iter::repeat / once / empty / successors / from_fn</td><td>Generated</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Adapters — lazy, return another iterator</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">.map(f)</td><td>Transform each</td></tr>
+        <tr><td class="col-mono">.filter(p)</td><td>Keep matching</td></tr>
+        <tr><td class="col-mono">.filter_map(f)</td><td>Both; keeps the <code>Some</code>s</td></tr>
+        <tr><td class="col-mono">.take(n) / .skip(n)</td><td>First n / drop n</td></tr>
+        <tr><td class="col-mono">.take_while(p) / .skip_while(p)</td><td>Until / from first failure</td></tr>
+        <tr><td class="col-mono">.step_by(n) / .rev()</td><td>Every nth / backwards</td></tr>
+        <tr><td class="col-mono">.zip(other) / .chain(other)</td><td>Pair up / append</td></tr>
+        <tr><td class="col-mono">.enumerate()</td><td>Add indices</td></tr>
+        <tr><td class="col-mono">.flatten() / .flat_map(f)</td><td>Unnest</td></tr>
+        <tr><td class="col-mono">.scan(init, f) / .peekable()</td><td>Running state / lookahead</td></tr>
+        <tr><td class="col-mono">.inspect(f)</td><td>Debug mid-chain</td></tr>
+        <tr><td class="col-mono">.copied() / .cloned()</td><td><code>&amp;T</code> → <code>T</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Consumers — eager, produce a value</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">.collect()</td><td>Build a collection</td></tr>
+        <tr><td class="col-mono">.sum() / .product() / .count()</td><td>Numbers</td></tr>
+        <tr><td class="col-mono">.min() / .max()</td><td><code>Option&lt;T&gt;</code></td></tr>
+        <tr><td class="col-mono">.max_by_key(f) / .max_by(cmp)</td><td>By computed key / comparison</td></tr>
+        <tr><td class="col-mono">.fold(init, f) / .reduce(f)</td><td>General reduction</td></tr>
+        <tr><td class="col-mono">.any(p) / .all(p)</td><td><code>bool</code>, short-circuits</td></tr>
+        <tr><td class="col-mono">.find(p) / .position(p)</td><td>Value / index</td></tr>
+        <tr><td class="col-mono">.partition(p) / .unzip()</td><td>Split into two</td></tr>
+        <tr><td class="col-mono">.for_each(f)</td><td>Side effects only</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Which adapter?</h4>
+  <div class="tree"><b>What are you doing to each item?</b>
+├─ Change it ─────────────────→ <i>map</i>
+├─ Drop some ─────────────────→ <i>filter</i>
+├─ Both at once ──────────────→ <i>filter_map</i>
+├─ Stop at a condition ───────→ <i>take_while</i>
+├─ Each yields many items ────→ <i>flat_map</i>
+└─ Need a running total ──────→ <i>scan</i>  (or <i>fold</i> for just the end)
+
+<b>What do you want out?</b>
+├─ A collection ──────────────→ <i>collect</i>
+├─ One number ────────────────→ <i>sum / count / fold</i>
+├─ Yes or no ─────────────────→ <i>any / all</i>
+├─ One item ──────────────────→ <i>find / max_by_key</i>
+└─ Nothing, just effects ─────→ <i>for_each</i> or a for loop</div>
+
+  <h4>The six things to remember</h4>
+  <div class="tree"><b>1.</b> Adapters are <i>lazy</i> — nothing runs without a consumer
+<b>2.</b> <i>&amp;v</i> to borrow, <i>v</i> to consume — same rule as always
+<b>3.</b> <i>filter</i> gives your closure <i>&amp;&amp;T</i>; <i>map</i> gives <i>&amp;T</i>
+<b>4.</b> <i>collect</i> needs to be told the target type
+<b>5.</b> Implement <i>next()</i> and you get 75 methods free
+<b>6.</b> Chains are <i>zero-cost</i> — same machine code as the loop</div>
+
+  <div class="keyline">An iterator is a value that knows how to produce the next thing. Everything else — every adapter, every consumer, the whole tower — is built on that one method.</div>
+
+  <div class="foot">
+    <p><b>Next topic.</b> Error handling — <code>Result</code>, the <code>?</code> operator, and custom error types. <code>Result</code> has now appeared in three guides running; this is where it gets studied properly.</p>
+    <p>Companion workbook: <b>iterators_practice.html</b> — 47 exercises with worked solutions.</p>
+    <p>All output in this guide was verified against rustc 1.96.0, edition 2021.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+
+</body>
+</html>

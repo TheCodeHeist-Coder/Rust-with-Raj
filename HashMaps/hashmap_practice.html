@@ -1,0 +1,1911 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HashMap &amp; HashSet — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Shares the palette and identity of hashmap_guide.html.
+   Denser register: this is a workbook, not a reference.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.progress { margin: 1.5rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill { height: 100%; width: 0%; background: var(--rust); transition: width 0.25s ease; }
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.15rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+.howto {
+  max-width: calc(var(--measure) + 10ch);
+  margin: 0 0 3.5rem; padding: 1.35rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust); border-radius: 2px;
+}
+.howto h2 {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.85rem; font-weight: 700;
+}
+.howto ol { margin: 0; padding-left: 1.3rem; font-size: 0.9688rem; }
+.howto li { margin-bottom: 0.45rem; }
+.howto li:last-child { margin-bottom: 0; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.set-head h2 {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-underline-offset: 2px; }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 3px; margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch); overflow: hidden;
+}
+.ex-head {
+  display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; gap: 0.7rem;
+  padding: 0.7rem 1rem; background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked { background: var(--oxide); border-color: var(--oxide); }
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-out { border-left-color: var(--oxide); }
+.code.is-bad { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint ----------------------------------------------------------- */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong); border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line { border-bottom: 1px solid var(--rule-strong); height: 1.5rem; }
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none; padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before { content: "▸"; color: var(--rust); font-size: 0.8rem; }
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+.set-note { max-width: var(--measure); margin: 0 0 1.5rem; font-size: 0.9688rem; color: var(--ink-soft); }
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">HashMap — Practice</p>
+  <p class="rail-sub">38 exercises<br>+ 5-part capstone</p>
+  <nav id="toc">
+    <a href="#s1"><span class="n">SET 1</span><span>Creating</span></a>
+    <a href="#s2"><span class="n">SET 2</span><span>Insert &amp; remove</span></a>
+    <a href="#s3"><span class="n">SET 3</span><span>The entry API</span></a>
+    <a href="#s4"><span class="n">SET 4</span><span>Iteration</span></a>
+    <a href="#s5"><span class="n">SET 5</span><span>HashSet</span></a>
+    <a href="#s6"><span class="n">SET 6</span><span>Set operations</span></a>
+    <a href="#s7"><span class="n">SET 7</span><span>Custom keys</span></a>
+    <a href="#s8"><span class="n">SET 8</span><span>BTreeMap</span></a>
+    <a href="#cap"><span class="n">FINAL</span><span>Capstone</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 0 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<!-- ====================== MAIN ====================== -->
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Practice workbook</p>
+  <h1>HashMap &amp; HashSet:<br><em>38 exercises</em></h1>
+  <p class="standfirst">The entry API in particular only clicks once you have written it a dozen times. Each exercise is small and has one clear answer. Solutions stay hidden until you ask.</p>
+  <div class="masthead-meta">
+    <span><b>38</b> exercises + capstone</span>
+    <span><b>Guide:</b> hashmap_guide.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Solutions</b> verified on rustc 1.96</span>
+  </div>
+</header>
+
+<div class="howto">
+  <h2>How to use this workbook</h2>
+  <ol>
+    <li>Start every file with <code>use std::collections::HashMap;</code> — nothing here works without it.</li>
+    <li>Write your attempt <strong>before</strong> opening the solution.</li>
+    <li>Compile and run: <code>rustc --edition 2021 practice.rs &amp;&amp; ./practice</code></li>
+    <li>When printing a map, <strong>sort first</strong> — otherwise your output order will differ from the solution's every run.</li>
+    <li>Tick the checkbox. Progress is saved in this browser.</li>
+  </ol>
+</div>
+
+<!-- ============ SET 1 ============ -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 01</span>
+    <h2>Creating and reading</h2>
+  </div>
+  <p class="set-note">The basics, plus the safe-versus-panicking read you already know from vectors.</p>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Build a map from scratch</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a <code>HashMap&lt;String, i32&gt;</code> with <code>"ada"</code> → 90 and <code>"ravi"</code> → 78.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="k">fn</span> <span class="fn">make_scores</span>() -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> m = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    m.<span class="fn">insert</span>(<span class="st">"ada"</span>.<span class="fn">to_string</span>(), <span class="nu">90</span>);
+    m.<span class="fn">insert</span>(<span class="st">"ravi"</span>.<span class="fn">to_string</span>(), <span class="nu">78</span>);
+    m
+}
+<span class="cm">// keys, sorted: ["ada", "ravi"]</span></code></pre>
+        </div>
+        <p><code>mut</code> is required to insert. The trailing <code>m</code> with no semicolon returns it. <code>HashMap::new()</code> needs no annotation here because the return type pins <code>K</code> and <code>V</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">From an array of pairs</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Build a map with <code>a</code>→1, <code>b</code>→2, <code>c</code>→3 in a single expression — no <code>mut</code>, no loop.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"a"</span>, <span class="nu">1</span>), (<span class="st">"b"</span>, <span class="nu">2</span>), (<span class="st">"c"</span>, <span class="nu">3</span>)]);
+<span class="cm">// len = 3</span></code></pre>
+        </div>
+        <p>There is no <code>hashmap!</code> macro in std. <code>HashMap::from([...])</code> is the idiomatic literal form.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span><span class="pill med">med</span>
+      <span class="ex-title">Zip two slices into a map</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given names <code>["x", "y"]</code> and values <code>[1, 2]</code>, build a map pairing them.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">zip_map</span>(names: &amp;[&amp;<span class="ty">'static</span> <span class="ty">str</span>], vals: &amp;[<span class="ty">i32</span>])
+    -&gt; <span class="ty">HashMap</span>&lt;&amp;<span class="ty">'static</span> <span class="ty">str</span>, <span class="ty">i32</span>&gt;
+{
+    names.<span class="fn">iter</span>().<span class="fn">copied</span>()
+        .<span class="fn">zip</span>(vals.<span class="fn">iter</span>().<span class="fn">copied</span>())
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// len = 2</span></code></pre>
+        </div>
+        <p><code>collect()</code> builds a <code>HashMap</code> from any iterator of <code>(K, V)</code> pairs — the same <code>collect</code> you used for vectors, steered by the return type.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.4">
+    <div class="ex-head">
+      <span class="ex-id">1.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Read with a default</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the value for a key, or <code>0</code> if it is missing. Must never panic.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">get_or_zero</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;, k: &amp;<span class="ty">str</span>) -&gt; <span class="ty">i32</span> {
+    m.<span class="fn">get</span>(k).<span class="fn">copied</span>().<span class="fn">unwrap_or</span>(<span class="nu">0</span>)
+}
+<span class="cm">// present -&gt; 1,  missing -&gt; 0</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Not this</span>
+          <p><code>m[k]</code> panics with <code>no entry found for key</code>. It compiles fine — the failure only shows up at runtime.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.5">
+    <div class="ex-head">
+      <span class="ex-id">1.5</span><span class="pill med">med</span>
+      <span class="ex-title">Match on a lookup</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>"k = v"</code> if the key exists, or <code>"k not found"</code> if not. Use <code>match</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">describe</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;, k: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="k">match</span> m.<span class="fn">get</span>(k) {
+        <span class="ty">Some</span>(v) =&gt; <span class="fn">format!</span>(<span class="st">"{k} = {v}"</span>),
+        <span class="ty">None</span>    =&gt; <span class="fn">format!</span>(<span class="st">"{k} not found"</span>),
+    }
+}
+<span class="cm">// "a = 1"  |  "zz not found"</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 2 ============ -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 02</span>
+    <h2>Insert, update, remove</h2>
+  </div>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span><span class="pill med">med</span>
+      <span class="ex-title">What does insert return?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Insert the same key twice with different values. Write down what each call returns <em>before</em> running it.</p>
+      <div class="answer-lines">
+        <p>First insert returns</p>
+        <div class="line"></div>
+        <p style="margin-top:0.7rem">Second insert returns</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+
+m.<span class="fn">insert</span>(<span class="st">"a"</span>.<span class="fn">to_string</span>(), <span class="nu">1</span>);   <span class="cm">// None     — key was new</span>
+m.<span class="fn">insert</span>(<span class="st">"a"</span>.<span class="fn">to_string</span>(), <span class="nu">2</span>);   <span class="cm">// Some(1)  — replaced, old value returned</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why it matters</span>
+          <p>Keys are unique — the second insert <strong>overwrites silently</strong>, with no error. The returned <code>Option</code> is how you detect that it happened, which is useful for "was this already set?" checks.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Remove a key twice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Remove the same key twice. What comes back each time?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"a"</span>, <span class="nu">1</span>), (<span class="st">"b"</span>, <span class="nu">2</span>)]);
+
+m.<span class="fn">remove</span>(<span class="st">"a"</span>);   <span class="cm">// Some(1)  — removed, handed back</span>
+m.<span class="fn">remove</span>(<span class="st">"a"</span>);   <span class="cm">// None     — already gone, no panic</span></code></pre>
+        </div>
+        <p>Like <code>Vec::pop</code>, the <code>Option</code> means the "not there" case needs no special handling.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span><span class="pill med">med</span>
+      <span class="ex-title">Modify a value in place</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Add <code>delta</code> to the value at a key, doing nothing if the key is absent. Use <code>get_mut</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">bump</span>(m: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;, k: &amp;<span class="ty">str</span>, delta: <span class="ty">i32</span>) {
+    <span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(v) = m.<span class="fn">get_mut</span>(k) {
+        *v += delta;      <span class="cm">// * — v is &amp;mut i32</span>
+    }
+}
+<span class="cm">// 10 with delta 5 -&gt; Some(15)</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Not m[k] += delta</span>
+          <p><code>HashMap</code> has no <code>IndexMut</code>, so assigning through an index does not compile — <strong>E0594</strong>. Use <code>get_mut</code> or the entry API.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.4">
+    <div class="ex-head">
+      <span class="ex-id">2.4</span><span class="pill med">med</span>
+      <span class="ex-title">Keep only even keys</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>From a map keyed 1–6, keep only the pairs whose key is even.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">keep_even</span>(m: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;<span class="ty">i32</span>, <span class="ty">i32</span>&gt;) {
+    m.<span class="fn">retain</span>(|k, _| k % <span class="nu">2</span> == <span class="nu">0</span>);
+}
+<span class="cm">// keys left: [2, 4, 6]</span></code></pre>
+        </div>
+        <p>Same <code>retain</code> as <code>Vec</code>, but the closure gets <em>both</em> key and value — <code>|k, v|</code>. Use <code>_</code> for the one you ignore.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.5">
+    <div class="ex-head">
+      <span class="ex-id">2.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">Double every value</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Multiply every value in the map by 2, in place.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">double_all</span>(m: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) {
+    <span class="k">for</span> v <span class="k">in</span> m.<span class="fn">values_mut</span>() {
+        *v *= <span class="nu">2</span>;
+    }
+}
+<span class="cm">// values 1, 2 -&gt; 2, 4</span></code></pre>
+        </div>
+        <p><code>values_mut()</code> when you only touch values. Note there is no <code>keys_mut()</code> — changing a key would change its hash and corrupt the map.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 3 ============ -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 03</span>
+    <h2>The entry API</h2>
+  </div>
+  <p class="set-note">The most important set in this workbook. Do all five, even if the first two feel easy — the idiom needs to become automatic.</p>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span><span class="pill med">med</span>
+      <span class="ex-title">Character frequency</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Count how often each character appears in <code>"hello world"</code>, ignoring spaces.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">char_counts</span>(text: &amp;<span class="ty">str</span>) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">char</span>, <span class="ty">i32</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> counts = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> c <span class="k">in</span> text.<span class="fn">chars</span>().<span class="fn">filter</span>(|c| !c.<span class="fn">is_whitespace</span>()) {
+        *counts.<span class="fn">entry</span>(c).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+    }
+    counts
+}
+<span class="cm">// sorted: [('d',1), ('e',1), ('h',1), ('l',3), ('o',2), ('r',1), ('w',1)]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Reading the line</span>
+          <p><code>entry(c)</code> gets a handle to that slot. <code>or_insert(0)</code> puts a 0 there if empty and returns <code>&amp;mut i32</code> either way. The leading <code>*</code> reaches through that reference so <code>+= 1</code> works on the number.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span><span class="pill med">med</span>
+      <span class="ex-title">Word frequency</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Count occurrences in <code>["a", "b", "a", "c", "a"]</code>, returning a <code>HashMap&lt;String, i32&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">word_counts</span>(words: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> counts = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> w <span class="k">in</span> words {
+        *counts.<span class="fn">entry</span>(w.<span class="fn">to_string</span>()).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+    }
+    counts
+}
+<span class="cm">// sorted: [("a", 3), ("b", 1), ("c", 1)]</span></code></pre>
+        </div>
+        <p>Identical shape to 3.1. The <code>to_string()</code> is needed because the map owns <code>String</code> keys.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">Group words by length</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Group <code>["hi", "hey", "hello", "yo"]</code> into a <code>HashMap&lt;usize, Vec&lt;&amp;str&gt;&gt;</code> keyed by length.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">by_length</span>&lt;<span class="ty">'a</span>&gt;(words: &amp;[&amp;<span class="ty">'a</span> <span class="ty">str</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">usize</span>, <span class="ty">Vec</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>&gt;&gt; {
+    <span class="k">let</span> <span class="k">mut</span> groups: <span class="ty">HashMap</span>&lt;<span class="ty">usize</span>, <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> w <span class="k">in</span> words {
+        groups.<span class="fn">entry</span>(w.<span class="fn">len</span>()).<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>).<span class="fn">push</span>(w);
+    }
+    groups
+}
+<span class="cm">// sorted: [(2, ["hi", "yo"]), (3, ["hey"]), (5, ["hello"])]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">or_insert_with, not or_insert</span>
+          <p><code>or_insert(Vec::new())</code> would build a fresh empty <code>Vec</code> on <em>every</em> iteration and discard it whenever the key already exists. <code>or_insert_with(Vec::new)</code> only calls it when needed. Note: no <code>()</code> — you pass the function, not its result.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">and_modify vs or_insert</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function that inserts <code>1</code> for a new key, but adds <code>1</code> to an existing one. Call it three times on the same key — what is the final value?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">tally</span>(m: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;&amp;<span class="ty">'static</span> <span class="ty">str</span>, <span class="ty">i32</span>&gt;, k: &amp;<span class="ty">'static</span> <span class="ty">str</span>) {
+    m.<span class="fn">entry</span>(k).<span class="fn">and_modify</span>(|v| *v += <span class="nu">1</span>).<span class="fn">or_insert</span>(<span class="nu">1</span>);
+}
+<span class="cm">// three calls on "x" -&gt; Some(3)</span>
+<span class="cm">//   1st: absent  -&gt; or_insert(1)  = 1</span>
+<span class="cm">//   2nd: present -&gt; and_modify    = 2</span>
+<span class="cm">//   3rd: present -&gt; and_modify    = 3</span></code></pre>
+        </div>
+        <p><code>and_modify</code> runs only when the key exists; <code>or_insert</code> only when it does not. Chaining them gives different behaviour for the two cases in one expression.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.5">
+    <div class="ex-head">
+      <span class="ex-id">3.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">Partition into even and odd</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Split <code>[1..6]</code> into a <code>HashMap&lt;bool, Vec&lt;i32&gt;&gt;</code> where the key is "is even". Use <code>or_default()</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">split_parity</span>(nums: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">bool</span>, <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; {
+    <span class="k">let</span> <span class="k">mut</span> g: <span class="ty">HashMap</span>&lt;<span class="ty">bool</span>, <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> &amp;n <span class="k">in</span> nums {
+        g.<span class="fn">entry</span>(n % <span class="nu">2</span> == <span class="nu">0</span>).<span class="fn">or_default</span>().<span class="fn">push</span>(n);
+    }
+    g
+}
+<span class="cm">// true  -&gt; [2, 4, 6]</span>
+<span class="cm">// false -&gt; [1, 3, 5]</span></code></pre>
+        </div>
+        <p><code>or_default()</code> uses the type's <code>Default</code> impl — an empty <code>Vec</code> here. It is the shortest form when the default is the obvious one.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 4 ============ -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 04</span>
+    <h2>Iteration</h2>
+  </div>
+  <p class="set-note">Every exercise here sorts before returning — map order is arbitrary, so unsorted output is untestable.</p>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Sum all values</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Total every value in the map.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">i32</span> {
+    m.<span class="fn">values</span>().<span class="fn">sum</span>()
+}
+<span class="cm">// {ada:90, ravi:78, meera:88} -&gt; 256</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Sorted keys</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return every key as a sorted <code>Vec&lt;String&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">sorted_keys</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> k: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = m.<span class="fn">keys</span>().<span class="fn">map</span>(|s| s.<span class="fn">to_string</span>()).<span class="fn">collect</span>();
+    k.<span class="fn">sort</span>();
+    k
+}
+<span class="cm">// ["ada", "meera", "ravi"]</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The sort is mandatory</span>
+          <p>Without it the order differs between runs of the same binary — Rust randomises the hash seed at startup. Tests that skip this pass locally and fail in CI.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span><span class="pill med">med</span>
+      <span class="ex-title">Filter by value</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the names of everyone scoring above a threshold, sorted.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">above</span>&lt;<span class="ty">'a</span>&gt;(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>, <span class="ty">i32</span>&gt;, min: <span class="ty">i32</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = m.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|(_, &amp;s)| s &gt; min)
+        .<span class="fn">map</span>(|(k, _)| *k)
+        .<span class="fn">collect</span>();
+    v.<span class="fn">sort</span>();
+    v
+}
+<span class="cm">// min 80 -&gt; ["ada", "meera"]</span></code></pre>
+        </div>
+        <p>The closure receives a <code>(&amp;K, &amp;V)</code> tuple. <code>|(_, &amp;s)|</code> ignores the key and destructures the value reference in one step.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span><span class="pill med">med</span>
+      <span class="ex-title">Highest scorer</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the key–value pair with the largest value, as an <code>Option</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">top</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">Option</span>&lt;(<span class="ty">String</span>, <span class="ty">i32</span>)&gt; {
+    m.<span class="fn">iter</span>()
+        .<span class="fn">max_by_key</span>(|(_, &amp;v)| v)
+        .<span class="fn">map</span>(|(k, &amp;v)| (k.<span class="fn">to_string</span>(), v))
+}
+<span class="cm">// Some(("ada", 90))</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Ties are unpredictable</span>
+          <p>If two keys share the maximum value, which one you get is arbitrary — the map has no order. Only rely on this when the maximum is unique, or sort explicitly to break ties.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.5">
+    <div class="ex-head">
+      <span class="ex-id">4.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">A leaderboard</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return all pairs sorted by value descending, breaking ties by key ascending.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">leaderboard</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;(<span class="ty">String</span>, <span class="ty">i32</span>)&gt; {
+    <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;(<span class="ty">String</span>, <span class="ty">i32</span>)&gt; = m.<span class="fn">iter</span>()
+        .<span class="fn">map</span>(|(k, &amp;s)| (k.<span class="fn">to_string</span>(), s))
+        .<span class="fn">collect</span>();
+    v.<span class="fn">sort_by</span>(|a, b| b.<span class="nu">1</span>.<span class="fn">cmp</span>(&amp;a.<span class="nu">1</span>).<span class="fn">then</span>(a.<span class="nu">0</span>.<span class="fn">cmp</span>(&amp;b.<span class="nu">0</span>)));
+    v
+}
+<span class="cm">// [("ada", 90), ("meera", 88), ("ravi", 78)]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">.then() for tie-breaking</span>
+          <p><code>b.1.cmp(&amp;a.1)</code> sorts by value descending. <code>.then(...)</code> supplies a second comparison used only when the first says <code>Equal</code>. Chaining <code>then</code> gives you multi-level sorting, and it makes the result deterministic even with ties.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.6">
+    <div class="ex-head">
+      <span class="ex-id">4.6</span><span class="pill med">med</span>
+      <span class="ex-title">Invert a map</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Swap keys and values: <code>HashMap&lt;&amp;str, i32&gt;</code> becomes <code>HashMap&lt;i32, String&gt;</code>. What breaks if two keys share a value?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">invert</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">i32</span>, <span class="ty">String</span>&gt; {
+    m.<span class="fn">iter</span>().<span class="fn">map</span>(|(k, &amp;v)| (v, k.<span class="fn">to_string</span>())).<span class="fn">collect</span>()
+}
+<span class="cm">// len = 3 when all values are distinct</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Duplicate values collapse</span>
+          <p>If two names share a score, they collide on the same new key and one <strong>silently overwrites</strong> the other — the result is smaller than the input. If that matters, invert into <code>HashMap&lt;i32, Vec&lt;String&gt;&gt;</code> using the grouping idiom instead.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 5 ============ -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 05</span>
+    <h2>HashSet basics</h2>
+  </div>
+  <p class="set-note">Remember <code>insert</code> returns a <code>bool</code> — several of these depend on it.</p>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Deduplicate a vector</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn <code>[3, 1, 3, 2, 1]</code> into a sorted vector of unique values, using a <code>HashSet</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashSet</span>;
+
+<span class="k">fn</span> <span class="fn">unique</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    <span class="k">let</span> s: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">collect</span>();
+    <span class="k">let</span> <span class="k">mut</span> out: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = s.<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+    out.<span class="fn">sort</span>();
+    out
+}
+<span class="cm">// [1, 2, 3]</span></code></pre>
+        </div>
+        <p>Compare with <code>vec.sort()</code> + <code>vec.dedup()</code> from the vectors topic — that keeps order and needs <code>Ord</code>; this is O(n) and needs <code>Hash + Eq</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">Deduplicate, keeping first-seen order</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>["a", "b", "a", "c"]</code> → <code>["a", "b", "c"]</code>, preserving the original order. Collecting straight into a set will not work — why not?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">dedup_ordered</span>(v: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> seen = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+    v.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|s| seen.<span class="fn">insert</span>(s.<span class="fn">to_string</span>()))
+        .<span class="fn">map</span>(|s| s.<span class="fn">to_string</span>())
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// ["a", "b", "c"]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The trick</span>
+          <p><code>insert</code> returns <code>true</code> only the <em>first</em> time it sees a value. So <code>filter</code> keeps first occurrences and the set records them in the same step. Collecting directly into a <code>HashSet</code> would work but <strong>destroy the order</strong> — sets have none.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span><span class="pill med">med</span>
+      <span class="ex-title">Any duplicates?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>true</code> if the slice contains any repeated value. Stop early when you find one.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">has_dupes</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">bool</span> {
+    <span class="k">let</span> <span class="k">mut</span> s = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+    v.<span class="fn">iter</span>().<span class="fn">any</span>(|x| !s.<span class="fn">insert</span>(x))
+}
+<span class="cm">// [1,2,3] -&gt; false</span>
+<span class="cm">// [1,2,1] -&gt; true</span></code></pre>
+        </div>
+        <p><code>any</code> short-circuits on the first <code>true</code>, so this stops at the first duplicate rather than scanning everything.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Which values repeat?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>From <code>[1, 2, 2, 3, 3, 3]</code> return the sorted values that appear more than once — each listed once.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">repeated</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> seen = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+    <span class="k">let</span> <span class="k">mut</span> dupes = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+    <span class="k">for</span> &amp;x <span class="k">in</span> v {
+        <span class="k">if</span> !seen.<span class="fn">insert</span>(x) {
+            dupes.<span class="fn">insert</span>(x);      <span class="cm">// second set dedupes the dupes</span>
+        }
+    }
+    <span class="k">let</span> <span class="k">mut</span> out: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = dupes.<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+    out.<span class="fn">sort</span>();
+    out
+}
+<span class="cm">// [2, 3]   — 3 appears three times but is listed once</span></code></pre>
+        </div>
+        <p>Two sets: one tracking what has been seen, one collecting offenders. The second is what stops <code>3</code> appearing twice in the output.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 6 ============ -->
+<section id="s6">
+  <div class="set-head">
+    <span class="set-num">SET 06</span>
+    <h2>Set operations</h2>
+  </div>
+  <p class="set-note">All exercises use <code>a = {1,2,3,4}</code> and <code>b = {3,4,5,6}</code>. Results are sorted for comparison.</p>
+
+  <article class="ex" data-ex="6.1">
+    <div class="ex-head">
+      <span class="ex-id">6.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Intersection</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the values present in both sets.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">both</span>(a: &amp;<span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt;, b: &amp;<span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = a.<span class="fn">intersection</span>(b).<span class="fn">copied</span>().<span class="fn">collect</span>();
+    v.<span class="fn">sort</span>();
+    v
+}
+<span class="cm">// [3, 4]</span></code></pre>
+        </div>
+        <p>These methods return <em>iterators</em>, not sets — you must <code>collect</code> to use the result.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.2">
+    <div class="ex-head">
+      <span class="ex-id">6.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Union</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return everything in either set, with no duplicates.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = a.<span class="fn">union</span>(b).<span class="fn">copied</span>().<span class="fn">collect</span>();
+v.<span class="fn">sort</span>();
+<span class="cm">// [1, 2, 3, 4, 5, 6]</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.3">
+    <div class="ex-head">
+      <span class="ex-id">6.3</span><span class="pill med">med</span>
+      <span class="ex-title">Difference</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return what is in <code>a</code> but not <code>b</code>. Then swap the arguments — do you get the same answer?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = a.<span class="fn">difference</span>(b).<span class="fn">copied</span>().<span class="fn">collect</span>();
+v.<span class="fn">sort</span>();
+<span class="cm">// a.difference(b) = [1, 2]     in a, not in b</span>
+<span class="cm">// b.difference(a) = [5, 6]     DIFFERENT — it is directional</span></code></pre>
+        </div>
+        <p>Difference is the only one of the four that is not symmetric. Intersection, union, and symmetric difference give the same answer either way round.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.4">
+    <div class="ex-head">
+      <span class="ex-id">6.4</span><span class="pill med">med</span>
+      <span class="ex-title">Symmetric difference</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the values in exactly one of the two sets.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = a.<span class="fn">symmetric_difference</span>(b).<span class="fn">copied</span>().<span class="fn">collect</span>();
+v.<span class="fn">sort</span>();
+<span class="cm">// [1, 2, 5, 6]   — everything except the shared 3 and 4</span></code></pre>
+        </div>
+        <p>Equivalent to union minus intersection, but in one pass.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.5">
+    <div class="ex-head">
+      <span class="ex-id">6.5</span><span class="pill med">med</span>
+      <span class="ex-title">A permission check</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given required permissions and granted permissions, return whether the user has everything they need. One method call.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">allowed</span>(required: &amp;<span class="ty">HashSet</span>&lt;&amp;<span class="ty">str</span>&gt;, granted: &amp;<span class="ty">HashSet</span>&lt;&amp;<span class="ty">str</span>&gt;) -&gt; <span class="ty">bool</span> {
+    required.<span class="fn">is_subset</span>(granted)
+}
+<span class="cm">// required {read}, granted {read, write} -&gt; true</span></code></pre>
+        </div>
+        <p>This is the kind of thing sets are for. The alternative — looping over required and checking each against granted — is five lines that say less clearly.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.6">
+    <div class="ex-head">
+      <span class="ex-id">6.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Diff two lists</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given an old and a new set of ids, return <code>(added, removed)</code> — both sorted.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">diff</span>&lt;<span class="ty">'a</span>&gt;(old: &amp;<span class="ty">HashSet</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>&gt;, new: &amp;<span class="ty">HashSet</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>&gt;)
+    -&gt; (<span class="ty">Vec</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>&gt;, <span class="ty">Vec</span>&lt;&amp;<span class="ty">'a</span> <span class="ty">str</span>&gt;)
+{
+    <span class="k">let</span> <span class="k">mut</span> added:   <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = new.<span class="fn">difference</span>(old).<span class="fn">copied</span>().<span class="fn">collect</span>();
+    <span class="k">let</span> <span class="k">mut</span> removed: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = old.<span class="fn">difference</span>(new).<span class="fn">copied</span>().<span class="fn">collect</span>();
+    added.<span class="fn">sort</span>();
+    removed.<span class="fn">sort</span>();
+    (added, removed)
+}
+<span class="cm">// old {a,b}, new {b,c} -&gt; (["c"], ["a"])</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Direction is the whole trick</span>
+          <p><code>new.difference(old)</code> = things in new that were not in old = <strong>additions</strong>. Reverse it for <strong>removals</strong>. Getting these backwards is the classic bug — and it compiles perfectly.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 7 ============ -->
+<section id="s7">
+  <div class="set-head">
+    <span class="set-num">SET 07</span>
+    <h2>Custom keys and structs</h2>
+  </div>
+
+  <article class="ex" data-ex="7.1">
+    <div class="ex-head">
+      <span class="ex-id">7.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">Make a struct usable as a key</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This does not compile. Read the error, then fix it — and write down which two traits are missing and why each is needed.</p>
+      <div class="code is-bad">
+        <div class="code-label">Broken</div>
+<pre><code><span class="at">#[derive(Debug)]</span>
+<span class="k">struct</span> <span class="ty">Point</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span> }
+
+<span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">Point</span>, <span class="ty">String</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+m.<span class="fn">insert</span>(<span class="ty">Point</span> { x: <span class="nu">0</span>, y: <span class="nu">0</span> }, <span class="st">"origin"</span>.<span class="fn">to_string</span>());</code></pre>
+      </div>
+      <div class="answer-lines">
+        <p>Missing traits, and why</p>
+        <div class="line"></div>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="errblock">
+<pre><span class="code-id">error[E0599]</span>: the method `insert` exists for struct
+              `HashMap&lt;Point, String&gt;`, but its trait bounds
+              were not satisfied
+  |
+  | struct Point { x: i32, y: i32 }
+  | ------------ doesn't satisfy `Point: Eq` or `Point: Hash`
+help: consider annotating `Point` with `#[derive(Eq, Hash, PartialEq)]`</pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Fixed</div>
+<pre><code><span class="at">#[derive(Debug, PartialEq, Eq, Hash)]</span>
+<span class="k">struct</span> <span class="ty">Point</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span> }
+<span class="cm">// now len = 2 after two inserts</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why these two</span>
+          <p><strong><code>Hash</code></strong> turns the key into a number so the map knows which bucket to use. <strong><code>Eq</code></strong> settles which key is which when two land in the same bucket. Both are required; neither is enough alone. <code>Eq</code> also requires <code>PartialEq</code>, which is why all three appear.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.2">
+    <div class="ex-head">
+      <span class="ex-id">7.2</span><span class="pill med">med</span>
+      <span class="ex-title">Group employees by department</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>Employee { name, dept, salary }</code>, build <code>HashMap&lt;String, Vec&lt;String&gt;&gt;</code> mapping department to employee names.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">by_dept</span>(emps: &amp;[<span class="ty">Employee</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt; {
+    <span class="k">let</span> <span class="k">mut</span> g: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> e <span class="k">in</span> emps {
+        g.<span class="fn">entry</span>(e.dept.<span class="fn">clone</span>())
+            .<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>)
+            .<span class="fn">push</span>(e.name.<span class="fn">clone</span>());
+    }
+    g
+}
+<span class="cm">// [("Eng", ["Ada", "Ravi"]), ("Sales", ["Meera"])]</span></code></pre>
+        </div>
+        <p>The grouping idiom again. Both <code>clone()</code>s are needed because the map owns its keys and values while <code>emps</code> is only borrowed.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.3">
+    <div class="ex-head">
+      <span class="ex-id">7.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">Average salary per department</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>HashMap&lt;String, f64&gt;</code> of mean salary by department. You need a running sum <em>and</em> a count per department.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">avg_by_dept</span>(emps: &amp;[<span class="ty">Employee</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">f64</span>&gt; {
+    <span class="cm">// accumulate (total, count) per department</span>
+    <span class="k">let</span> <span class="k">mut</span> sums: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, (<span class="ty">u32</span>, <span class="ty">u32</span>)&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> e <span class="k">in</span> emps {
+        <span class="k">let</span> t = sums.<span class="fn">entry</span>(e.dept.<span class="fn">clone</span>()).<span class="fn">or_insert</span>((<span class="nu">0</span>, <span class="nu">0</span>));
+        t.<span class="nu">0</span> += e.salary;
+        t.<span class="nu">1</span> += <span class="nu">1</span>;
+    }
+    <span class="cm">// then divide</span>
+    sums.<span class="fn">into_iter</span>()
+        .<span class="fn">map</span>(|(d, (total, n))| (d, total <span class="k">as</span> <span class="ty">f64</span> / n <span class="k">as</span> <span class="ty">f64</span>))
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// [("Eng", 95.0), ("Sales", 80.0)]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">A tuple as the value</span>
+          <p>Storing <code>(sum, count)</code> lets one pass gather everything needed. <code>or_insert((0,0))</code> returns <code>&amp;mut (u32,u32)</code>, and <code>t.0</code>/<code>t.1</code> modify the tuple fields through it — no dereference star needed, because field access auto-dereferences.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.4">
+    <div class="ex-head">
+      <span class="ex-id">7.4</span><span class="pill med">med</span>
+      <span class="ex-title">Highest paid</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the highest-paid employee as <code>Option&lt;&amp;Employee&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">highest_paid</span>(emps: &amp;[<span class="ty">Employee</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">Employee</span>&gt; {
+    emps.<span class="fn">iter</span>().<span class="fn">max_by_key</span>(|e| e.salary)
+}
+<span class="cm">// Some("Ada")</span></code></pre>
+        </div>
+        <p><code>max_by_key</code> works directly because <code>salary</code> is <code>u32</code>, which implements <code>Ord</code>. Had it been <code>f64</code> you would need <code>max_by</code> with <code>partial_cmp</code>, as in the vectors workbook.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 8 ============ -->
+<section id="s8">
+  <div class="set-head">
+    <span class="set-num">SET 08</span>
+    <h2>BTreeMap</h2>
+  </div>
+  <p class="set-note">Same interface, permanently sorted by key.</p>
+
+  <article class="ex" data-ex="8.1">
+    <div class="ex-head">
+      <span class="ex-id">8.1</span><span class="pill med">med</span>
+      <span class="ex-title">Convert HashMap to BTreeMap</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn a <code>HashMap&lt;&amp;str, i32&gt;</code> into a <code>BTreeMap&lt;String, i32&gt;</code> and iterate it. What is different about the output?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">BTreeMap</span>;
+
+<span class="k">fn</span> <span class="fn">to_btree</span>(m: &amp;<span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">BTreeMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; {
+    m.<span class="fn">iter</span>().<span class="fn">map</span>(|(k, &amp;v)| (k.<span class="fn">to_string</span>(), v)).<span class="fn">collect</span>()
+}
+<span class="cm">// [("ada", 90), ("meera", 88), ("ravi", 78)]</span>
+<span class="cm">// Sorted — and sorted on EVERY run, with no sort() call.</span></code></pre>
+        </div>
+        <p>Same <code>collect</code>, different destination type. If you find yourself sorting a map every time you touch it, this is the better structure.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.2">
+    <div class="ex-head">
+      <span class="ex-id">8.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Keys come out sorted</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the keys of a <code>BTreeMap</code>. Notice what you do <em>not</em> have to write.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">keys_of</span>(b: &amp;<span class="ty">BTreeMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt;) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    b.<span class="fn">keys</span>().<span class="fn">cloned</span>().<span class="fn">collect</span>()      <span class="cm">// no .sort() needed</span>
+}
+<span class="cm">// ["ada", "meera", "ravi"]</span></code></pre>
+        </div>
+        <p>Compare with exercise 4.2, where the <code>sort()</code> was mandatory. That is the entire trade: O(log n) lookups in exchange for never sorting again.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.3">
+    <div class="ex-head">
+      <span class="ex-id">8.3</span><span class="pill med">med</span>
+      <span class="ex-title">Smallest key</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the pair with the smallest key. Why is this cheap on a <code>BTreeMap</code> but not on a <code>HashMap</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">smallest</span>(b: &amp;<span class="ty">BTreeMap</span>&lt;<span class="ty">i32</span>, &amp;<span class="ty">str</span>&gt;) -&gt; <span class="ty">Option</span>&lt;(<span class="ty">i32</span>, <span class="ty">String</span>)&gt; {
+    b.<span class="fn">iter</span>().<span class="fn">next</span>().<span class="fn">map</span>(|(&amp;k, &amp;v)| (k, v.<span class="fn">to_string</span>()))
+}
+<span class="cm">// Some((1, "a"))</span>
+
+<span class="cm">// BTreeMap also has first_key_value() / last_key_value().</span></code></pre>
+        </div>
+        <p>Because a <code>BTreeMap</code> is ordered, the first item <em>is</em> the smallest — one step. On a <code>HashMap</code> you would have to scan every entry, since there is no order to exploit.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ CAPSTONE ============ -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone: a word frequency analyser</h2>
+  </div>
+  <p class="set-note">Everything at once. Build a small text analyser backed by a <code>HashMap&lt;String, usize&gt;</code>, using this test input:</p>
+
+  <div class="code">
+    <div class="code-label">Given</div>
+<pre><code><span class="k">use</span> std::collections::{<span class="ty">HashMap</span>, <span class="ty">HashSet</span>};
+
+<span class="k">struct</span> <span class="ty">WordStats</span> {
+    counts: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">usize</span>&gt;,
+}
+
+<span class="cm">// Test text:</span>
+<span class="cm">// "the quick brown fox the lazy dog the end"</span></code></pre>
+  </div>
+
+  <article class="ex" data-ex="cap.1">
+    <div class="ex-head">
+      <span class="ex-id">C.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">new — build the counts</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>new(text)</code>. Split on whitespace, strip non-alphanumeric characters, lowercase everything, and skip anything that ends up empty.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">impl</span> <span class="ty">WordStats</span> {
+    <span class="k">fn</span> <span class="fn">new</span>(text: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Self</span> {
+        <span class="k">let</span> <span class="k">mut</span> counts: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">usize</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+        <span class="k">for</span> w <span class="k">in</span> text.<span class="fn">split_whitespace</span>() {
+            <span class="k">let</span> clean: <span class="ty">String</span> = w.<span class="fn">chars</span>()
+                .<span class="fn">filter</span>(|c| c.<span class="fn">is_alphanumeric</span>())
+                .<span class="fn">collect</span>::&lt;<span class="ty">String</span>&gt;()
+                .<span class="fn">to_lowercase</span>();
+            <span class="k">if</span> !clean.<span class="fn">is_empty</span>() {
+                *counts.<span class="fn">entry</span>(clean).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+            }
+        }
+        <span class="ty">WordStats</span> { counts }
+    }
+}</code></pre>
+        </div>
+        <p>The cleaning step matters: without it <code>"dog."</code> and <code>"dog"</code> count as different words. The <code>is_empty</code> guard stops a token of pure punctuation becoming an empty-string key.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.2">
+    <div class="ex-head">
+      <span class="ex-id">C.2</span><span class="pill med">med</span>
+      <span class="ex-title">total_words, unique_words, count_of</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <ul>
+        <li><code>total_words()</code> — every word, including repeats</li>
+        <li><code>unique_words()</code> — distinct words only</li>
+        <li><code>count_of(w)</code> — occurrences of one word, <code>0</code> if absent</li>
+      </ul>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>    <span class="k">fn</span> <span class="fn">total_words</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">usize</span> {
+        <span class="k">self</span>.counts.<span class="fn">values</span>().<span class="fn">sum</span>()      <span class="cm">// sum of counts</span>
+    }
+
+    <span class="k">fn</span> <span class="fn">unique_words</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">usize</span> {
+        <span class="k">self</span>.counts.<span class="fn">len</span>()               <span class="cm">// number of keys</span>
+    }
+
+    <span class="k">fn</span> <span class="fn">count_of</span>(&amp;<span class="k">self</span>, w: &amp;<span class="ty">str</span>) -&gt; <span class="ty">usize</span> {
+        <span class="k">self</span>.counts.<span class="fn">get</span>(w).<span class="fn">copied</span>().<span class="fn">unwrap_or</span>(<span class="nu">0</span>)
+    }</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified output</div>
+<pre><code>total=9  unique=7
+count_of("the")=3   count_of("zzz")=0</code></pre>
+        </div>
+        <p>The distinction is the point: 9 words were written, but only 7 different ones — because <code>"the"</code> appears three times.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.3">
+    <div class="ex-head">
+      <span class="ex-id">C.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">top_n — most frequent words</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the <code>n</code> most frequent words as <code>Vec&lt;(String, usize)&gt;</code>, highest first. Ties must break alphabetically so the result is deterministic.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>    <span class="k">fn</span> <span class="fn">top_n</span>(&amp;<span class="k">self</span>, n: <span class="ty">usize</span>) -&gt; <span class="ty">Vec</span>&lt;(<span class="ty">String</span>, <span class="ty">usize</span>)&gt; {
+        <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;(<span class="ty">String</span>, <span class="ty">usize</span>)&gt; = <span class="k">self</span>.counts
+            .<span class="fn">iter</span>()
+            .<span class="fn">map</span>(|(k, &amp;c)| (k.<span class="fn">clone</span>(), c))
+            .<span class="fn">collect</span>();
+        v.<span class="fn">sort_by</span>(|a, b| b.<span class="nu">1</span>.<span class="fn">cmp</span>(&amp;a.<span class="nu">1</span>).<span class="fn">then</span>(a.<span class="nu">0</span>.<span class="fn">cmp</span>(&amp;b.<span class="nu">0</span>)));
+        v.<span class="fn">into_iter</span>().<span class="fn">take</span>(n).<span class="fn">collect</span>()
+    }</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified output</div>
+<pre><code>top_n(3) = [("the", 3), ("brown", 1), ("dog", 1)]</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why the tie-break is not optional</span>
+          <p>Six words tie at count 1. Without <code>.then(a.0.cmp(&amp;b.0))</code> you would get an arbitrary three of them, differing between runs. The alphabetical tie-break is what makes <code>"brown"</code> and <code>"dog"</code> the reproducible answer.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.4">
+    <div class="ex-head">
+      <span class="ex-id">C.4</span><span class="pill med">med</span>
+      <span class="ex-title">words_appearing_once</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return every word that appears exactly once, sorted alphabetically.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>    <span class="k">fn</span> <span class="fn">words_appearing_once</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+        <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = <span class="k">self</span>.counts
+            .<span class="fn">iter</span>()
+            .<span class="fn">filter</span>(|(_, &amp;c)| c == <span class="nu">1</span>)
+            .<span class="fn">map</span>(|(k, _)| k.<span class="fn">clone</span>())
+            .<span class="fn">collect</span>();
+        v.<span class="fn">sort</span>();
+        v
+    }</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified output</div>
+<pre><code>["brown", "dog", "end", "fox", "lazy", "quick"]</code></pre>
+        </div>
+        <p>Six of the seven unique words appear once — everything except <code>"the"</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.5">
+    <div class="ex-head">
+      <span class="ex-id">C.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">shared_with — vocabulary overlap</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given another <code>WordStats</code>, return the words that appear in both texts, sorted. This is where <code>HashSet</code> earns its place.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>    <span class="k">fn</span> <span class="fn">shared_with</span>(&amp;<span class="k">self</span>, other: &amp;<span class="ty">WordStats</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+        <span class="k">let</span> a: <span class="ty">HashSet</span>&lt;&amp;<span class="ty">String</span>&gt; = <span class="k">self</span>.counts.<span class="fn">keys</span>().<span class="fn">collect</span>();
+        <span class="k">let</span> b: <span class="ty">HashSet</span>&lt;&amp;<span class="ty">String</span>&gt; = other.counts.<span class="fn">keys</span>().<span class="fn">collect</span>();
+
+        <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = a.<span class="fn">intersection</span>(&amp;b)
+            .<span class="fn">map</span>(|s| (*s).<span class="fn">clone</span>())
+            .<span class="fn">collect</span>();
+        v.<span class="fn">sort</span>();
+        v
+    }</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified output</div>
+<pre><code>text A: "the quick brown fox the lazy dog the end"
+text B: "the lazy cat"
+
+shared = ["lazy", "the"]</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Maps and sets together</span>
+          <p>Collecting <code>keys()</code> into a <code>HashSet</code> gives you the whole set-operations vocabulary over a map's keys. Swap <code>intersection</code> for <code>difference</code> and you get "words unique to this text" — a one-word change.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p><b>All 38 exercises and the 5-part capstone were compiled and run</b> on rustc 1.96.0, edition 2021. Every output shown is real program output.</p>
+    <p><b>If you finished these,</b> you can use maps and sets for real work. The next topic is error handling — <code>Result</code>, <code>?</code>, and custom error types.</p>
+    <p>Companion reference: <b>hashmap_guide.html</b></p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var TKEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(TKEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = currentIsDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(TKEY, next); } catch (e) {}
+    syncBtn();
+  });
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-hashmap-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+
+</body>
+</html>

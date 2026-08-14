@@ -1,0 +1,2041 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vectors in Rust — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Shares the palette and identity of vectors_guide.html.
+   Denser register: this is a workbook, not a reference.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;   /* difficulty: med */
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+/* Progress meter */
+.progress { margin: 1.5rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill { height: 100%; width: 0%; background: var(--rust); transition: width 0.25s ease; }
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.15rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- How to use ----------------------------------------------------- */
+
+.howto {
+  max-width: calc(var(--measure) + 10ch);
+  margin: 0 0 3.5rem; padding: 1.35rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust); border-radius: 2px;
+}
+.howto h2 {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.85rem; font-weight: 700;
+}
+.howto ol { margin: 0; padding-left: 1.3rem; font-size: 0.9688rem; }
+.howto li { margin-bottom: 0.45rem; }
+.howto li:last-child { margin-bottom: 0; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.set-head h2 {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-underline-offset: 2px; }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 3px; margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch); overflow: hidden;
+}
+.ex-head {
+  display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; gap: 0.7rem;
+  padding: 0.7rem 1rem; background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked { background: var(--oxide); border-color: var(--oxide); }
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-out { border-left-color: var(--oxide); }
+.code.is-bad { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint ----------------------------------------------------------- */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong); border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line { border-bottom: 1px solid var(--rule-strong); height: 1.5rem; }
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none; padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before { content: "▸"; color: var(--rust); font-size: 0.8rem; }
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+.set-note { max-width: var(--measure); margin: 0 0 1.5rem; font-size: 0.9688rem; color: var(--ink-soft); }
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">Vectors — Practice</p>
+  <p class="rail-sub">44 exercises<br>+ 4-part capstone</p>
+  <nav id="toc">
+    <a href="#s1"><span class="n">SET 1</span><span>Creating</span></a>
+    <a href="#s2"><span class="n">SET 2</span><span>Reading safely</span></a>
+    <a href="#s3"><span class="n">SET 3</span><span>Modifying</span></a>
+    <a href="#s4"><span class="n">SET 4</span><span>Iterators</span></a>
+    <a href="#s5"><span class="n">SET 5</span><span>Sort &amp; search</span></a>
+    <a href="#s6"><span class="n">SET 6</span><span>Slices</span></a>
+    <a href="#s7"><span class="n">SET 7</span><span>Structs</span></a>
+    <a href="#s8"><span class="n">SET 8</span><span>Nested</span></a>
+    <a href="#cap"><span class="n">FINAL</span><span>Capstone</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 0 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<!-- ====================== MAIN ====================== -->
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Practice workbook</p>
+  <h1>Vectors:<br><em>44 exercises</em></h1>
+  <p class="standfirst">Reading about vectors is not the same as using them. Each exercise below is small, has one clear answer, and builds on the last. Solutions are hidden until you ask for them.</p>
+  <div class="masthead-meta">
+    <span><b>44</b> exercises + capstone</span>
+    <span><b>Guide:</b> vectors_guide.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Solutions</b> verified on rustc 1.96</span>
+  </div>
+</header>
+
+<div class="howto">
+  <h2>How to use this workbook</h2>
+  <ol>
+    <li>Make a file to work in: <code>touch practice.rs</code></li>
+    <li>Write your attempt <strong>before</strong> opening the solution. Getting it wrong first is what makes it stick.</li>
+    <li>Compile and run: <code>rustc --edition 2021 practice.rs &amp;&amp; ./practice</code></li>
+    <li>Read every compiler error in full — the <code>help:</code> lines usually contain the fix.</li>
+    <li>Compare with the solution. If yours differs but works, that is fine; read the notes for <em>why</em> the shown version is written that way.</li>
+    <li>Tick the checkbox. Your progress is saved in this browser.</li>
+  </ol>
+</div>
+
+<!-- ============ SET 1 ============ -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 01</span>
+    <h2>Creating vectors</h2>
+  </div>
+  <p class="set-note">Five ways to make a vector, and knowing which reaches for which.</p>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">A vector from known values</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function that returns a <code>Vec&lt;i32&gt;</code> containing 10, 20, 30, 40, 50.</p>
+      <div class="code">
+        <div class="code-label">Starting point</div>
+<pre><code><span class="k">fn</span> <span class="fn">make_numbers</span>() -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    <span class="td">todo!</span>()
+}</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">make_numbers</span>() -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>, <span class="nu">40</span>, <span class="nu">50</span>]
+}
+<span class="cm">// [10, 20, 30, 40, 50]</span></code></pre>
+        </div>
+        <p>No <code>return</code> and no semicolon — the <code>vec![]</code> is a tail expression, which is the idiomatic way to return in Rust.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Seven zeros</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a <code>Vec&lt;i32&gt;</code> of seven zeros — without typing <code>0</code> seven times.</p>
+      <div class="hint is-trap">
+        <span class="hint-tag">Careful</span>
+        <p>The separator decides everything here. One of comma and semicolon gives you seven elements; the other gives you two.</p>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">seven_zeros</span>() -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    <span class="fn">vec!</span>[<span class="nu">0</span>; <span class="nu">7</span>]        <span class="cm">// SEMICOLON = "0, repeated 7 times"</span>
+}
+<span class="cm">// [0, 0, 0, 0, 0, 0, 0]</span>
+
+<span class="cm">// vec![0, 7] would be a 2-element vector: [0, 7]</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Length is not capacity</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Create a vector with <code>Vec::with_capacity(10)</code> and print both its length and its capacity. Predict the two numbers <em>before</em> you run it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = <span class="ty">Vec</span>::<span class="fn">with_capacity</span>(<span class="nu">10</span>);
+<span class="fn">println!</span>(<span class="st">"len={} cap={}"</span>, v.<span class="fn">len</span>(), v.<span class="fn">capacity</span>());
+<span class="cm">// len=0 cap=10</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why</span>
+          <p><code>with_capacity</code> reserves <em>space</em>; it does not create elements. The vector is empty — <code>len</code> is 0 — but it can absorb 10 pushes without a single reallocation.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.4">
+    <div class="ex-head">
+      <span class="ex-id">1.4</span><span class="pill med">med</span>
+      <span class="ex-title">From a range</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Build a <code>Vec&lt;i32&gt;</code> holding 1 through 10 inclusive, using a range rather than listing them.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">one_to_ten</span>() -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    (<span class="nu">1</span>..=<span class="nu">10</span>).<span class="fn">collect</span>()
+}
+<span class="cm">// [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]</span></code></pre>
+        </div>
+        <p><code>..=</code> includes the end; <code>1..10</code> would stop at 9. The return type tells <code>collect</code> what to build — without it you would get <strong>E0282: type annotations needed</strong>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.5">
+    <div class="ex-head">
+      <span class="ex-id">1.5</span><span class="pill med">med</span>
+      <span class="ex-title">Three empty Strings</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make a <code>Vec&lt;String&gt;</code> containing three empty strings. Why does this work when <code>String</code> is not <code>Copy</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">new</span>(); <span class="nu">3</span>];
+<span class="cm">// ["", "", ""]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why it works</span>
+          <p><code>vec![x; n]</code> requires <code>T: Clone</code>, not <code>T: Copy</code>. <code>String</code> implements <code>Clone</code>, so the macro clones the value into each slot. Your <strong>traits</strong> topic, doing quiet work.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 2 ============ -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 02</span>
+    <h2>Reading safely</h2>
+  </div>
+  <p class="set-note">Every exercise here is about the choice between a panic and an <code>Option</code>.</p>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Read with a fallback</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>get_or(v, i)</code> returning the element at <code>i</code>, or <code>-1</code> if the index is out of range. It must never panic.</p>
+      <div class="code">
+        <div class="code-label">Signature</div>
+<pre><code><span class="k">fn</span> <span class="fn">get_or</span>(v: &amp;[<span class="ty">i32</span>], i: <span class="ty">usize</span>) -&gt; <span class="ty">i32</span> { <span class="td">todo!</span>() }</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">get_or</span>(v: &amp;[<span class="ty">i32</span>], i: <span class="ty">usize</span>) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">get</span>(i).<span class="fn">copied</span>().<span class="fn">unwrap_or</span>(-<span class="nu">1</span>)
+}
+<span class="cm">// get_or(&amp;[1,2,3], 1)  -&gt; 2</span>
+<span class="cm">// get_or(&amp;[1,2,3], 99) -&gt; -1</span></code></pre>
+        </div>
+        <p><code>.get()</code> gives <code>Option&lt;&amp;i32&gt;</code>. <code>.copied()</code> turns it into <code>Option&lt;i32&gt;</code> — dereferencing through the Option. Then <code>.unwrap_or(-1)</code> supplies the default.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Last element, safely</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the last element as an <code>Option&lt;i32&gt;</code>. It must work on an empty vector.</p>
+      <div class="hint is-trap">
+        <span class="hint-tag">Do not write this</span>
+        <p><code>v[v.len() - 1]</code> panics twice over on an empty vector: <code>0 - 1</code> underflows <code>usize</code> before the index is even attempted.</p>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">last_of</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Option</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">last</span>().<span class="fn">copied</span>()
+}
+<span class="cm">// last_of(&amp;[1,2,3]) -&gt; Some(3)</span>
+<span class="cm">// last_of(&amp;[])      -&gt; None</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span><span class="pill med">med</span>
+      <span class="ex-title">Match on the first element</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>"first is N"</code> when the vector has elements, and <code>"empty"</code> when it does not. Use <code>match</code>, not <code>if</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">describe</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">String</span> {
+    <span class="k">match</span> v.<span class="fn">first</span>() {
+        <span class="ty">Some</span>(x) =&gt; <span class="fn">format!</span>(<span class="st">"first is {x}"</span>),
+        <span class="ty">None</span>    =&gt; <span class="st">"empty"</span>.<span class="fn">to_string</span>(),
+    }
+}
+<span class="cm">// describe(&amp;[1,2,3]) -&gt; "first is 1"</span>
+<span class="cm">// describe(&amp;[])      -&gt; "empty"</span></code></pre>
+        </div>
+        <p>The <code>match</code> is exhaustive — <code>Option</code> has exactly two variants, and you handled both, so the compiler is satisfied without a catch-all arm.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.4">
+    <div class="ex-head">
+      <span class="ex-id">2.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Membership test</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>true</code> if the vector contains a given value.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">has</span>(v: &amp;[<span class="ty">i32</span>], target: <span class="ty">i32</span>) -&gt; <span class="ty">bool</span> {
+    v.<span class="fn">contains</span>(&amp;target)     <span class="cm">// note the &amp; — it takes a reference</span>
+}</code></pre>
+        </div>
+        <p>Forgetting the <code>&amp;</code> gives <strong>E0308: mismatched types</strong>, expecting <code>&amp;i32</code> and finding <code>i32</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.5">
+    <div class="ex-head">
+      <span class="ex-id">2.5</span><span class="pill med">med</span>
+      <span class="ex-title">Index of the first negative</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the index of the first negative number as <code>Option&lt;usize&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">first_negative</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Option</span>&lt;<span class="ty">usize</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">position</span>(|&amp;x| x &lt; <span class="nu">0</span>)
+}
+<span class="cm">// first_negative(&amp;[1, -2, 3]) -&gt; Some(1)</span></code></pre>
+        </div>
+        <p>The <code>&amp;x</code> in the closure pattern destructures the reference, so <code>x</code> is a plain <code>i32</code>. Without it you would write <code>|x| *x &lt; 0</code>. Both work.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 3 ============ -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 03</span>
+    <h2>Modifying</h2>
+  </div>
+  <p class="set-note">Everything here needs <code>mut</code>. If you forget, the compiler will name the fix for you.</p>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Push through a reference</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function that appends a value to a vector it was given. Think about what the parameter type has to be.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">add_item</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, x: <span class="ty">i32</span>) {
+    v.<span class="fn">push</span>(x);
+}
+
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="fn">add_item</span>(&amp;<span class="k">mut</span> v, <span class="nu">4</span>);      <span class="cm">// [1, 2, 3, 4]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why &amp;mut Vec and not &amp;mut [T]</span>
+          <p>This is the exception to the "always take a slice" rule from Part 9. <code>push</code> changes the <em>length</em>, and a slice has a fixed length. Only <code>&amp;mut Vec&lt;T&gt;</code> can grow.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Pop the last</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Remove and return the last element. What happens on an empty vector — and why does that not need a special case?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">take_last</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) -&gt; <span class="ty">Option</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">pop</span>()
+}
+<span class="cm">// on [1,2,3,4] -&gt; Some(4), vector becomes [1,2,3]</span>
+<span class="cm">// on []        -&gt; None,    no panic</span></code></pre>
+        </div>
+        <p><code>pop</code> already returns an <code>Option</code>, so the empty case is handled by the type. No <code>if</code> needed.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Insert in the middle</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Insert <code>99</code> at index 1 of <code>[1, 2, 3]</code>. What is the result, and what is the cost?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+v.<span class="fn">insert</span>(<span class="nu">1</span>, <span class="nu">99</span>);
+<span class="cm">// [1, 99, 2, 3]</span></code></pre>
+        </div>
+        <p>O(n) — everything from index 1 onward shifts right by one. Fine occasionally; a performance problem inside a hot loop.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span><span class="pill med">med</span>
+      <span class="ex-title">remove vs swap_remove</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Starting from <code>['a', 'b', 'c', 'd']</code>, predict the result of <code>remove(1)</code> and of <code>swap_remove(1)</code>. Write both down before running them.</p>
+      <div class="answer-lines">
+        <p>remove(1) gives</p>
+        <div class="line"></div>
+        <p style="margin-top:0.7rem">swap_remove(1) gives</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> a = <span class="fn">vec!</span>[<span class="st">'a'</span>, <span class="st">'b'</span>, <span class="st">'c'</span>, <span class="st">'d'</span>];
+a.<span class="fn">remove</span>(<span class="nu">1</span>);        <span class="cm">// ['a', 'c', 'd']       order kept, O(n)</span>
+
+<span class="k">let</span> <span class="k">mut</span> b = <span class="fn">vec!</span>[<span class="st">'a'</span>, <span class="st">'b'</span>, <span class="st">'c'</span>, <span class="st">'d'</span>];
+b.<span class="fn">swap_remove</span>(<span class="nu">1</span>);   <span class="cm">// ['a', 'd', 'c']       order lost, O(1)</span>
+<span class="cm">//                              ↑ the last element filled the gap</span></code></pre>
+        </div>
+        <p>Both return the removed <code>'b'</code>. Use <code>swap_remove</code> whenever order does not matter — it is genuinely free speed.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.5">
+    <div class="ex-head">
+      <span class="ex-id">3.5</span><span class="pill med">med</span>
+      <span class="ex-title">Keep only the evens</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Remove every odd number from a vector, <strong>in place</strong>. Do not build a new vector.</p>
+      <div class="hint is-trap">
+        <span class="hint-tag">The wrong approach</span>
+        <p>Looping over indices and calling <code>.remove(i)</code> is buggy: each removal shifts everything left, so you skip elements. It is also O(n²).</p>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">keep_evens</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) {
+    v.<span class="fn">retain</span>(|x| x % <span class="nu">2</span> == <span class="nu">0</span>);
+}
+<span class="cm">// [1,2,3,4,5,6] -&gt; [2, 4, 6]</span></code></pre>
+        </div>
+        <p>Read <code>retain</code> as "keep the ones where this is true", never as "remove them". One pass, O(n), correct.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.6">
+    <div class="ex-head">
+      <span class="ex-id">3.6</span><span class="pill med">med</span>
+      <span class="ex-title">Unique elements</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn <code>[3, 1, 3, 2, 1]</code> into a sorted vector of unique values. Two method calls, in the right order.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">unique_sorted</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) {
+    v.<span class="fn">sort</span>();
+    v.<span class="fn">dedup</span>();
+}
+<span class="cm">// [3, 1, 3, 2, 1] -&gt; [1, 2, 3]</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Order matters</span>
+          <p><code>dedup</code> alone gives <code>[3, 1, 3, 2, 1]</code> — it only collapses <em>adjacent</em> duplicates, and none are adjacent here. Sorting first is what puts equal values next to each other.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 4 ============ -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 04</span>
+    <h2>Iterators</h2>
+  </div>
+  <p class="set-note">Where vectors stop being lists and start being pipelines.</p>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Sum</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum a vector of <code>i32</code> without writing a loop.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>()
+}
+<span class="cm">// [5, 12, 8, 20] -&gt; 45</span></code></pre>
+        </div>
+        <p>The return type tells <code>sum()</code> what to produce. Standing alone you would need <code>.sum::&lt;i32&gt;()</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Square every element</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a new vector with every element squared. Leave the original untouched.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">squares</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * x).<span class="fn">collect</span>()
+}
+<span class="cm">// [5, 12, 8, 20] -&gt; [25, 144, 64, 400]</span></code></pre>
+        </div>
+        <p><code>.iter()</code> borrows, so the caller keeps their vector. Using <code>.into_iter()</code> here would consume it.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span><span class="pill med">med</span>
+      <span class="ex-title">Filter greater than ten</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a <code>Vec&lt;i32&gt;</code> of only the elements greater than 10. Watch the reference levels here — this one trips almost everyone.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">big_ones</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">filter</span>(|&amp;&amp;x| x &gt; <span class="nu">10</span>).<span class="fn">copied</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// [5, 12, 8, 20] -&gt; [12, 20]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Counting the ampersands</span>
+          <p><code>.iter()</code> yields <code>&amp;i32</code>. <code>filter</code> hands its closure a <em>reference to the item</em>, so the closure sees <code>&amp;&amp;i32</code> — hence <code>|&amp;&amp;x|</code> to strip both. Then <code>.copied()</code> converts the surviving <code>&amp;i32</code>s into owned <code>i32</code>s to match the return type.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span><span class="pill med">med</span>
+      <span class="ex-title">Number a list</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn <code>["ada", "grace"]</code> into <code>["1. ada", "2. grace"]</code> — note it starts at 1, not 0.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">numbered</span>(v: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    v.<span class="fn">iter</span>()
+        .<span class="fn">enumerate</span>()
+        .<span class="fn">map</span>(|(i, s)| <span class="fn">format!</span>(<span class="st">"{}. {}"</span>, i + <span class="nu">1</span>, s))
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// ["1. ada", "2. grace"]</span></code></pre>
+        </div>
+        <p><code>enumerate</code> yields <code>(usize, &amp;String)</code> tuples, destructured as <code>(i, s)</code> right in the closure parameter. The <code>+ 1</code> is what makes it human-facing.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.5">
+    <div class="ex-head">
+      <span class="ex-id">4.5</span><span class="pill med">med</span>
+      <span class="ex-title">Zip two vectors</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given names <code>["a", "b"]</code> and scores <code>[1, 2]</code>, produce <code>["a=1", "b=2"]</code>. What happens if the two have different lengths?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">pair_up</span>(names: &amp;[&amp;<span class="ty">str</span>], scores: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    names.<span class="fn">iter</span>()
+        .<span class="fn">zip</span>(scores.<span class="fn">iter</span>())
+        .<span class="fn">map</span>(|(n, s)| <span class="fn">format!</span>(<span class="st">"{n}={s}"</span>))
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// ["a=1", "b=2"]</span></code></pre>
+        </div>
+        <p><code>zip</code> stops at the shorter of the two. No panic, no error — the extra elements are silently ignored, which is occasionally a bug you have to watch for.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.6">
+    <div class="ex-head">
+      <span class="ex-id">4.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Parse, skipping failures</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>["1", "x", "3"]</code>, return <code>[1, 3]</code> — parse each string, silently dropping the ones that fail. One adapter does both jobs.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">parse_valid</span>(v: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">filter_map</span>(|s| s.<span class="fn">parse</span>().<span class="fn">ok</span>()).<span class="fn">collect</span>()
+}
+<span class="cm">// ["1", "x", "3"] -&gt; [1, 3]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">How it works</span>
+          <p><code>.parse()</code> returns <code>Result</code>; <code>.ok()</code> converts it to <code>Option</code>, discarding the error. <code>filter_map</code> keeps the <code>Some</code> values and drops the <code>None</code>s — filtering and mapping in one pass.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.7">
+    <div class="ex-head">
+      <span class="ex-id">4.7</span><span class="pill med">med</span>
+      <span class="ex-title">Average, without dividing by zero</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the mean as an <code>f64</code>. An empty vector must give <code>0.0</code>, not a crash or a <code>NaN</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">average</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">f64</span> {
+    <span class="k">if</span> v.<span class="fn">is_empty</span>() {
+        <span class="k">return</span> <span class="nu">0.0</span>;
+    }
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;() <span class="k">as</span> <span class="ty">f64</span> / v.<span class="fn">len</span>() <span class="k">as</span> <span class="ty">f64</span>
+}
+<span class="cm">// [5, 12, 8, 20] -&gt; 11.25</span>
+<span class="cm">// []             -&gt; 0.0</span></code></pre>
+        </div>
+        <p>Two things to notice: the turbofish on <code>sum::&lt;i32&gt;()</code> is needed because nothing else pins the type; and both operands need <code>as f64</code>, since integer division would truncate.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 5 ============ -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 05</span>
+    <h2>Sorting and searching</h2>
+  </div>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Descending order</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sort a <code>Vec&lt;i32&gt;</code> largest first.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">sort_desc</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) {
+    v.<span class="fn">sort_by</span>(|a, b| b.<span class="fn">cmp</span>(a));   <span class="cm">// b before a = reversed</span>
+}
+<span class="cm">// [3,1,4,1,5] -&gt; [5, 4, 3, 1, 1]</span>
+
+<span class="cm">// Equivalent: v.sort(); v.reverse();</span></code></pre>
+        </div>
+        <p>The whole trick is the argument order. <code>a.cmp(b)</code> is ascending; <code>b.cmp(a)</code> is descending.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">Why floats will not sort</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Try <code>.sort()</code> on <code>vec![3.5, 1.2, 9.9]</code> and read the error. Then make it work — and write down, in your own words, why the plain <code>.sort()</code> is rejected.</p>
+      <div class="answer-lines">
+        <p>Why f64 has no Ord</p>
+        <div class="line"></div>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="errblock">
+<pre><span class="code-id">error[E0277]</span>: the trait bound `f64: Ord` is not satisfied
+ --&gt; src/main.rs:4:7
+  |
+4 |     v.sort();
+  |       ^^^^ the trait `Ord` is not implemented for `f64`</pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">The fix</div>
+<pre><code><span class="k">fn</span> <span class="fn">sort_floats</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">f64</span>&gt;) {
+    v.<span class="fn">sort_by</span>(|a, b| a.<span class="fn">partial_cmp</span>(b).<span class="fn">unwrap</span>());
+}
+<span class="cm">// [3.5, 1.2, 9.9] -&gt; [1.2, 3.5, 9.9]</span>
+
+<span class="cm">// If NaN might be present, .total_cmp() never panics:</span>
+<span class="cm">// v.sort_by(|a, b| a.total_cmp(b));</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The reason</span>
+          <p><code>NaN</code> compares <code>false</code> against everything, including itself. A type containing such a value cannot have a <em>total</em> order, so <code>f64</code> implements only <code>PartialOrd</code>. <code>sort()</code> requires the stronger <code>Ord</code>, so the bound fails. Rust refuses to pretend the ordering is total when it is not.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span><span class="pill med">med</span>
+      <span class="ex-title">Sort by length</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sort <code>["hello", "hi", "hey"]</code> shortest first.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">by_length</span>(v: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt;) {
+    v.<span class="fn">sort_by_key</span>(|s| s.<span class="fn">len</span>());
+}
+<span class="cm">// ["hello", "hi", "hey"] -&gt; ["hi", "hey", "hello"]</span></code></pre>
+        </div>
+        <p><code>sort_by_key</code> is clearer than <code>sort_by</code> when you are sorting on a derived value — you say <em>what</em> to compare rather than <em>how</em>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Binary search, both outcomes</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>On the sorted vector <code>[1, 3, 5, 7]</code>, report where a value was found, or where it <em>would</em> go. Handle both arms.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">locate</span>(v: &amp;[<span class="ty">i32</span>], target: <span class="ty">i32</span>) -&gt; <span class="ty">String</span> {
+    <span class="k">match</span> v.<span class="fn">binary_search</span>(&amp;target) {
+        <span class="ty">Ok</span>(i)  =&gt; <span class="fn">format!</span>(<span class="st">"found at {i}"</span>),
+        <span class="ty">Err</span>(i) =&gt; <span class="fn">format!</span>(<span class="st">"not found, insert at {i}"</span>),
+    }
+}
+<span class="cm">// locate(&amp;[1,3,5,7], 5) -&gt; "found at 2"</span>
+<span class="cm">// locate(&amp;[1,3,5,7], 4) -&gt; "not found, insert at 2"</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Precondition</span>
+          <p>The <code>Err</code> is not a failure — it is the insertion point that keeps the vector sorted. But all of this is meaningless on unsorted input: <code>binary_search</code> will happily return a confidently wrong answer with no warning.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.5">
+    <div class="ex-head">
+      <span class="ex-id">5.5</span><span class="pill med">med</span>
+      <span class="ex-title">Min and max together</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>Option&lt;(i32, i32)&gt;</code> holding the smallest and largest. Empty vector gives <code>None</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">min_max</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Option</span>&lt;(<span class="ty">i32</span>, <span class="ty">i32</span>)&gt; {
+    <span class="k">let</span> lo = v.<span class="fn">iter</span>().<span class="fn">min</span>()?;   <span class="cm">// ? returns None early if empty</span>
+    <span class="k">let</span> hi = v.<span class="fn">iter</span>().<span class="fn">max</span>()?;
+    <span class="ty">Some</span>((*lo, *hi))
+}
+<span class="cm">// [3,1,4] -&gt; Some((1, 4))</span>
+<span class="cm">// []      -&gt; None</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The ? operator</span>
+          <p>You met <code>?</code> with <code>Option</code> earlier. Here it means: if <code>min()</code> gives <code>None</code>, return <code>None</code> from the whole function immediately. It replaces a <code>match</code> per line. You will use this constantly once you reach <code>Result</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 6 ============ -->
+<section id="s6">
+  <div class="set-head">
+    <span class="set-num">SET 06</span>
+    <h2>Slices</h2>
+  </div>
+  <p class="set-note">Writing functions that accept more than just <code>Vec</code>.</p>
+
+  <article class="ex" data-ex="6.1">
+    <div class="ex-head">
+      <span class="ex-id">6.1</span><span class="pill med">med</span>
+      <span class="ex-title">Accept arrays too</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This function only accepts a <code>&amp;Vec</code>. Change one thing so it also accepts arrays and sub-slices.</p>
+      <div class="code is-bad">
+        <div class="code-label">Before</div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>(v: &amp;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>()
+}</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">total</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>()
+}
+
+<span class="cm">// All three now work:</span>
+<span class="fn">total</span>(&amp;<span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]);   <span class="cm">// Vec — derefs to a slice automatically</span>
+<span class="fn">total</span>(&amp;[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]);        <span class="cm">// array</span>
+<span class="fn">total</span>(&amp;<span class="fn">vec!</span>[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>][<span class="nu">1</span>..]); <span class="cm">// part of a Vec</span></code></pre>
+        </div>
+        <p>Same speed, strictly more useful. Take <code>&amp;[T]</code> by default; only take <code>&amp;Vec&lt;T&gt;</code> when you need to change the length.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.2">
+    <div class="ex-head">
+      <span class="ex-id">6.2</span><span class="pill med">med</span>
+      <span class="ex-title">Double in place</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Double every element of a slice in place. Note that this needs a <em>mutable</em> slice, and watch for the dereference.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">double_all</span>(v: &amp;<span class="k">mut</span> [<span class="ty">i32</span>]) {
+    <span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter_mut</span>() {
+        *x *= <span class="nu">2</span>;      <span class="cm">// the * reaches THROUGH the reference</span>
+    }
+}
+<span class="cm">// [1, 2, 3] -&gt; [2, 4, 6]</span></code></pre>
+        </div>
+        <p>Writing <code>x *= 2</code> without the star gives <strong>E0368</strong>: you cannot apply <code>*=</code> to a <code>&amp;mut i32</code>. A mutable slice works here because we change values, not the length.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.3">
+    <div class="ex-head">
+      <span class="ex-id">6.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Reversed copy</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return a new reversed vector, leaving the input alone.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">reversed</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">rev</span>().<span class="fn">copied</span>().<span class="fn">collect</span>()
+}
+<span class="cm">// [1, 2, 3] -&gt; [3, 2, 1]</span></code></pre>
+        </div>
+        <p><code>.reverse()</code> would flip it in place and needs <code>&amp;mut</code>. <code>.rev()</code> is an adapter that produces a new sequence — that is the difference between the two names.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.4">
+    <div class="ex-head">
+      <span class="ex-id">6.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Split into chunks</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Split <code>[1,2,3,4,5]</code> into groups of 2, returning <code>Vec&lt;Vec&lt;i32&gt;&gt;</code>. What happens to the leftover element?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">in_groups</span>(v: &amp;[<span class="ty">i32</span>], n: <span class="ty">usize</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; {
+    v.<span class="fn">chunks</span>(n).<span class="fn">map</span>(|c| c.<span class="fn">to_vec</span>()).<span class="fn">collect</span>()
+}
+<span class="cm">// [1,2,3,4,5] with n=2 -&gt; [[1, 2], [3, 4], [5]]</span>
+<span class="cm">//                                        ↑ short, not dropped</span></code></pre>
+        </div>
+        <p><code>chunks</code> yields <code>&amp;[i32]</code> slices; <code>.to_vec()</code> turns each into an owned <code>Vec</code>. The final chunk is simply shorter — nothing is lost and nothing is padded.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.5">
+    <div class="ex-head">
+      <span class="ex-id">6.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">Differences between neighbours</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>[1, 4, 9, 16]</code>, return the gaps: <code>[3, 5, 7]</code>. There is a slice method built exactly for this.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">gaps</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    v.<span class="fn">windows</span>(<span class="nu">2</span>).<span class="fn">map</span>(|w| w[<span class="nu">1</span>] - w[<span class="nu">0</span>]).<span class="fn">collect</span>()
+}
+<span class="cm">// [1, 4, 9, 16] -&gt; [3, 5, 7]</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">windows vs chunks</span>
+          <p><code>chunks(2)</code> gives <code>[1,4]</code>, <code>[9,16]</code> — non-overlapping. <code>windows(2)</code> gives <code>[1,4]</code>, <code>[4,9]</code>, <code>[9,16]</code> — sliding, overlapping. Comparing each element to its neighbour always wants <code>windows</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 7 ============ -->
+<section id="s7">
+  <div class="set-head">
+    <span class="set-num">SET 07</span>
+    <h2>Vectors of structs</h2>
+  </div>
+  <p class="set-note">All exercises here use this type:</p>
+  <div class="code">
+    <div class="code-label">Shared setup</div>
+<pre><code><span class="at">#[derive(Debug, Clone, PartialEq)]</span>
+<span class="k">struct</span> <span class="ty">Book</span> {
+    title:  <span class="ty">String</span>,
+    author: <span class="ty">String</span>,
+    year:   <span class="ty">u32</span>,
+    price:  <span class="ty">f64</span>,
+}</code></pre>
+  </div>
+
+  <article class="ex" data-ex="7.1">
+    <div class="ex-head">
+      <span class="ex-id">7.1</span><span class="pill med">med</span>
+      <span class="ex-title">Filter by year</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return all books published after a given year. Do not clone anything.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">after_year</span>(books: &amp;[<span class="ty">Book</span>], y: <span class="ty">u32</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Book</span>&gt; {
+    books.<span class="fn">iter</span>().<span class="fn">filter</span>(|b| b.year &gt; y).<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <p>The return type is <code>Vec&lt;&amp;Book&gt;</code> — a vector of <em>references</em>. No <code>Book</code> is copied; you get a new list pointing at the originals.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.2">
+    <div class="ex-head">
+      <span class="ex-id">7.2</span><span class="pill med">med</span>
+      <span class="ex-title">Average price</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Compute the mean price. Empty input gives <code>0.0</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">avg_price</span>(books: &amp;[<span class="ty">Book</span>]) -&gt; <span class="ty">f64</span> {
+    <span class="k">if</span> books.<span class="fn">is_empty</span>() { <span class="k">return</span> <span class="nu">0.0</span>; }
+    books.<span class="fn">iter</span>().<span class="fn">map</span>(|b| b.price).<span class="fn">sum</span>::&lt;<span class="ty">f64</span>&gt;() / books.<span class="fn">len</span>() <span class="k">as</span> <span class="ty">f64</span>
+}
+<span class="cm">// prices 10.0, 30.0, 20.0 -&gt; 20.00</span></code></pre>
+        </div>
+        <p><code>.map(|b| b.price)</code> extracts one field from each struct, turning a stream of <code>Book</code>s into a stream of <code>f64</code>s. That pattern comes up constantly.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.3">
+    <div class="ex-head">
+      <span class="ex-id">7.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">Most expensive book</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return <code>Option&lt;&amp;Book&gt;</code> for the priciest. Remember what set 5 taught you about <code>f64</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">priciest</span>(books: &amp;[<span class="ty">Book</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">Book</span>&gt; {
+    books.<span class="fn">iter</span>()
+        .<span class="fn">max_by</span>(|a, b| a.price.<span class="fn">partial_cmp</span>(&amp;b.price).<span class="fn">unwrap</span>())
+}</code></pre>
+        </div>
+        <p><code>.max()</code> would need <code>Ord</code>, which <code>f64</code> does not have — so <code>max_by</code> with an explicit comparison. It returns <code>Option</code> because an empty slice has no maximum.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.4">
+    <div class="ex-head">
+      <span class="ex-id">7.4</span><span class="pill med">med</span>
+      <span class="ex-title">Sort by year</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sort the books oldest first, in place.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">by_year</span>(books: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">Book</span>&gt;) {
+    books.<span class="fn">sort_by</span>(|a, b| a.year.<span class="fn">cmp</span>(&amp;b.year));
+}
+<span class="cm">// years become [2000, 2010, 2020]</span>
+
+<span class="cm">// sort_by_key(|b| b.year) also works here — u32 is Copy.</span></code></pre>
+        </div>
+        <p><code>year</code> is a <code>u32</code>, which <em>does</em> implement <code>Ord</code>, so plain <code>cmp</code> is available. Contrast with 7.3.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.5">
+    <div class="ex-head">
+      <span class="ex-id">7.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">Group by author</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Build a <code>HashMap&lt;String, Vec&lt;&amp;Book&gt;&gt;</code> grouping books by their author. This is the single most useful idiom in this workbook.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="k">fn</span> <span class="fn">group_by_author</span>(books: &amp;[<span class="ty">Book</span>]) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;&amp;<span class="ty">Book</span>&gt;&gt; {
+    <span class="k">let</span> <span class="k">mut</span> map: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Vec</span>&lt;&amp;<span class="ty">Book</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+    <span class="k">for</span> b <span class="k">in</span> books {
+        map.<span class="fn">entry</span>(b.author.<span class="fn">clone</span>())
+            .<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>)
+            .<span class="fn">push</span>(b);
+    }
+    map
+}
+<span class="cm">// author "X" -&gt; 2 books, author "Y" -&gt; 1 book</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Memorise this shape</span>
+          <p><code>.entry(k).or_insert_with(Vec::new).push(v)</code>. It handles "first time seeing this key" and "seen before" in one expression, with only one hash lookup. The <code>.clone()</code> on the author is needed because the map owns its keys while the books are only borrowed.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.6">
+    <div class="ex-head">
+      <span class="ex-id">7.6</span><span class="pill med">med</span>
+      <span class="ex-title">Raise every price</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Increase every book's price by a given percentage, modifying the vector in place.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">raise_prices</span>(books: &amp;<span class="k">mut</span> <span class="ty">Vec</span>&lt;<span class="ty">Book</span>&gt;, pct: <span class="ty">f64</span>) {
+    <span class="k">for</span> b <span class="k">in</span> books.<span class="fn">iter_mut</span>() {
+        b.price *= <span class="nu">1.0</span> + pct / <span class="nu">100.0</span>;
+    }
+}
+<span class="cm">// 10.0, 20.0, 30.0 with pct=10.0 -&gt; 11.0, 22.0, 33.0</span></code></pre>
+        </div>
+        <p>No dereference star needed here: <code>b</code> is <code>&amp;mut Book</code>, and field access through a reference auto-dereferences. The star was only needed in 6.2 because the element itself was the number.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 8 ============ -->
+<section id="s8">
+  <div class="set-head">
+    <span class="set-num">SET 08</span>
+    <h2>Nested vectors</h2>
+  </div>
+
+  <article class="ex" data-ex="8.1">
+    <div class="ex-head">
+      <span class="ex-id">8.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Build a grid</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>make_grid(rows, cols)</code> returning a grid of zeros. Get the dimension order right.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">make_grid</span>(rows: <span class="ty">usize</span>, cols: <span class="ty">usize</span>) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; {
+    <span class="fn">vec!</span>[<span class="fn">vec!</span>[<span class="nu">0</span>; cols]; rows]
+    <span class="cm">//        ↑ inner = width   ↑ outer = height</span>
+}
+<span class="cm">// make_grid(2, 3) -&gt; [[0, 0, 0], [0, 0, 0]]</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Backwards from how you say it</span>
+          <p>You say "a 2 by 3 grid" but you write <code>cols</code> first. Swapping them compiles fine and silently gives you a transposed grid — a bug that surfaces much later.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.2">
+    <div class="ex-head">
+      <span class="ex-id">8.2</span><span class="pill med">med</span>
+      <span class="ex-title">Row sums</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given a grid, return one total per row.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">row_sums</span>(grid: &amp;[<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    grid.<span class="fn">iter</span>().<span class="fn">map</span>(|row| row.<span class="fn">iter</span>().<span class="fn">sum</span>()).<span class="fn">collect</span>()
+}
+<span class="cm">// [[1,2,3], [4,5,6]] -&gt; [6, 15]</span></code></pre>
+        </div>
+        <p>A <code>map</code> whose closure contains its own iterator chain — nesting like this is normal and reads cleanly once you are used to it.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.3">
+    <div class="ex-head">
+      <span class="ex-id">8.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">Transpose</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Flip rows and columns: <code>[[1,2,3], [4,5,6]]</code> becomes <code>[[1,4], [2,5], [3,6]]</code>. Handle the empty case.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">transpose</span>(grid: &amp;[<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; {
+    <span class="k">if</span> grid.<span class="fn">is_empty</span>() { <span class="k">return</span> <span class="fn">vec!</span>[]; }
+
+    (<span class="nu">0</span>..grid[<span class="nu">0</span>].<span class="fn">len</span>())                  <span class="cm">// for each COLUMN index</span>
+        .<span class="fn">map</span>(|c| {
+            (<span class="nu">0</span>..grid.<span class="fn">len</span>())                <span class="cm">// walk every ROW</span>
+                .<span class="fn">map</span>(|r| grid[r][c])
+                .<span class="fn">collect</span>()
+        })
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// [[1,2,3], [4,5,6]] -&gt; [[1,4], [2,5], [3,6]]</span></code></pre>
+        </div>
+        <p>The empty guard is not optional — <code>grid[0]</code> on an empty grid panics. Note the index order flips: you read <code>grid[r][c]</code> while building column-first.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.4">
+    <div class="ex-head">
+      <span class="ex-id">8.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">Flatten</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Turn a grid into a single flat vector.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">flatten</span>(grid: &amp;[<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; {
+    grid.<span class="fn">concat</span>()
+}
+<span class="cm">// [[1,2,3], [4,5,6]] -&gt; [1, 2, 3, 4, 5, 6]</span>
+
+<span class="cm">// Equivalent: grid.iter().flatten().copied().collect()</span></code></pre>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="8.5">
+    <div class="ex-head">
+      <span class="ex-id">8.5</span><span class="pill med">med</span>
+      <span class="ex-title">Maximum in the whole grid</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Find the largest value anywhere in the grid, as an <code>Option&lt;i32&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">grid_max</span>(grid: &amp;[<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;]) -&gt; <span class="ty">Option</span>&lt;<span class="ty">i32</span>&gt; {
+    grid.<span class="fn">iter</span>().<span class="fn">flatten</span>().<span class="fn">copied</span>().<span class="fn">max</span>()
+}
+<span class="cm">// [[1,2,3], [4,5,6]] -&gt; Some(6)</span></code></pre>
+        </div>
+        <p><code>.flatten()</code> collapses the nested iterators into one stream, so <code>.max()</code> sees every cell. No nested loop, no manual tracking variable.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ CAPSTONE ============ -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone: a task list</h2>
+  </div>
+  <p class="set-note">Everything at once. Build a small task manager backed by a <code>Vec&lt;Task&gt;</code>. Attempt each method before opening any solution — this is the exercise that tells you whether the topic has landed.</p>
+
+  <div class="code">
+    <div class="code-label">Given</div>
+<pre><code><span class="at">#[derive(Debug, Clone)]</span>
+<span class="k">struct</span> <span class="ty">Task</span> {
+    id:       <span class="ty">u32</span>,
+    title:    <span class="ty">String</span>,
+    done:     <span class="ty">bool</span>,
+    priority: <span class="ty">u8</span>,      <span class="cm">// higher = more urgent</span>
+}
+
+<span class="k">struct</span> <span class="ty">TaskList</span> {
+    tasks:   <span class="ty">Vec</span>&lt;<span class="ty">Task</span>&gt;,
+    next_id: <span class="ty">u32</span>,
+}</code></pre>
+  </div>
+
+  <article class="ex" data-ex="cap.1">
+    <div class="ex-head">
+      <span class="ex-id">C.1</span><span class="pill med">med</span>
+      <span class="ex-title">new, add, complete</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <ul>
+        <li><code>new()</code> — an empty list, ids starting at 1</li>
+        <li><code>add(title, priority) -&gt; u32</code> — push a task, return its new id</li>
+        <li><code>complete(id) -&gt; bool</code> — mark done; <code>false</code> if no such id</li>
+      </ul>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">impl</span> <span class="ty">TaskList</span> {
+    <span class="k">fn</span> <span class="fn">new</span>() -&gt; <span class="ty">Self</span> {
+        <span class="ty">TaskList</span> { tasks: <span class="ty">Vec</span>::<span class="fn">new</span>(), next_id: <span class="nu">1</span> }
+    }
+
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, title: &amp;<span class="ty">str</span>, priority: <span class="ty">u8</span>) -&gt; <span class="ty">u32</span> {
+        <span class="k">let</span> id = <span class="k">self</span>.next_id;
+        <span class="k">self</span>.tasks.<span class="fn">push</span>(<span class="ty">Task</span> {
+            id,
+            title: title.<span class="fn">to_string</span>(),
+            done: <span class="k">false</span>,
+            priority,
+        });
+        <span class="k">self</span>.next_id += <span class="nu">1</span>;
+        id
+    }
+
+    <span class="k">fn</span> <span class="fn">complete</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, id: <span class="ty">u32</span>) -&gt; <span class="ty">bool</span> {
+        <span class="k">match</span> <span class="k">self</span>.tasks.<span class="fn">iter_mut</span>().<span class="fn">find</span>(|t| t.id == id) {
+            <span class="ty">Some</span>(t) =&gt; { t.done = <span class="k">true</span>; <span class="k">true</span> }
+            <span class="ty">None</span>    =&gt; <span class="k">false</span>,
+        }
+    }
+}</code></pre>
+        </div>
+        <p><code>iter_mut().find()</code> is the key move in <code>complete</code>: it locates the task <em>and</em> hands you a mutable reference to it, so you can flip the flag directly. <code>next_id</code> increments separately so ids are never reused, even after deletions.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.2">
+    <div class="ex-head">
+      <span class="ex-id">C.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">remove, pending, by_priority</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <ul>
+        <li><code>remove(id) -&gt; Option&lt;Task&gt;</code> — take the task out and return it</li>
+        <li><code>pending() -&gt; Vec&lt;&amp;Task&gt;</code> — the unfinished ones</li>
+        <li><code>by_priority() -&gt; Vec&lt;&amp;Task&gt;</code> — all tasks, most urgent first</li>
+      </ul>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>    <span class="k">fn</span> <span class="fn">remove</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, id: <span class="ty">u32</span>) -&gt; <span class="ty">Option</span>&lt;<span class="ty">Task</span>&gt; {
+        <span class="k">let</span> pos = <span class="k">self</span>.tasks.<span class="fn">iter</span>().<span class="fn">position</span>(|t| t.id == id)?;
+        <span class="ty">Some</span>(<span class="k">self</span>.tasks.<span class="fn">remove</span>(pos))
+    }
+
+    <span class="k">fn</span> <span class="fn">pending</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Task</span>&gt; {
+        <span class="k">self</span>.tasks.<span class="fn">iter</span>().<span class="fn">filter</span>(|t| !t.done).<span class="fn">collect</span>()
+    }
+
+    <span class="k">fn</span> <span class="fn">by_priority</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">Task</span>&gt; {
+        <span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;&amp;<span class="ty">Task</span>&gt; = <span class="k">self</span>.tasks.<span class="fn">iter</span>().<span class="fn">collect</span>();
+        v.<span class="fn">sort_by</span>(|a, b| b.priority.<span class="fn">cmp</span>(&amp;a.priority));
+        v
+    }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Two things worth noticing</span>
+          <p><strong>The <code>?</code> in remove:</strong> <code>position</code> gives <code>Option&lt;usize&gt;</code>; if it is <code>None</code> the whole function returns <code>None</code> right there, so the <code>self.tasks.remove(pos)</code> line only ever runs with a valid index — no panic possible.</p>
+          <p><strong><code>by_priority</code> sorts a vector of references,</strong> not the tasks themselves. The original order in <code>self.tasks</code> is untouched, and nothing is cloned. <code>b.cmp(&amp;a)</code> gives descending.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.3">
+    <div class="ex-head">
+      <span class="ex-id">C.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">clear_done and stats</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <ul>
+        <li><code>clear_done() -&gt; usize</code> — drop finished tasks, return how many went</li>
+        <li><code>stats() -&gt; (usize, usize, f64)</code> — total, completed, percent complete</li>
+      </ul>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>    <span class="k">fn</span> <span class="fn">clear_done</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">usize</span> {
+        <span class="k">let</span> before = <span class="k">self</span>.tasks.<span class="fn">len</span>();
+        <span class="k">self</span>.tasks.<span class="fn">retain</span>(|t| !t.done);
+        before - <span class="k">self</span>.tasks.<span class="fn">len</span>()
+    }
+
+    <span class="k">fn</span> <span class="fn">stats</span>(&amp;<span class="k">self</span>) -&gt; (<span class="ty">usize</span>, <span class="ty">usize</span>, <span class="ty">f64</span>) {
+        <span class="k">let</span> total = <span class="k">self</span>.tasks.<span class="fn">len</span>();
+        <span class="k">let</span> done = <span class="k">self</span>.tasks.<span class="fn">iter</span>().<span class="fn">filter</span>(|t| t.done).<span class="fn">count</span>();
+        <span class="k">let</span> pct = <span class="k">if</span> total == <span class="nu">0</span> {
+            <span class="nu">0.0</span>
+        } <span class="k">else</span> {
+            done <span class="k">as</span> <span class="ty">f64</span> / total <span class="k">as</span> <span class="ty">f64</span> * <span class="nu">100.0</span>
+        };
+        (total, done, pct)
+    }</code></pre>
+        </div>
+        <p>Measuring the length before and after <code>retain</code> is the simplest honest way to count removals. The <code>total == 0</code> guard prevents a <code>NaN</code> from <code>0 / 0</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.4">
+    <div class="ex-head">
+      <span class="ex-id">C.4</span><span class="pill med">med</span>
+      <span class="ex-title">Run it end to end</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a <code>main</code> that adds three tasks, completes one, prints the pending list and the stats, removes a task, and clears the finished ones. Predict the output before running.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">fn</span> <span class="fn">main</span>() {
+    <span class="k">let</span> <span class="k">mut</span> list = <span class="ty">TaskList</span>::<span class="fn">new</span>();
+
+    <span class="k">let</span> a = list.<span class="fn">add</span>(<span class="st">"write guide"</span>, <span class="nu">3</span>);
+    <span class="k">let</span> b = list.<span class="fn">add</span>(<span class="st">"review"</span>, <span class="nu">1</span>);
+    list.<span class="fn">add</span>(<span class="st">"ship"</span>, <span class="nu">2</span>);
+
+    list.<span class="fn">complete</span>(a);
+
+    <span class="fn">println!</span>(<span class="st">"pending: {:?}"</span>,
+        list.<span class="fn">pending</span>().<span class="fn">iter</span>().<span class="fn">map</span>(|t| &amp;t.title).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;());
+    <span class="fn">println!</span>(<span class="st">"stats:   {:?}"</span>, list.<span class="fn">stats</span>());
+    <span class="fn">println!</span>(<span class="st">"removed: {:?}"</span>, list.<span class="fn">remove</span>(b).<span class="fn">map</span>(|t| t.title));
+    <span class="fn">println!</span>(<span class="st">"cleared: {}"</span>, list.<span class="fn">clear_done</span>());
+    <span class="fn">println!</span>(<span class="st">"left:    {:?}"</span>,
+        list.tasks.<span class="fn">iter</span>().<span class="fn">map</span>(|t| &amp;t.title).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;());
+}</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified output</div>
+<pre><code>pending: ["review", "ship"]
+stats:   (3, 1, 33.33333333333333)
+removed: Some("review")
+cleared: 1
+left:    ["ship"]</code></pre>
+        </div>
+        <p>Trace it: three added, "write guide" completed so pending has the other two. Stats are 3 total / 1 done / 33.3%. Removing <code>b</code> takes "review" out. <code>clear_done</code> then drops the single completed task, leaving only "ship".</p>
+      </div></details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p><b>All 44 exercises and the capstone were compiled and run</b> on rustc 1.96.0, edition 2021. Every output shown is real program output, not written from memory.</p>
+    <p><b>If you finished these,</b> you can use vectors for real work. The next topic is error handling — <code>Result</code>, <code>?</code>, and custom error types.</p>
+    <p>Companion reference: <b>vectors_guide.html</b></p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var TKEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(TKEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = currentIsDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(TKEY, next); } catch (e) {}
+    syncBtn();
+  });
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-vectors-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+
+</body>
+</html>

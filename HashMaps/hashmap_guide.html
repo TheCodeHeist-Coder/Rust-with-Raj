@@ -1,0 +1,1691 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HashMap &amp; HashSet in Rust — The Complete Guide</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.75rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 1.85rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem; padding-left: 0.35rem;
+  font-size: 0.625rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.6vw, 3.9rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif); font-size: 1.28rem; line-height: 1.28;
+  font-weight: 700; letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem; max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono); font-size: 0.75rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.5rem 1rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 1.05rem 1.15rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); font-weight: 700; }
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure); margin: 1.5rem 0;
+  padding: 1rem 1.15rem; border-radius: 2px;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  font-size: 0.9688rem; line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block; font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto; margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; background: var(--surface); }
+th, td {
+  text-align: left; padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+th {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure --------------------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0; max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 2px; overflow-x: auto;
+}
+.figure pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; color: var(--ink-soft); white-space: pre;
+}
+.figcap {
+  font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-faint);
+  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1.15rem 1.3rem; margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto; white-space: pre; color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split ---------------------------------------------------------- */
+
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem; margin: 1.5rem 0; max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0; max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember); border-radius: 2px;
+  padding: 0.95rem 1.1rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.7813rem;
+  line-height: 1.6; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Keyline -------------------------------------------------------- */
+
+.keyline {
+  max-width: var(--measure); margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.45;
+  font-style: italic; color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">HashMap &amp; HashSet</p>
+  <p class="rail-sub">Complete guide<br>17 parts</p>
+  <nav id="toc">
+    <div class="rail-group">Foundations</div>
+    <a href="#p1"><span class="n">01</span><span>Why maps exist</span></a>
+    <a href="#p2"><span class="n">02</span><span>Creating a map</span></a>
+    <a href="#p3"><span class="n">03</span><span>Reading values</span></a>
+    <a href="#p4"><span class="n">04</span><span>Insert, update, remove</span></a>
+
+    <div class="rail-group">The entry API</div>
+    <a href="#p5"><span class="n">05</span><span>The entry pattern</span></a>
+    <a href="#p6"><span class="n">06</span><span>Counting &amp; grouping</span></a>
+
+    <div class="rail-group">Ownership</div>
+    <a href="#p7"><span class="n">07</span><span>Keys and ownership</span></a>
+    <a href="#p8"><span class="n">08</span><span>Borrow checker</span></a>
+
+    <div class="rail-group">Iteration</div>
+    <a href="#p9"><span class="n">09</span><span>Iterating a map</span></a>
+    <a href="#p10"><span class="n">10</span><span>Order is arbitrary</span></a>
+
+    <div class="rail-group">HashSet</div>
+    <a href="#p11"><span class="n">11</span><span>HashSet basics</span></a>
+    <a href="#p12"><span class="n">12</span><span>Set operations</span></a>
+
+    <div class="rail-group">Advanced</div>
+    <a href="#p13"><span class="n">13</span><span>Custom key types</span></a>
+    <a href="#p14"><span class="n">14</span><span>BTreeMap &amp; BTreeSet</span></a>
+
+    <div class="rail-group">In practice</div>
+    <a href="#p15"><span class="n">15</span><span>Real-world patterns</span></a>
+    <a href="#p16"><span class="n">16</span><span>Common errors</span></a>
+    <a href="#p17"><span class="n">17</span><span>Cheat sheet</span></a>
+  </nav>
+</aside>
+
+<!-- ====================== MAIN ====================== -->
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Learning notes</p>
+  <h1>HashMap &amp; HashSet:<br>lookup by <em>key</em>, not position</h1>
+  <p class="standfirst">A vector answers "what is at index 3?". A map answers "what is stored under <em>this</em> key?" — and answers it in constant time, no matter how much is in there. A set is the same machinery with the values thrown away.</p>
+  <div class="masthead-meta">
+    <span><b>17</b> parts</span>
+    <span><b>Companion:</b> hashmap_practice.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>The mental model — why maps exist</h2>
+  </div>
+
+  <h3>The problem with vectors</h3>
+  <p>You know vectors now. Say you want to store exam scores by student name. With a vector your options are grim:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">The vector approach falls apart</div>
+<pre><code><span class="cm">// Two parallel vectors, kept in sync by hand and by hope.</span>
+<span class="k">let</span> names  = <span class="fn">vec!</span>[<span class="st">"ada"</span>, <span class="st">"ravi"</span>, <span class="st">"meera"</span>];
+<span class="k">let</span> scores = <span class="fn">vec!</span>[<span class="nu">90</span>, <span class="nu">78</span>, <span class="nu">88</span>];
+
+<span class="cm">// To find Ravi's score you must SCAN:</span>
+<span class="k">let</span> <span class="k">mut</span> ravi = <span class="nu">0</span>;
+<span class="k">for</span> (i, n) <span class="k">in</span> names.<span class="fn">iter</span>().<span class="fn">enumerate</span>() {
+    <span class="k">if</span> *n == <span class="st">"ravi"</span> { ravi = scores[i]; }
+}
+<span class="cm">// O(n). And if the vectors ever fall out of sync, every</span>
+<span class="cm">// lookup silently returns the WRONG person's score.</span></code></pre>
+  </div>
+
+  <p>Two separate problems there. The scan is slow — a million students means a million comparisons. And the pairing is a convention you enforce by hand, not a guarantee the compiler checks.</p>
+
+  <div class="keyline">A HashMap stores key–value pairs together and finds any value by its key in constant time — however large the map gets.</div>
+
+  <div class="code is-good">
+    <div class="code-label">The same thing with a map</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="k">let</span> <span class="k">mut</span> scores = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+scores.<span class="fn">insert</span>(<span class="st">"ada"</span>, <span class="nu">90</span>);
+scores.<span class="fn">insert</span>(<span class="st">"ravi"</span>, <span class="nu">78</span>);
+scores.<span class="fn">insert</span>(<span class="st">"meera"</span>, <span class="nu">88</span>);
+
+scores.<span class="fn">get</span>(<span class="st">"ravi"</span>);   <span class="cm">// Some(&amp;78) — one step, no scan</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The import</span>
+    <p><code>HashMap</code> is not in the prelude — you must write <code>use std::collections::HashMap;</code>. <code>Vec</code> and <code>String</code> are imported automatically; <code>HashMap</code> is not. Forgetting this is the single most common first error with maps.</p>
+  </div>
+
+  <h3>How the constant time works</h3>
+  <p>You do not need this to use maps, but it explains every rule that follows. A hash function turns your key into a number, and that number decides which "bucket" the pair lives in.</p>
+
+  <div class="figure">
+<pre>insert("ravi", 78)
+
+  "ravi"  ──hash──→  8favc9e2…  ──mod n──→  bucket 3
+                                                │
+   ┌────┬────┬────┬──────────────┬────┬────┐   │
+   │ 0  │ 1  │ 2  │ 3  ("ravi",78)│ 4  │ 5  │ ←─┘
+   └────┴────┴────┴──────────────┴────┴────┘
+
+get("ravi")
+
+  "ravi"  ──hash──→  8favc9e2…  ──mod n──→  bucket 3  → found
+
+  The SAME key always hashes to the SAME bucket. So lookup
+  goes straight there — it never scans the other buckets.</pre>
+    <p class="figcap">This is why lookup is O(1): the key itself computes the location. It is also why keys must be hashable and comparable — see Part 13.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th><code>Vec&lt;T&gt;</code></th><th><code>HashMap&lt;K, V&gt;</code></th></tr></thead>
+      <tbody>
+        <tr><td>Find by position</td><td>O(1) — <code>v[3]</code></td><td>Not possible</td></tr>
+        <tr><td>Find by value/key</td><td>O(n) — must scan</td><td>O(1) — hashes straight to it</td></tr>
+        <tr><td>Order</td><td>Kept, exactly as inserted</td><td><strong>None</strong> — arbitrary</td></tr>
+        <tr><td>Duplicates</td><td>Allowed</td><td>Keys are unique; inserting again replaces</td></tr>
+        <tr><td>Use when</td><td>Sequence, order matters</td><td>Lookup by name/id</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>And HashSet?</h3>
+  <p>A <code>HashSet&lt;T&gt;</code> is a <code>HashMap&lt;T, ()&gt;</code> with the values discarded. It answers exactly one question — <em>is this thing present?</em> — in constant time, and it automatically refuses duplicates.</p>
+
+  <div class="figure">
+<pre>HashMap&lt;K, V&gt;    keys → values     "what is stored under this key?"
+HashSet&lt;T&gt;       keys only         "have I seen this before?"
+
+Everything you learn about HashMap keys applies to HashSet
+elements unchanged. It is genuinely the same machinery.</pre>
+    <p class="figcap">Verified: both are 48 bytes on a 64-bit machine, because they are the same structure underneath.</p>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">If you know other languages</span>
+    <p>Python <code>dict</code> / <code>set</code>. Java <code>HashMap</code> / <code>HashSet</code>. JavaScript <code>Map</code> / <code>Set</code>. C++ <code>unordered_map</code> / <code>unordered_set</code>. Same idea everywhere; Rust's differences are ownership and the <code>entry</code> API, which are Parts 5 and 7.</p>
+  </div>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2>Creating a map</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Four ways</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="cm">// 1. Empty, then fill. Needs `mut`.</span>
+<span class="k">let</span> <span class="k">mut</span> scores: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+scores.<span class="fn">insert</span>(<span class="st">"ada"</span>.<span class="fn">to_string</span>(), <span class="nu">90</span>);
+
+<span class="cm">// 2. From an array of pairs — the most readable literal form.</span>
+<span class="k">let</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([
+    (<span class="st">"ada"</span>, <span class="nu">90</span>),
+    (<span class="st">"ravi"</span>, <span class="nu">78</span>),
+]);
+
+<span class="cm">// 3. Collected from an iterator of pairs.</span>
+<span class="k">let</span> names = <span class="fn">vec!</span>[<span class="st">"x"</span>, <span class="st">"y"</span>, <span class="st">"z"</span>];
+<span class="k">let</span> vals  = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+<span class="k">let</span> zipped: <span class="ty">HashMap</span>&lt;_, _&gt; = names.<span class="fn">iter</span>().<span class="fn">zip</span>(vals.<span class="fn">iter</span>()).<span class="fn">collect</span>();
+
+<span class="cm">// 4. Pre-sized, when you know roughly how many pairs are coming.</span>
+<span class="k">let</span> <span class="k">mut</span> big: <span class="ty">HashMap</span>&lt;<span class="ty">i32</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">with_capacity</span>(<span class="nu">1000</span>);</code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Type annotations</span>
+    <p>Same rule as <code>Vec</code>. <code>HashMap::new()</code> alone is ambiguous — the compiler needs to learn <code>K</code> and <code>V</code> from somewhere. If a later <code>insert</code> pins them down, you can drop the annotation. If nothing does, you get <strong>E0282: type annotations needed</strong>.</p>
+  </div>
+
+  <p>There is no <code>hashmap!</code> macro in the standard library, which surprises people coming from other languages. <code>HashMap::from([...])</code> is the closest thing and is what you should reach for.</p>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>Reading values</h2>
+  </div>
+
+  <p>Exactly the same safety choice you learned with vectors: a method that returns <code>Option</code>, and an indexing form that panics.</p>
+
+  <div class="code is-good">
+    <div class="code-label">.get() — the safe read</div>
+<pre><code><span class="k">let</span> scores = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"ada"</span>, <span class="nu">90</span>), (<span class="st">"ravi"</span>, <span class="nu">78</span>)]);
+
+scores.<span class="fn">get</span>(<span class="st">"ada"</span>);    <span class="cm">// Some(&amp;90)</span>
+scores.<span class="fn">get</span>(<span class="st">"nope"</span>);   <span class="cm">// None      — no panic, ever</span>
+
+<span class="cm">// Handle both cases:</span>
+<span class="k">match</span> scores.<span class="fn">get</span>(<span class="st">"ravi"</span>) {
+    <span class="ty">Some</span>(s) =&gt; <span class="fn">println!</span>(<span class="st">"ravi scored {s}"</span>),
+    <span class="ty">None</span>    =&gt; <span class="fn">println!</span>(<span class="st">"no record for ravi"</span>),
+}
+
+<span class="cm">// Or supply a default:</span>
+<span class="k">let</span> s = scores.<span class="fn">get</span>(<span class="st">"nope"</span>).<span class="fn">copied</span>().<span class="fn">unwrap_or</span>(<span class="nu">0</span>);   <span class="cm">// 0</span></code></pre>
+  </div>
+
+  <div class="code is-bad">
+    <div class="code-label">Indexing — panics on a missing key</div>
+<pre><code><span class="k">let</span> scores = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"ada"</span>, <span class="nu">90</span>)]);
+<span class="k">let</span> v = scores[<span class="st">"zz"</span>];   <span class="cm">// PANIC</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre>thread 'main' panicked at src/main.rs:5:14:
+no entry found for key</pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The rule</span>
+    <p>Prefer <code>.get()</code>. Index with <code>map[key]</code> only when a missing key would mean your program is broken — a configuration value you set yourself two lines earlier, for instance. If the key comes from user input, a file, or a network, <code>.get()</code> is the only defensible choice.</p>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Asymmetry worth noting</span>
+    <p>Unlike <code>Vec</code>, a <code>HashMap</code> has <strong>no <code>IndexMut</code></strong>. You can read <code>map["a"]</code> but you cannot write <code>map["a"] = 5</code>. Use <code>.insert()</code> or the entry API instead. This trips up people arriving from Python.</p>
+  </div>
+
+  <h4>Other reads</h4>
+  <div class="code">
+    <div class="code-label">All safe on an empty map</div>
+<pre><code>scores.<span class="fn">contains_key</span>(<span class="st">"ada"</span>)   <span class="cm">// true / false</span>
+scores.<span class="fn">len</span>()                  <span class="cm">// number of pairs</span>
+scores.<span class="fn">is_empty</span>()             <span class="cm">// clearer than len() == 0</span>
+scores.<span class="fn">get_mut</span>(<span class="st">"ada"</span>)        <span class="cm">// Option&lt;&amp;mut V&gt; — to modify in place</span>
+
+<span class="cm">// get_mut in use:</span>
+<span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(s) = scores.<span class="fn">get_mut</span>(<span class="st">"ada"</span>) {
+    *s += <span class="nu">5</span>;      <span class="cm">// note the * — s is &amp;mut i32</span>
+}</code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2>Insert, update, remove</h2>
+  </div>
+
+  <h3><code>insert</code> returns the old value</h3>
+  <p>This is easy to miss and genuinely useful. <code>insert</code> hands back an <code>Option&lt;V&gt;</code>: <code>Some(old)</code> if the key was already present, <code>None</code> if it is new.</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> scores = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+
+<span class="k">let</span> a = scores.<span class="fn">insert</span>(<span class="st">"ada"</span>, <span class="nu">90</span>);   <span class="cm">// None      — brand new key</span>
+<span class="k">let</span> b = scores.<span class="fn">insert</span>(<span class="st">"ada"</span>, <span class="nu">95</span>);   <span class="cm">// Some(90)  — replaced, old value returned</span>
+
+<span class="cm">// The map now holds ada → 95. There is no duplicate.</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Keys are unique</span>
+    <p>Inserting an existing key <strong>overwrites</strong> silently. There is no error and no warning. If you meant "only insert if absent", use <code>.entry(k).or_insert(v)</code> from Part 5.</p>
+  </div>
+
+  <h3>Removing</h3>
+
+  <div class="code">
+    <div class="code-label">remove also returns what it removed</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"a"</span>, <span class="nu">1</span>), (<span class="st">"b"</span>, <span class="nu">2</span>)]);
+
+m.<span class="fn">remove</span>(<span class="st">"a"</span>);       <span class="cm">// Some(1)  — removed and handed back</span>
+m.<span class="fn">remove</span>(<span class="st">"a"</span>);       <span class="cm">// None     — already gone, no panic</span>
+
+m.<span class="fn">clear</span>();           <span class="cm">// empty it entirely</span></code></pre>
+  </div>
+
+  <h3>Bulk update and filter</h3>
+
+  <div class="code">
+    <div class="code-label">values_mut and retain</div>
+<pre><code><span class="cm">// Multiply every value by 10</span>
+<span class="k">let</span> <span class="k">mut</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"a"</span>, <span class="nu">1</span>), (<span class="st">"b"</span>, <span class="nu">2</span>)]);
+<span class="k">for</span> v <span class="k">in</span> m.<span class="fn">values_mut</span>() {
+    *v *= <span class="nu">10</span>;      <span class="cm">// a → 10, b → 20</span>
+}
+
+<span class="cm">// Keep only the pairs you want — same name and meaning as Vec::retain</span>
+<span class="k">let</span> <span class="k">mut</span> squares: <span class="ty">HashMap</span>&lt;<span class="ty">i32</span>, <span class="ty">i32</span>&gt; = (<span class="nu">1</span>..=<span class="nu">6</span>).<span class="fn">map</span>(|i| (i, i * i)).<span class="fn">collect</span>();
+squares.<span class="fn">retain</span>(|k, _| k % <span class="nu">2</span> == <span class="nu">0</span>);
+<span class="cm">// keys left: [2, 4, 6]</span></code></pre>
+  </div>
+
+  <p>The closure passed to <code>retain</code> receives <em>both</em> the key and the value (<code>|k, v|</code>), so you can filter on either. Use <code>_</code> for whichever you do not need.</p>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2>The entry API — the most important thing here</h2>
+  </div>
+
+  <p>If you remember one thing from this guide, make it this part. <code>entry</code> is what makes Rust maps pleasant, and beginners consistently write clumsy code because they have not met it yet.</p>
+
+  <h3>The problem it solves</h3>
+  <p>"Look up this key. If it is missing, put a default there. Then modify whatever is now there." Written by hand, that is ugly and does the lookup twice:</p>
+
+  <div class="split">
+    <div class="code is-bad">
+      <div class="code-label">By hand — two lookups</div>
+<pre><code><span class="k">if</span> !m.<span class="fn">contains_key</span>(k) {
+    m.<span class="fn">insert</span>(k, <span class="nu">0</span>);
+}
+<span class="k">let</span> v = m.<span class="fn">get_mut</span>(k).<span class="fn">unwrap</span>();
+*v += <span class="nu">1</span>;</code></pre>
+    </div>
+    <div class="code is-good">
+      <div class="code-label">With entry — one lookup</div>
+<pre><code>*m.<span class="fn">entry</span>(k).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;</code></pre>
+    </div>
+  </div>
+
+  <div class="keyline"><code>entry(key)</code> returns a handle to that slot in the map — occupied or vacant — and lets you decide what happens in each case, hashing the key only once.</div>
+
+  <h3>Reading that one-liner</h3>
+
+  <div class="figure">
+<pre>*m.entry(k).or_insert(0) += 1;
+│ │         │              │
+│ │         │              └── add 1 to whatever is now there
+│ │         └── if the slot is EMPTY, put 0 in it.
+│ │             Either way, hand back &amp;mut V pointing at the slot.
+│ └── get a handle on the slot for key `k`
+└── dereference the &amp;mut V so we can do arithmetic on the value</pre>
+    <p class="figcap">The leading <code>*</code> catches everyone once. <code>or_insert</code> gives you a <em>mutable reference</em>; the star reaches through it to the number.</p>
+  </div>
+
+  <h3>The four entry methods</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>If key is missing</th><th>Returns</th></tr></thead>
+      <tbody>
+        <tr><td><code>.or_insert(v)</code></td><td>Inserts <code>v</code></td><td><code>&amp;mut V</code></td></tr>
+        <tr><td><code>.or_insert_with(f)</code></td><td>Inserts <code>f()</code></td><td><code>&amp;mut V</code></td></tr>
+        <tr><td><code>.or_default()</code></td><td>Inserts <code>V::default()</code></td><td><code>&amp;mut V</code></td></tr>
+        <tr><td><code>.and_modify(f)</code></td><td>Does nothing</td><td>the entry, for chaining</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-label">All four, with verified results</div>
+<pre><code><span class="cm">// or_insert — the default value is built even if unused</span>
+*counts.<span class="fn">entry</span>(<span class="st">"a"</span>).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+
+<span class="cm">// or_insert_with — LAZY. The closure runs only when actually needed.</span>
+<span class="cm">// Use this whenever the default is expensive to build (like a Vec).</span>
+groups.<span class="fn">entry</span>(key).<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>).<span class="fn">push</span>(item);
+
+<span class="cm">// or_default — uses the type's Default impl. 0 for numbers,</span>
+<span class="cm">// empty for Vec/String. Shortest form when the default is the obvious one.</span>
+<span class="k">let</span> <span class="k">mut</span> d: <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+*d.<span class="fn">entry</span>(<span class="st">"k"</span>).<span class="fn">or_default</span>() += <span class="nu">5</span>;      <span class="cm">// k → 5</span>
+
+<span class="cm">// and_modify + or_insert — different behaviour for present vs absent</span>
+<span class="k">let</span> <span class="k">mut</span> am: <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+am.<span class="fn">entry</span>(<span class="st">"a"</span>).<span class="fn">and_modify</span>(|v| *v += <span class="nu">1</span>).<span class="fn">or_insert</span>(<span class="nu">100</span>);  <span class="cm">// absent → 100</span>
+am.<span class="fn">entry</span>(<span class="st">"a"</span>).<span class="fn">and_modify</span>(|v| *v += <span class="nu">1</span>).<span class="fn">or_insert</span>(<span class="nu">100</span>);  <span class="cm">// present → 101</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">or_insert vs or_insert_with</span>
+    <p><code>or_insert(Vec::new())</code> constructs an empty <code>Vec</code> <em>every single call</em>, then throws it away when the key already exists. <code>or_insert_with(Vec::new)</code> only calls it when genuinely needed. For cheap values like <code>0</code> the difference is nil; for allocations it matters. Note there are no <code>()</code> after <code>Vec::new</code> — you are passing the function itself, not calling it.</p>
+  </div>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2>Counting and grouping — the two patterns you will actually use</h2>
+  </div>
+
+  <p>These two shapes cover an enormous fraction of real map usage. Learn them as units.</p>
+
+  <h3>Pattern 1: counting occurrences</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Character frequency — verified output</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="k">let</span> text = <span class="st">"hello world"</span>;
+<span class="k">let</span> <span class="k">mut</span> counts: <span class="ty">HashMap</span>&lt;<span class="ty">char</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+
+<span class="k">for</span> c <span class="k">in</span> text.<span class="fn">chars</span>().<span class="fn">filter</span>(|c| !c.<span class="fn">is_whitespace</span>()) {
+    *counts.<span class="fn">entry</span>(c).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+}
+
+<span class="cm">// sorted for display: [('d',1), ('e',1), ('h',1), ('l',3),</span>
+<span class="cm">//                     ('o',2), ('r',1), ('w',1)]</span></code></pre>
+  </div>
+
+  <p>Word frequency is the same three lines with <code>.split_whitespace()</code> in place of <code>.chars()</code>. Once you see the shape, you will reach for it constantly.</p>
+
+  <h3>Pattern 2: grouping into buckets</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Group words by first letter — verified output</div>
+<pre><code><span class="k">let</span> words = <span class="fn">vec!</span>[<span class="st">"apple"</span>, <span class="st">"avocado"</span>, <span class="st">"banana"</span>, <span class="st">"blueberry"</span>, <span class="st">"cherry"</span>];
+<span class="k">let</span> <span class="k">mut</span> by_letter: <span class="ty">HashMap</span>&lt;<span class="ty">char</span>, <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+
+<span class="k">for</span> w <span class="k">in</span> &amp;words {
+    <span class="k">let</span> first = w.<span class="fn">chars</span>().<span class="fn">next</span>().<span class="fn">unwrap</span>();
+    by_letter.<span class="fn">entry</span>(first).<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>).<span class="fn">push</span>(w);
+}
+
+<span class="cm">// 'a' → ["apple", "avocado"]</span>
+<span class="cm">// 'b' → ["banana", "blueberry"]</span>
+<span class="cm">// 'c' → ["cherry"]</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Memorise these two lines</span>
+    <p><strong>Count:</strong> <code>*map.entry(k).or_insert(0) += 1;</code><br>
+    <strong>Group:</strong> <code>map.entry(k).or_insert_with(Vec::new).push(v);</code></p>
+    <p>You met the grouping line in the vectors guide. It is the same idiom — worth knowing cold.</p>
+  </div>
+
+  <h3>Finding the most frequent</h3>
+
+  <div class="code">
+    <div class="code-label">max_by_key over the pairs</div>
+<pre><code><span class="k">let</span> most = counts
+    .<span class="fn">iter</span>()
+    .<span class="fn">max_by_key</span>(|(_, &amp;count)| count);
+<span class="cm">// Some(('l', 3))</span>
+
+<span class="cm">// CAREFUL: on ties, which one wins is arbitrary — the map has</span>
+<span class="cm">// no order, so "the maximum" is only well-defined if it is unique.</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Keys and ownership</h2>
+  </div>
+
+  <p>A map <strong>owns</strong> its keys and values. That has consequences you will meet immediately.</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Inserting moves the key</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+<span class="k">let</span> k = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"a"</span>);
+m.<span class="fn">insert</span>(k, <span class="nu">1</span>);
+<span class="fn">println!</span>(<span class="st">"{}"</span>, k);   <span class="cm">// ← k was moved into the map</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `k`
+ --&gt; src/main.rs:6:20
+  |
+4 |     let k = String::from("a");
+  |         - move occurs because `k` has type `String`,
+  |           which does not implement the `Copy` trait
+5 |     m.insert(k, 1);
+  |              - value moved here
+6 |     println!("{}", k);
+  |                    ^ value borrowed here after move
+  |
+help: consider cloning the value if the performance cost is acceptable
+  |
+5 |     m.insert(k.clone(), 1);
+  |               ++++++++</pre>
+  </div>
+
+  <p>The map must own the key, because it has to keep it alive for as long as the entry exists. Three ways forward:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Fixes</div>
+<pre><code><span class="cm">// 1. Clone if you need to keep your own copy</span>
+m.<span class="fn">insert</span>(k.<span class="fn">clone</span>(), <span class="nu">1</span>);
+<span class="fn">println!</span>(<span class="st">"{}"</span>, k);          <span class="cm">// ✓ k is still yours</span>
+
+<span class="cm">// 2. Use the key AFTER inserting, via the map</span>
+m.<span class="fn">insert</span>(k, <span class="nu">1</span>);
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, m.<span class="fn">keys</span>());   <span class="cm">// ✓ read it back out</span>
+
+<span class="cm">// 3. Best when possible — use &amp;str keys, which are Copy</span>
+<span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+m.<span class="fn">insert</span>(<span class="st">"a"</span>, <span class="nu">1</span>);
+<span class="fn">println!</span>(<span class="st">"{}"</span>, <span class="st">"a"</span>);        <span class="cm">// ✓ no ownership problem at all</span></code></pre>
+  </div>
+
+  <h3><code>String</code> keys, <code>&amp;str</code> lookups</h3>
+  <p>A pleasant asymmetry: even when the map owns <code>String</code> keys, you can look up with a plain <code>&amp;str</code>. No allocation needed to ask a question.</p>
+
+  <div class="code is-good">
+    <div class="code-label">This just works</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+m.<span class="fn">insert</span>(<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"ada"</span>), <span class="nu">90</span>);
+
+m.<span class="fn">get</span>(<span class="st">"ada"</span>);                    <span class="cm">// ✓ &amp;str, no String::from needed</span>
+m.<span class="fn">contains_key</span>(<span class="st">"ada"</span>);           <span class="cm">// ✓ same</span>
+
+<span class="cm">// Insert still needs an owned String — that one is unavoidable.</span>
+m.<span class="fn">insert</span>(<span class="st">"ravi"</span>.<span class="fn">to_string</span>(), <span class="nu">78</span>);</code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Why that works</span>
+    <p><code>get</code> is generic over any <code>Q</code> where <code>String: Borrow&lt;Q&gt;</code>. Since <code>String</code> borrows as <code>str</code>, a <code>&amp;str</code> is accepted. This is your <strong>traits</strong> topic quietly saving you an allocation on every lookup.</p>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Choosing a key type</span>
+    <p>Use <code>String</code> keys when the map must outlive the source data or owns its content. Use <code>&amp;str</code> keys when everything lives in the same scope and you want zero copying — but the map is then tied to that data's lifetime.</p>
+  </div>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2>Maps and the borrow checker</h2>
+  </div>
+
+  <p>The same rule you met with vectors, in a new costume.</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Holding a reference while inserting</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+m.<span class="fn">insert</span>(<span class="st">"a"</span>, <span class="fn">vec!</span>[<span class="nu">1</span>]);
+
+<span class="k">let</span> v = m.<span class="fn">get</span>(<span class="st">"a"</span>).<span class="fn">unwrap</span>();   <span class="cm">// borrow the map</span>
+m.<span class="fn">insert</span>(<span class="st">"b"</span>, <span class="fn">vec!</span>[<span class="nu">2</span>]);        <span class="cm">// modify the map</span>
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, v);            <span class="cm">// use the borrow</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0502]</span>: cannot borrow `m` as mutable because it is also
+              borrowed as immutable
+ --&gt; src/main.rs:6:5
+  |
+5 |     let v = m.get("a").unwrap();
+  |             - immutable borrow occurs here
+6 |     m.insert("b", vec![2]);
+  |     ^^^^^^^^^^^^^^^^^^^^^^ mutable borrow occurs here
+7 |     println!("{:?}", v);
+  |                      - immutable borrow later used here</pre>
+  </div>
+
+  <p>The reason is the same as with <code>Vec</code>: inserting can force the map to <strong>rehash and reallocate</strong>, moving every entry to a new location. Any reference you held would dangle.</p>
+
+  <div class="code is-good">
+    <div class="code-label">Fixes</div>
+<pre><code><span class="cm">// 1. Finish with the borrow first (borrows end at last use)</span>
+<span class="k">let</span> v = m.<span class="fn">get</span>(<span class="st">"a"</span>).<span class="fn">unwrap</span>();
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, v);        <span class="cm">// last use — borrow over</span>
+m.<span class="fn">insert</span>(<span class="st">"b"</span>, <span class="fn">vec!</span>[<span class="nu">2</span>]);    <span class="cm">// ✓ fine now</span>
+
+<span class="cm">// 2. Clone what you need out of the map</span>
+<span class="k">let</span> v = m.<span class="fn">get</span>(<span class="st">"a"</span>).<span class="fn">cloned</span>().<span class="fn">unwrap</span>();
+m.<span class="fn">insert</span>(<span class="st">"b"</span>, <span class="fn">vec!</span>[<span class="nu">2</span>]);    <span class="cm">// ✓ v owns its own data</span>
+
+<span class="cm">// 3. For a "read then write same key" cycle, use entry — it</span>
+<span class="cm">//    holds exactly one borrow for the whole operation.</span>
+m.<span class="fn">entry</span>(<span class="st">"a"</span>).<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>).<span class="fn">push</span>(<span class="nu">9</span>);</code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">A hidden benefit of entry</span>
+    <p>Fix 3 is why the entry API exists. "Check if present, then insert or modify" is exactly the shape that trips the borrow checker when written by hand — and exactly what <code>entry</code> does in a single borrow. If you are fighting E0502 around a map, entry is usually the answer.</p>
+  </div>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>Iterating a map</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">The three iterators, plus keys and values</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"a"</span>, <span class="nu">1</span>), (<span class="st">"b"</span>, <span class="nu">2</span>)]);
+
+<span class="cm">// Pairs, by reference. Note the (k, v) tuple destructuring.</span>
+<span class="k">for</span> (k, v) <span class="k">in</span> &amp;m {
+    <span class="fn">println!</span>(<span class="st">"{k} = {v}"</span>);     <span class="cm">// k: &amp;&amp;str, v: &amp;i32</span>
+}
+
+<span class="cm">// Values mutably</span>
+<span class="k">for</span> (k, v) <span class="k">in</span> &amp;<span class="k">mut</span> m {
+    *v *= <span class="nu">10</span>;                  <span class="cm">// keys are NOT mutable — only values</span>
+}
+
+<span class="cm">// Consuming — the map is gone afterwards</span>
+<span class="k">for</span> (k, v) <span class="k">in</span> m {
+    <span class="cm">// k: &amp;str, v: i32 — both owned</span>
+}
+
+<span class="cm">// Just one side:</span>
+m.<span class="fn">keys</span>()         <span class="cm">// iterator of &amp;K</span>
+m.<span class="fn">values</span>()       <span class="cm">// iterator of &amp;V</span>
+m.<span class="fn">values_mut</span>()   <span class="cm">// iterator of &amp;mut V</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Keys are immutable</span>
+    <p>Even with <code>&amp;mut m</code>, you get <code>(&amp;K, &amp;mut V)</code> — the key is read-only. Changing a key would change its hash, putting it in the wrong bucket and corrupting the map. To "rename" a key you must remove and re-insert.</p>
+  </div>
+
+  <h3>Maps and iterator adapters</h3>
+
+  <div class="code">
+    <div class="code-label">Same adapters you know from vectors</div>
+<pre><code><span class="k">let</span> scores = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"ada"</span>, <span class="nu">90</span>), (<span class="st">"ravi"</span>, <span class="nu">78</span>), (<span class="st">"meera"</span>, <span class="nu">88</span>)]);
+
+<span class="cm">// Sum of all values</span>
+<span class="k">let</span> total: <span class="ty">i32</span> = scores.<span class="fn">values</span>().<span class="fn">sum</span>();          <span class="cm">// 256</span>
+
+<span class="cm">// Everyone above 80 — filter on the pair, then take the key</span>
+<span class="k">let</span> <span class="k">mut</span> top: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = scores
+    .<span class="fn">iter</span>()
+    .<span class="fn">filter</span>(|(_, &amp;v)| v &gt; <span class="nu">80</span>)
+    .<span class="fn">map</span>(|(k, _)| *k)
+    .<span class="fn">collect</span>();
+top.<span class="fn">sort</span>();                                    <span class="cm">// ["ada", "meera"]</span>
+
+<span class="cm">// Build a NEW map from an old one</span>
+<span class="k">let</span> doubled: <span class="ty">HashMap</span>&lt;&amp;<span class="ty">str</span>, <span class="ty">i32</span>&gt; = scores
+    .<span class="fn">iter</span>()
+    .<span class="fn">map</span>(|(k, v)| (*k, v * <span class="nu">2</span>))
+    .<span class="fn">collect</span>();</code></pre>
+  </div>
+
+  <p>Notice the <code>sort()</code> on the filtered result. That is not decoration — it is the subject of the next part.</p>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>Iteration order is arbitrary — and that is deliberate</h2>
+  </div>
+
+  <div class="keyline">A HashMap has no order. Not "insertion order", not "sorted order" — no order at all. Do not rely on it, ever.</div>
+
+  <div class="code is-bad">
+    <div class="code-label">Do not do this</div>
+<pre><code><span class="k">let</span> m = <span class="ty">HashMap</span>::<span class="fn">from</span>([(<span class="st">"one"</span>, <span class="nu">1</span>), (<span class="st">"two"</span>, <span class="nu">2</span>), (<span class="st">"three"</span>, <span class="nu">3</span>)]);
+
+<span class="k">for</span> (k, v) <span class="k">in</span> &amp;m {
+    <span class="fn">println!</span>(<span class="st">"{k}"</span>);   <span class="cm">// order differs between runs of the SAME binary</span>
+}</code></pre>
+  </div>
+
+  <p>Rust goes further than most languages here: it seeds each map with a <strong>random</strong> hash key at startup, so the order genuinely changes from run to run. This is a security measure — it prevents an attacker from crafting inputs that all collide into one bucket and degrade your map to O(n). It also stops you accidentally depending on an order that was never guaranteed.</p>
+
+  <div class="code is-good">
+    <div class="code-label">If you need order, sort explicitly</div>
+<pre><code><span class="cm">// Sorted keys</span>
+<span class="k">let</span> <span class="k">mut</span> keys: <span class="ty">Vec</span>&lt;_&gt; = m.<span class="fn">keys</span>().<span class="fn">collect</span>();
+keys.<span class="fn">sort</span>();
+<span class="cm">// ["one", "three", "two"]</span>
+
+<span class="cm">// Sorted pairs</span>
+<span class="k">let</span> <span class="k">mut</span> pairs: <span class="ty">Vec</span>&lt;_&gt; = m.<span class="fn">iter</span>().<span class="fn">collect</span>();
+pairs.<span class="fn">sort</span>();                       <span class="cm">// sorts by key, then value</span>
+
+<span class="cm">// Sorted by VALUE, descending — a leaderboard</span>
+<span class="k">let</span> <span class="k">mut</span> board: <span class="ty">Vec</span>&lt;_&gt; = m.<span class="fn">iter</span>().<span class="fn">collect</span>();
+board.<span class="fn">sort_by</span>(|a, b| b.<span class="nu">1</span>.<span class="fn">cmp</span>(a.<span class="nu">1</span>));  <span class="cm">// .1 is the value</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The habit</span>
+    <p>Any time you <strong>print</strong> a map, or <strong>compare</strong> map output in a test, sort first. Tests that pass locally and fail in CI are very often an unsorted map iteration.</p>
+  </div>
+
+  <p>If you find yourself sorting the same map on every use, you want <code>BTreeMap</code> instead — see Part 14.</p>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>HashSet basics</h2>
+  </div>
+
+  <p>Everything you now know transfers. A set is a map with no values — it answers "is this present?" and nothing else.</p>
+
+  <div class="code">
+    <div class="code-label">The core operations</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashSet</span>;
+
+<span class="k">let</span> <span class="k">mut</span> s: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+
+s.<span class="fn">insert</span>(<span class="nu">1</span>);        <span class="cm">// true  — it was newly added</span>
+s.<span class="fn">insert</span>(<span class="nu">1</span>);        <span class="cm">// false — already there, set unchanged</span>
+s.<span class="fn">insert</span>(<span class="nu">2</span>);
+
+s.<span class="fn">contains</span>(&amp;<span class="nu">2</span>);    <span class="cm">// true   — note the &amp;</span>
+s.<span class="fn">remove</span>(&amp;<span class="nu">1</span>);      <span class="cm">// true   — it was present and is now gone</span>
+s.<span class="fn">len</span>();           <span class="cm">// 1</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">insert returns a bool — use it</span>
+    <p><code>set.insert(x)</code> returns <code>true</code> only if <code>x</code> was <em>not</em> already present. That gives you duplicate detection for free:</p>
+    <div class="code" style="margin-top:0.7rem">
+<pre><code><span class="k">if</span> !seen.<span class="fn">insert</span>(item) {
+    <span class="fn">println!</span>(<span class="st">"duplicate: {item}"</span>);
+}</code></pre>
+    </div>
+  </div>
+
+  <h3>Building a set</h3>
+
+  <div class="code">
+    <div class="code-label">Usually from an iterator</div>
+<pre><code><span class="cm">// From an array</span>
+<span class="k">let</span> a: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+
+<span class="cm">// From a Vec — this is THE way to deduplicate</span>
+<span class="k">let</span> dup = <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">3</span>, <span class="nu">2</span>, <span class="nu">1</span>];
+<span class="k">let</span> uniq: <span class="ty">HashSet</span>&lt;_&gt; = dup.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">collect</span>();
+<span class="k">let</span> <span class="k">mut</span> out: <span class="ty">Vec</span>&lt;_&gt; = uniq.<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+out.<span class="fn">sort</span>();      <span class="cm">// [1, 2, 3]</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Two ways to deduplicate</span>
+    <p>You now know both. <code>vec.sort()</code> + <code>vec.dedup()</code> keeps sorted order and needs <code>Ord</code>. A <code>HashSet</code> needs <code>Hash + Eq</code>, destroys order, and is O(n) rather than O(n log n). Use the set when order does not matter; use sort+dedup when it does.</p>
+  </div>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>Set operations</h2>
+  </div>
+
+  <p>This is where sets earn their place. Four operations, all reading like the mathematics they come from.</p>
+
+  <div class="code">
+    <div class="code-label">All four — verified output</div>
+<pre><code><span class="k">let</span> a: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+<span class="k">let</span> b: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = [<span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>, <span class="nu">6</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+
+a.<span class="fn">intersection</span>(&amp;b)           <span class="cm">// [3, 4]        in BOTH</span>
+a.<span class="fn">union</span>(&amp;b)                  <span class="cm">// [1,2,3,4,5,6] in EITHER</span>
+a.<span class="fn">difference</span>(&amp;b)             <span class="cm">// [1, 2]        in a but NOT b</span>
+a.<span class="fn">symmetric_difference</span>(&amp;b)   <span class="cm">// [1, 2, 5, 6]  in exactly ONE</span>
+
+<span class="cm">// These return ITERATORS, so collect to use them:</span>
+<span class="k">let</span> <span class="k">mut</span> both: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = a.<span class="fn">intersection</span>(&amp;b).<span class="fn">copied</span>().<span class="fn">collect</span>();
+both.<span class="fn">sort</span>();   <span class="cm">// [3, 4]</span></code></pre>
+  </div>
+
+  <div class="figure">
+<pre>       a = {1,2,3,4}          b = {3,4,5,6}
+
+        ┌───────────┬───────────┬───────────┐
+        │   1, 2    │   3, 4    │   5, 6    │
+        │  only a   │   both    │  only b   │
+        └───────────┴───────────┴───────────┘
+
+  intersection          ▓▓▓▓▓▓▓▓▓▓▓              {3,4}
+  union            ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓       {1,2,3,4,5,6}
+  difference(a-b)  ▓▓▓▓▓▓▓▓▓▓▓                   {1,2}
+  symmetric_diff   ▓▓▓▓▓▓▓▓▓▓▓            ▓▓▓▓   {1,2,5,6}</pre>
+    <p class="figcap">Difference is directional: <code>a.difference(&amp;b)</code> is not <code>b.difference(&amp;a)</code>. The other three are symmetric.</p>
+  </div>
+
+  <h3>Relationship tests</h3>
+
+  <div class="code">
+    <div class="code-label">These return bool directly</div>
+<pre><code><span class="k">let</span> small: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = [<span class="nu">1</span>, <span class="nu">2</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+
+small.<span class="fn">is_subset</span>(&amp;a);      <span class="cm">// true  — every element of small is in a</span>
+a.<span class="fn">is_superset</span>(&amp;small);   <span class="cm">// true  — the same fact, other way round</span>
+a.<span class="fn">is_disjoint</span>(&amp;other);   <span class="cm">// true  — they share nothing</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Where this pays off</span>
+    <p>Permissions: <code>required.is_subset(&amp;granted)</code>. Tags: <code>post_tags.intersection(&amp;filter_tags)</code>. Diffing two lists of ids: <code>old.difference(&amp;new)</code> gives deletions, <code>new.difference(&amp;old)</code> gives additions. Each is one line and reads as the question you were actually asking.</p>
+  </div>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>Custom key types</h2>
+  </div>
+
+  <p>You will eventually want your own struct as a key. Try it naively and the compiler stops you:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">A struct is not automatically a valid key</div>
+<pre><code><span class="at">#[derive(Debug)]</span>
+<span class="k">struct</span> <span class="ty">Point</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span> }
+
+<span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">Point</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+m.<span class="fn">insert</span>(<span class="ty">Point</span> { x: <span class="nu">1</span>, y: <span class="nu">2</span> }, <span class="nu">5</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0599]</span>: the method `insert` exists for struct
+              `HashMap&lt;Point, i32&gt;`, but its trait bounds were not satisfied
+  |
+3 | struct Point { x: i32, y: i32 }
+  | ------------ doesn't satisfy `Point: Eq` or `Point: Hash`
+  |
+  = note: the following trait bounds were not satisfied:
+          `Point: Eq`
+          `Point: Hash`
+help: consider annotating `Point` with `#[derive(Eq, Hash, PartialEq)]`</pre>
+  </div>
+
+  <div class="code is-good">
+    <div class="code-label">The fix is in the error message</div>
+<pre><code><span class="at">#[derive(Debug, PartialEq, Eq, Hash)]</span>
+<span class="k">struct</span> <span class="ty">Point</span> { x: <span class="ty">i32</span>, y: <span class="ty">i32</span> }
+
+<span class="k">let</span> <span class="k">mut</span> m: <span class="ty">HashMap</span>&lt;<span class="ty">Point</span>, <span class="ty">i32</span>&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+m.<span class="fn">insert</span>(<span class="ty">Point</span> { x: <span class="nu">1</span>, y: <span class="nu">2</span> }, <span class="nu">5</span>);   <span class="cm">// ✓ compiles</span></code></pre>
+  </div>
+
+  <h3>Why those two traits, specifically</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Trait</th><th>Answers</th><th>Needed because</th></tr></thead>
+      <tbody>
+        <tr><td><code>Hash</code></td><td>"What bucket?"</td><td>Without it there is no way to place or find the key</td></tr>
+        <tr><td><code>Eq</code></td><td>"Same key?"</td><td>Two keys can share a bucket; equality settles which is which</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The contract between them</span>
+    <p>If <code>a == b</code>, then <code>hash(a)</code> <strong>must</strong> equal <code>hash(b)</code>. <code>#[derive]</code> guarantees this automatically. If you ever hand-write <code>Hash</code> and break the rule, your map silently loses entries — it looks in one bucket while the key sits in another. Derive unless you have a strong reason not to.</p>
+  </div>
+
+  <h3>Why floats cannot be keys</h3>
+
+  <div class="code is-bad">
+    <div class="code-label">HashSet&lt;f64&gt; will not work</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> s: <span class="ty">HashSet</span>&lt;<span class="ty">f64</span>&gt; = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+s.<span class="fn">insert</span>(<span class="nu">1.0</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0599]</span>: the method `insert` exists for struct `HashSet&lt;f64&gt;`,
+              but its trait bounds were not satisfied
+  = note: the following trait bounds were not satisfied:
+          `f64: Eq`
+          `f64: Hash`</pre>
+  </div>
+
+  <p>The same <code>NaN</code> problem you met when sorting floats. <code>NaN != NaN</code>, so <code>f64</code> implements only <code>PartialEq</code>, never <code>Eq</code> — and a key you cannot reliably compare is a key you cannot reliably find. Use an integer key instead: cents rather than <code>f64</code> rupees, or round to a fixed precision.</p>
+
+  <div class="note">
+    <span class="note-tag">Which types work as keys out of the box</span>
+    <p>All integers, <code>char</code>, <code>bool</code>, <code>String</code>, <code>&amp;str</code>, and tuples/arrays/<code>Vec</code>s of those. Not <code>f32</code>/<code>f64</code>. Your own types work as soon as you add <code>#[derive(PartialEq, Eq, Hash)]</code> — provided every field is itself hashable.</p>
+  </div>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>BTreeMap and BTreeSet — the ordered alternatives</h2>
+  </div>
+
+  <p>Same interface, one crucial difference: they stay <strong>sorted by key</strong>, always.</p>
+
+  <div class="code">
+    <div class="code-label">Ordered iteration, for free</div>
+<pre><code><span class="k">use</span> std::collections::{<span class="ty">BTreeMap</span>, <span class="ty">BTreeSet</span>};
+
+<span class="k">let</span> bt = <span class="ty">BTreeMap</span>::<span class="fn">from</span>([(<span class="st">"b"</span>, <span class="nu">2</span>), (<span class="st">"a"</span>, <span class="nu">1</span>), (<span class="st">"c"</span>, <span class="nu">3</span>)]);
+<span class="cm">// iterating gives [("a", 1), ("b", 2), ("c", 3)] — sorted,</span>
+<span class="cm">// regardless of the order they went in</span>
+
+<span class="k">let</span> bs: <span class="ty">BTreeSet</span>&lt;<span class="ty">i32</span>&gt; = [<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">2</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+<span class="cm">// {1, 2, 3}</span></code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th><code>HashMap</code></th><th><code>BTreeMap</code></th></tr></thead>
+      <tbody>
+        <tr><td>Lookup</td><td>O(1) average</td><td>O(log n)</td></tr>
+        <tr><td>Iteration order</td><td>Arbitrary, randomised</td><td>Sorted by key</td></tr>
+        <tr><td>Key requires</td><td><code>Hash + Eq</code></td><td><code>Ord</code></td></tr>
+        <tr><td>Range queries</td><td>No</td><td>Yes — <code>.range("a".."m")</code></td></tr>
+        <tr><td>First / last key</td><td>No</td><td>Yes — O(log n)</td></tr>
+        <tr><td>Typical speed</td><td>Faster</td><td>Slower, but predictable</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tree"><b>Do you need the keys in sorted order?</b>
+├─ No ────────────────────────→ <i>HashMap / HashSet</i>   ← the default
+└─ Yes
+   ├─ Just for printing once? → <i>HashMap, then sort()</i>
+   └─ Constantly, or you need
+      ranges / min / max ─────→ <i>BTreeMap / BTreeSet</i></div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Default to HashMap</span>
+    <p>Reach for <code>HashMap</code> unless you have a specific reason to want order. It is faster and it is what other Rust programmers expect. Switch to <code>BTreeMap</code> when you need sorted iteration, range queries, or the smallest/largest key — and the switch is nearly free, since the API is almost identical.</p>
+  </div>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Real-world patterns</h2>
+  </div>
+
+  <h3>An inventory system</h3>
+
+  <div class="code">
+    <div class="code-label">Everything in this guide, working together</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="at">#[derive(Debug, Clone)]</span>
+<span class="k">struct</span> <span class="ty">Item</span> {
+    name:  <span class="ty">String</span>,
+    qty:   <span class="ty">u32</span>,
+    price: <span class="ty">f64</span>,
+}
+
+<span class="k">struct</span> <span class="ty">Inventory</span> {
+    items: <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">Item</span>&gt;,   <span class="cm">// keyed by SKU</span>
+}
+
+<span class="k">impl</span> <span class="ty">Inventory</span> {
+    <span class="k">fn</span> <span class="fn">new</span>() -&gt; <span class="ty">Self</span> {
+        <span class="ty">Inventory</span> { items: <span class="ty">HashMap</span>::<span class="fn">new</span>() }
+    }
+
+    <span class="cm">// Add stock, creating the entry if this SKU is new</span>
+    <span class="k">fn</span> <span class="fn">add</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, sku: &amp;<span class="ty">str</span>, name: &amp;<span class="ty">str</span>, qty: <span class="ty">u32</span>, price: <span class="ty">f64</span>) {
+        <span class="k">self</span>.items
+            .<span class="fn">entry</span>(sku.<span class="fn">to_string</span>())
+            .<span class="fn">and_modify</span>(|i| i.qty += qty)
+            .<span class="fn">or_insert</span>(<span class="ty">Item</span> {
+                name: name.<span class="fn">to_string</span>(),
+                qty,
+                price,
+            });
+    }
+
+    <span class="cm">// Take stock out, refusing if there is not enough</span>
+    <span class="k">fn</span> <span class="fn">take</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, sku: &amp;<span class="ty">str</span>, qty: <span class="ty">u32</span>) -&gt; <span class="ty">bool</span> {
+        <span class="k">match</span> <span class="k">self</span>.items.<span class="fn">get_mut</span>(sku) {
+            <span class="ty">Some</span>(i) <span class="k">if</span> i.qty &gt;= qty =&gt; { i.qty -= qty; <span class="k">true</span> }
+            _ =&gt; <span class="k">false</span>,
+        }
+    }
+
+    <span class="cm">// Total value of everything held</span>
+    <span class="k">fn</span> <span class="fn">total_value</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">f64</span> {
+        <span class="k">self</span>.items.<span class="fn">values</span>().<span class="fn">map</span>(|i| i.qty <span class="k">as</span> <span class="ty">f64</span> * i.price).<span class="fn">sum</span>()
+    }
+
+    <span class="cm">// Anything running low — sorted, because map order is arbitrary</span>
+    <span class="k">fn</span> <span class="fn">low_stock</span>(&amp;<span class="k">self</span>, threshold: <span class="ty">u32</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; {
+        <span class="k">let</span> <span class="k">mut</span> low: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = <span class="k">self</span>.items
+            .<span class="fn">iter</span>()
+            .<span class="fn">filter</span>(|(_, i)| i.qty &lt; threshold)
+            .<span class="fn">map</span>(|(sku, _)| sku.<span class="fn">as_str</span>())
+            .<span class="fn">collect</span>();
+        low.<span class="fn">sort</span>();
+        low
+    }
+}</code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Worth noticing</span>
+    <p><code>and_modify().or_insert()</code> in <code>add</code> handles both "new SKU" and "restock" in one expression. The <code>match</code> guard in <code>take</code> — <code>Some(i) if i.qty &gt;= qty</code> — rejects insufficient stock without a nested <code>if</code>. And <code>low_stock</code> sorts before returning, because map order cannot be trusted.</p>
+  </div>
+
+  <h3>Caching / memoisation</h3>
+
+  <div class="code">
+    <div class="code-label">Compute once, reuse forever</div>
+<pre><code><span class="k">fn</span> <span class="fn">expensive</span>(n: <span class="ty">u64</span>, cache: &amp;<span class="k">mut</span> <span class="ty">HashMap</span>&lt;<span class="ty">u64</span>, <span class="ty">u64</span>&gt;) -&gt; <span class="ty">u64</span> {
+    <span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(&amp;hit) = cache.<span class="fn">get</span>(&amp;n) {
+        <span class="k">return</span> hit;                 <span class="cm">// already computed</span>
+    }
+    <span class="k">let</span> result = <span class="cm">/* the slow work */</span> n * n;
+    cache.<span class="fn">insert</span>(n, result);
+    result
+}</code></pre>
+  </div>
+
+  <h3>Deduplicating while preserving order</h3>
+
+  <div class="code">
+    <div class="code-label">HashSet as a "seen" tracker</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashSet</span>;
+
+<span class="k">fn</span> <span class="fn">dedup_keep_order</span>(items: &amp;[&amp;<span class="ty">str</span>]) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; {
+    <span class="k">let</span> <span class="k">mut</span> seen = <span class="ty">HashSet</span>::<span class="fn">new</span>();
+    items
+        .<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|s| seen.<span class="fn">insert</span>(s.<span class="fn">to_string</span>()))  <span class="cm">// true only the FIRST time</span>
+        .<span class="fn">map</span>(|s| s.<span class="fn">to_string</span>())
+        .<span class="fn">collect</span>()
+}
+<span class="cm">// ["a", "b", "a", "c"] -&gt; ["a", "b", "c"]  — first occurrences, in order</span></code></pre>
+  </div>
+
+  <p>This is a genuinely elegant use of <code>insert</code>'s return value: <code>filter</code> keeps an item exactly when the set had not seen it, and the set records it in the same step. Collecting into a <code>HashSet</code> would lose the order; this keeps it.</p>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Common errors</h2>
+  </div>
+
+  <p>All real compiler output. Recognise them by shape and they stop being obstacles.</p>
+
+  <h3>Forgetting the import</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0433]</span>: failed to resolve: use of undeclared type `HashMap`
+help: consider importing this struct:
+      use std::collections::HashMap;</pre>
+  </div>
+  <p><strong>Fix:</strong> add <code>use std::collections::HashMap;</code> at the top. The single most common map error.</p>
+
+  <h3>E0599 — key type is not hashable</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0599]</span>: the method `insert` exists for struct `HashMap&lt;Point, i32&gt;`,
+              but its trait bounds were not satisfied
+  = note: `Point: Eq` and `Point: Hash` not satisfied</pre>
+  </div>
+  <p><strong>Fix:</strong> <code>#[derive(PartialEq, Eq, Hash)]</code> on the key type. If the key is <code>f64</code>, you cannot — use an integer instead. See Part 13.</p>
+
+  <h3>E0382 — key moved into the map</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `k`
+  = move occurs because `k` has type `String`,
+    which does not implement the `Copy` trait</pre>
+  </div>
+  <p><strong>Fix:</strong> <code>m.insert(k.clone(), v)</code>, or use <code>&amp;str</code> keys, or simply stop using <code>k</code> afterwards. See Part 7.</p>
+
+  <h3>E0502 — borrow conflict</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0502]</span>: cannot borrow `m` as mutable because it is also
+              borrowed as immutable</pre>
+  </div>
+  <p><strong>Fix:</strong> finish with the reference first, clone the value out, or restructure using <code>entry</code>. See Part 8.</p>
+
+  <h3>Runtime panic — missing key</h3>
+  <div class="errblock">
+<pre>thread 'main' panicked at src/main.rs:5:14:
+no entry found for key</pre>
+  </div>
+  <p><strong>Fix:</strong> use <code>.get(k)</code> and handle the <code>None</code> rather than indexing with <code>m[k]</code>. Compiles fine, fails at runtime — the dangerous kind.</p>
+
+  <h3>Cannot assign through an index</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0594]</span>: cannot assign to data in an index of `HashMap`
+  = help: trait `IndexMut` is required to modify indexed content,
+          but it is not implemented for `HashMap`</pre>
+  </div>
+  <p><strong>Fix:</strong> <code>m.insert(k, v)</code> or <code>*m.entry(k).or_insert(0) = v</code>. Unlike <code>Vec</code>, maps deliberately have no <code>IndexMut</code>.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Read the help lines</span>
+    <p>Every error above names its own fix — the exact derive to add, the exact import, the exact <code>.clone()</code>. <code>rustc --explain E0599</code> gives the full explanation. Reading past the first red line is the highest-value habit you can build.</p>
+  </div>
+</section>
+
+<!-- ============ PART 17 ============ -->
+<section id="p17">
+  <div class="part-head">
+    <span class="part-num">PART 17</span>
+    <h2>Cheat sheet</h2>
+  </div>
+
+  <h4>Setup</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">use std::collections::HashMap;</td><td>Required — not in the prelude</td></tr>
+        <tr><td class="col-mono">HashMap::new()</td><td>Empty</td></tr>
+        <tr><td class="col-mono">HashMap::from([(k,v), ...])</td><td>From pairs</td></tr>
+        <tr><td class="col-mono">iter.collect()</td><td>From any iterator of pairs</td></tr>
+        <tr><td class="col-mono">HashMap::with_capacity(n)</td><td>Pre-sized</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Reading</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">m.get(&amp;k)</td><td><code>Option&lt;&amp;V&gt;</code> — safe</td></tr>
+        <tr><td class="col-mono">m[&amp;k]</td><td>Value — <strong>panics</strong> if missing</td></tr>
+        <tr><td class="col-mono">m.get_mut(&amp;k)</td><td><code>Option&lt;&amp;mut V&gt;</code></td></tr>
+        <tr><td class="col-mono">m.contains_key(&amp;k)</td><td>bool</td></tr>
+        <tr><td class="col-mono">m.len() / m.is_empty()</td><td>Size</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Writing</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">m.insert(k, v)</td><td>Returns <code>Option&lt;V&gt;</code> — the old value</td></tr>
+        <tr><td class="col-mono">m.remove(&amp;k)</td><td>Returns <code>Option&lt;V&gt;</code></td></tr>
+        <tr><td class="col-mono">m.retain(|k, v| ...)</td><td>Keep matching pairs</td></tr>
+        <tr><td class="col-mono">m.clear()</td><td>Empty it</td></tr>
+        <tr><td class="col-mono">m.values_mut()</td><td>Modify every value</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>The entry API</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">*m.entry(k).or_insert(0) += 1</td><td><strong>Count</strong></td></tr>
+        <tr><td class="col-mono">m.entry(k).or_insert_with(Vec::new).push(v)</td><td><strong>Group</strong></td></tr>
+        <tr><td class="col-mono">*m.entry(k).or_default() += 1</td><td>Count, using <code>Default</code></td></tr>
+        <tr><td class="col-mono">m.entry(k).and_modify(|v| ...).or_insert(x)</td><td>Different for present vs absent</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>HashSet</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">s.insert(x)</td><td><code>bool</code> — true if newly added</td></tr>
+        <tr><td class="col-mono">s.contains(&amp;x) / s.remove(&amp;x)</td><td>bool</td></tr>
+        <tr><td class="col-mono">a.intersection(&amp;b)</td><td>In both</td></tr>
+        <tr><td class="col-mono">a.union(&amp;b)</td><td>In either</td></tr>
+        <tr><td class="col-mono">a.difference(&amp;b)</td><td>In a, not b</td></tr>
+        <tr><td class="col-mono">a.symmetric_difference(&amp;b)</td><td>In exactly one</td></tr>
+        <tr><td class="col-mono">a.is_subset(&amp;b) / is_disjoint(&amp;b)</td><td>bool</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>The six things to remember</h4>
+  <div class="tree"><b>1.</b> <i>use std::collections::HashMap;</i> — it is not in the prelude
+<b>2.</b> <i>.get()</i> returns Option; <i>m[k]</i> panics on a missing key
+<b>3.</b> <i>*m.entry(k).or_insert(0) += 1</i> — the counting idiom
+<b>4.</b> <i>.or_insert_with(Vec::new).push(v)</i> — the grouping idiom
+<b>5.</b> Iteration order is <i>arbitrary and randomised</i> — sort before printing
+<b>6.</b> Custom keys need <i>#[derive(PartialEq, Eq, Hash)]</i>; floats can never be keys</div>
+
+  <div class="keyline">A map trades order for speed. Everything you must remember — the random iteration, the hashable-key requirement, the entry API — is the price of finding any value in one step.</div>
+
+  <div class="foot">
+    <p><b>Next topic.</b> Error handling — <code>Result</code>, the <code>?</code> operator, and custom error types. You have now met <code>Option</code> everywhere and <code>Result</code> in passing; this is the piece that ties them together.</p>
+    <p>Companion workbook: <b>hashmap_practice.html</b> — 38 exercises with worked solutions.</p>
+    <p>All output in this guide was verified against rustc 1.96.0, edition 2021.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+
+</body>
+</html>

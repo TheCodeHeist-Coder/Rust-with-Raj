@@ -1,0 +1,2126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vectors in Rust — The Complete Guide</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   Neutrals are biased warm toward the rust accent, never a flat grey.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;   /* warm bone */
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;   /* warm near-black */
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;   /* the pigment itself */
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;   /* correct / output */
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;   /* compiler errors */
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;   /* notes / asides */
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Shell ---------------------------------------------------------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  gap: 0;
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Left rail ------------------------------------------------------ */
+
+.rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.rail-brand {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+}
+.rail-sub {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  color: var(--ink-faint);
+  margin: 0 0 1.75rem;
+  line-height: 1.5;
+}
+
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+
+.rail a {
+  display: grid;
+  grid-template-columns: 1.85rem 1fr;
+  gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft);
+  text-decoration: none;
+  border-radius: 3px;
+  border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible {
+  outline: 2px solid var(--rust);
+  outline-offset: 1px;
+}
+.rail a.is-active {
+  color: var(--rust);
+  border-left-color: var(--rust);
+  background: var(--rust-wash);
+  font-weight: 700;
+}
+.rail .n {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem;
+  padding-left: 0.35rem;
+  font-size: 0.625rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border-top: 1px solid var(--rule);
+  padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+/* ---- Masthead ------------------------------------------------------- */
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin: 0 0 1.1rem;
+  font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.6rem, 6vw, 4.15rem);
+  line-height: 1.02;
+  letter-spacing: -0.022em;
+  font-weight: 600;
+  margin: 0 0 1.1rem;
+  text-wrap: balance;
+}
+.masthead h1 em {
+  font-style: italic;
+  color: var(--rust);
+}
+.standfirst {
+  font-size: 1.1875rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  max-width: 54ch;
+  margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong);
+  margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--rust);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif);
+  font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14;
+  letter-spacing: -0.017em;
+  font-weight: 600;
+  margin: 0;
+  text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif);
+  font-size: 1.28rem;
+  line-height: 1.28;
+  font-weight: 700;
+  letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem;
+  max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-faint);
+  margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+/* ---- Inline code ---------------------------------------------------- */
+
+code {
+  font-family: var(--mono);
+  font-size: 0.855em;
+  background: var(--surface-alt);
+  padding: 0.1em 0.34em;
+  border-radius: 3px;
+  border: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+/* Code breaks the prose measure to the right — it is the primary artifact,
+   prose is the annotation around it. */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono);
+  font-size: 0.6563rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0;
+  padding: 1.05rem 1.15rem;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.62;
+  color: var(--ink);
+  tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit;
+  white-space: pre;
+}
+
+/* Variants */
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+/* Syntax tokens */
+.k  { color: var(--rust); font-weight: 700; }            /* keyword */
+.ty { color: var(--steel); font-weight: 600; }           /* type */
+.fn { color: var(--ink); font-weight: 700; }             /* fn name */
+.st { color: var(--oxide); }                             /* string */
+.nu { color: var(--oxide); }                             /* number */
+.cm { color: var(--ink-faint); font-style: italic; }     /* comment */
+.at { color: var(--steel); }                             /* attribute */
+.er { color: var(--ember); font-weight: 700; }           /* error */
+.ok { color: var(--oxide); font-weight: 700; }           /* ok marker */
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure);
+  margin: 1.5rem 0;
+  padding: 1rem 1.15rem;
+  border-radius: 2px;
+  border-left: 3px solid var(--steel);
+  background: var(--steel-wash);
+  font-size: 0.9688rem;
+  line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.6563rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--steel);
+  margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875rem;
+  background: var(--surface);
+}
+th, td {
+  text-align: left;
+  padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+th {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink-faint);
+  background: var(--surface-alt);
+  white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure / diagram ----------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow-x: auto;
+}
+.figure pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  white-space: pre;
+}
+.figcap {
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  color: var(--ink-faint);
+  margin-top: 0.9rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 1.15rem 1.3rem;
+  margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split comparison ----------------------------------------------- */
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+  max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember);
+  border-radius: 2px;
+  padding: 0.95rem 1.1rem;
+  overflow-x: auto;
+}
+.errblock pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.7813rem;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Key-line (the memorable rule) ---------------------------------- */
+
+.keyline {
+  max-width: var(--measure);
+  margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  line-height: 1.45;
+  font-style: italic;
+  color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem;
+  padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Theme toggle --------------------------------------------------- */
+
+.toggle {
+  position: fixed;
+  top: 1rem; right: 1rem;
+  z-index: 20;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<!-- ====================== RAIL ====================== -->
+<aside class="rail">
+  <p class="rail-brand">Vectors in Rust</p>
+  <p class="rail-sub">Complete guide<br>16 parts</p>
+  <nav id="toc">
+    <div class="rail-group">Foundations</div>
+    <a href="#p1"><span class="n">01</span><span>Why vectors exist</span></a>
+    <a href="#p2"><span class="n">02</span><span>Creating a vector</span></a>
+    <a href="#p3"><span class="n">03</span><span>Memory &amp; capacity</span></a>
+    <a href="#p4"><span class="n">04</span><span>Reading elements</span></a>
+
+    <div class="rail-group">Changing a vector</div>
+    <a href="#p5"><span class="n">05</span><span>Adding &amp; removing</span></a>
+    <a href="#p6"><span class="n">06</span><span>Bulk operations</span></a>
+    <a href="#p7"><span class="n">07</span><span>Sorting &amp; searching</span></a>
+
+    <div class="rail-group">Ownership</div>
+    <a href="#p8"><span class="n">08</span><span>Vec and the borrow checker</span></a>
+    <a href="#p9"><span class="n">09</span><span>Slices: Vec's other half</span></a>
+
+    <div class="rail-group">Iteration</div>
+    <a href="#p10"><span class="n">10</span><span>The three iterators</span></a>
+    <a href="#p11"><span class="n">11</span><span>Iterator adapters</span></a>
+    <a href="#p12"><span class="n">12</span><span>Collecting</span></a>
+
+    <div class="rail-group">In practice</div>
+    <a href="#p13"><span class="n">13</span><span>Vec of structs</span></a>
+    <a href="#p14"><span class="n">14</span><span>Nested vectors</span></a>
+    <a href="#p15"><span class="n">15</span><span>Common errors</span></a>
+    <a href="#p16"><span class="n">16</span><span>Cheat sheet</span></a>
+  </nav>
+</aside>
+
+<!-- ====================== MAIN ====================== -->
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Learning notes</p>
+  <h1>Vectors in Rust:<br>a list that can <em>grow</em></h1>
+  <p class="standfirst">An array has a size fixed at compile time. A vector decides its size while your program runs. That one difference — the heap — explains every method, every borrow error, and every performance note in this guide.</p>
+  <div class="masthead-meta">
+    <span><b>16</b> parts</span>
+    <span><b>Companion:</b> vectors_practice.html</span>
+    <span><b>Edition</b> 2021</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>The mental model — why vectors exist</h2>
+  </div>
+
+  <h3>The problem with arrays</h3>
+  <p>Rust has arrays, written <code>[T; N]</code>. The <code>N</code> is part of the <em>type</em>. That has a consequence most beginners hit within an hour:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">The wall you hit with arrays</div>
+<pre><code><span class="k">let</span> numbers = [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];  <span class="cm">// type is [i32; 3]</span>
+
+<span class="cm">// How do I add a fourth?  You cannot. The 3 is baked into the type.</span>
+<span class="cm">// There is no .push(). An [i32; 3] and an [i32; 4] are</span>
+<span class="cm">// DIFFERENT TYPES, as unrelated as i32 and String.</span></code></pre>
+  </div>
+
+  <p>This is fine when you genuinely know the count up front — RGB channels, a chessboard, days of the week. It falls apart the moment the count depends on something that happens at runtime: lines read from a file, users who logged in, numbers the person typed.</p>
+
+  <div class="keyline">A vector is an array whose length is decided while the program runs, not while it compiles.</div>
+
+  <h3>Where the data lives</h3>
+  <p>This is the single idea that makes everything else click. An array lives entirely on the <strong>stack</strong> — fast, fixed, scope-bound. A vector keeps a small bookkeeping struct on the stack that <em>points to</em> data on the <strong>heap</strong>.</p>
+
+  <div class="figure">
+<pre>ARRAY  [i32; 3]                VECTOR  Vec&lt;i32&gt;
+
+  STACK                          STACK              HEAP
+┌───────────┐                  ┌──────────┐      ┌───┬───┬───┬───┐
+│  1  2  3  │                  │ ptr   ●──┼─────→│ 1 │ 2 │ 3 │ ? │
+└───────────┘                  │ len   3  │      └───┴───┴───┴───┘
+                               │ cap   4  │        ↑ 3 used, 1 spare
+ all of it, right here         └──────────┘
+ size known at compile time      24 bytes, always</pre>
+    <p class="figcap">The Vec itself is always 24 bytes on a 64-bit machine — pointer, length, capacity — no matter whether it holds 0 elements or 10 million.</p>
+  </div>
+
+  <p>Those three fields are worth naming precisely, because two of them are constantly confused:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Meaning</th><th>Method</th></tr></thead>
+      <tbody>
+        <tr><td class="col-mono">ptr</td><td>Address of the heap buffer</td><td><code>.as_ptr()</code></td></tr>
+        <tr><td class="col-mono">len</td><td>How many elements you have actually put in</td><td><code>.len()</code></td></tr>
+        <tr><td class="col-mono">cap</td><td>How many would fit before it must reallocate</td><td><code>.capacity()</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The rule</span>
+    <p><strong>Length is what you have. Capacity is what you have room for.</strong> <code>len</code> is always ≤ <code>cap</code>. Only <code>len</code> affects what you can read; <code>cap</code> only affects performance.</p>
+  </div>
+
+  <h3>Array vs Vec, side by side</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Array <code>[T; N]</code></th><th>Vector <code>Vec&lt;T&gt;</code></th></tr></thead>
+      <tbody>
+        <tr><td>Size fixed at</td><td>Compile time</td><td>Run time — grows freely</td></tr>
+        <tr><td>Stored on</td><td>Stack</td><td>Bookkeeping on stack, data on heap</td></tr>
+        <tr><td>Can <code>.push()</code></td><td>No</td><td>Yes</td></tr>
+        <tr><td>Size in type</td><td>Yes — <code>[i32; 3]</code></td><td>No — <code>Vec&lt;i32&gt;</code></td></tr>
+        <tr><td>Cost</td><td>Free</td><td>One heap allocation</td></tr>
+        <tr><td>Use when</td><td>Count is known and fixed</td><td>Count is unknown or changes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>In practice you will reach for <code>Vec</code> the overwhelming majority of the time. It is the default list type in Rust, the way <code>list</code> is in Python or <code>ArrayList</code> in Java.</p>
+
+  <div class="note">
+    <span class="note-tag">Connects to</span>
+    <p>You already know <strong>generics</strong>. <code>Vec&lt;T&gt;</code> is exactly that — one generic struct, and the compiler monomorphizes a specialised version for each <code>T</code> you actually use. A <code>Vec&lt;i32&gt;</code> and a <code>Vec&lt;String&gt;</code> become genuinely separate machine code, with no runtime type checks.</p>
+  </div>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2>Creating a vector</h2>
+  </div>
+
+  <p>There are three ways, and the difference between them matters.</p>
+
+  <h3>1. The <code>vec!</code> macro — most common</h3>
+
+  <div class="code">
+    <div class="code-label">vec! covers almost every case</div>
+<pre><code><span class="cm">// From a list of values. Type is inferred: Vec&lt;i32&gt;</span>
+<span class="k">let</span> numbers = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+
+<span class="cm">// N copies of one value — note the SEMICOLON, like array syntax</span>
+<span class="k">let</span> zeros = <span class="fn">vec!</span>[<span class="nu">0</span>; <span class="nu">10</span>];          <span class="cm">// ten 0s</span>
+<span class="k">let</span> blanks = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">new</span>(); <span class="nu">3</span>]; <span class="cm">// three empty Strings</span>
+
+<span class="cm">// Empty, with the type stated (inference has nothing to work from)</span>
+<span class="k">let</span> empty: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = <span class="fn">vec!</span>[];</code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Watch out</span>
+    <p><code>vec![0; 10]</code> is <em>ten zeros</em>. <code>vec![0, 10]</code> is <em>two elements: 0 and 10</em>. A semicolon and a comma produce completely different vectors, and both compile.</p>
+  </div>
+
+  <h3>2. <code>Vec::new()</code> — build up from empty</h3>
+
+  <div class="code">
+    <div class="code-label">Vec::new needs a type from somewhere</div>
+<pre><code><span class="cm">// Must be `mut` if you intend to push into it.</span>
+<span class="k">let</span> <span class="k">mut</span> scores: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = <span class="ty">Vec</span>::<span class="fn">new</span>();
+scores.<span class="fn">push</span>(<span class="nu">90</span>);
+
+<span class="cm">// The annotation is only needed when Rust cannot infer. Here it can —</span>
+<span class="cm">// the push(90) below tells it everything it needs.</span>
+<span class="k">let</span> <span class="k">mut</span> inferred = <span class="ty">Vec</span>::<span class="fn">new</span>();
+inferred.<span class="fn">push</span>(<span class="nu">90</span>);                 <span class="cm">// now it knows: Vec&lt;i32&gt;</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Why annotations appear and disappear</span>
+    <p>Rust infers from the <em>whole function body</em>, not line by line. <code>Vec::new()</code> on its own is ambiguous, but if anything later in the same scope pins the type down, the annotation is unnecessary. Write it when the compiler asks; leave it out otherwise.</p>
+  </div>
+
+  <h3>3. <code>Vec::with_capacity(n)</code> — when you know roughly how many</h3>
+
+  <div class="code is-good">
+    <div class="code-label">A free performance win</div>
+<pre><code><span class="cm">// Allocates room for 1000 up front. Length is still 0 —</span>
+<span class="cm">// this reserves space, it does NOT create elements.</span>
+<span class="k">let</span> <span class="k">mut</span> big = <span class="ty">Vec</span>::<span class="fn">with_capacity</span>(<span class="nu">1000</span>);
+<span class="fn">assert_eq!</span>(big.<span class="fn">len</span>(), <span class="nu">0</span>);          <span class="cm">// nothing in it yet</span>
+<span class="fn">assert_eq!</span>(big.<span class="fn">capacity</span>(), <span class="nu">1000</span>);   <span class="cm">// but room for 1000</span>
+
+<span class="k">for</span> i <span class="k">in</span> <span class="nu">0</span>..<span class="nu">1000</span> {
+    big.<span class="fn">push</span>(i);   <span class="cm">// not one reallocation in the whole loop</span>
+}</code></pre>
+  </div>
+
+  <p>If you know the count ahead of time, this is strictly better than <code>Vec::new()</code> — same code, less work at runtime. Part 3 explains what it is avoiding.</p>
+
+  <h3>Choosing between them</h3>
+  <div class="tree"><b>Do you know the elements right now?</b>
+├─ Yes ──────────────────→ <i>vec![a, b, c]</i>
+├─ Same value, N times ──→ <i>vec![value; n]</i>
+└─ No, building it up
+   ├─ Know roughly how many? → <i>Vec::with_capacity(n)</i>
+   └─ No idea ──────────────→ <i>Vec::new()</i></div>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>Memory and capacity — how growth actually works</h2>
+  </div>
+
+  <p>You can use vectors productively without this part. But it explains a whole family of otherwise-mysterious behaviours, so it is worth twenty minutes now rather than a confusing bug later.</p>
+
+  <h3>What happens when a vector fills up</h3>
+  <p>A heap allocation has a fixed size. When you <code>push</code> into a vector that is already at capacity, it cannot simply extend — the memory right after it may belong to something else. So it does this:</p>
+
+  <ol>
+    <li>Allocates a <strong>new, bigger</strong> buffer (typically double)</li>
+    <li><strong>Copies</strong> every existing element across</li>
+    <li><strong>Frees</strong> the old buffer</li>
+    <li>Updates its <code>ptr</code> to the new location</li>
+  </ol>
+
+  <div class="code">
+    <div class="code-label">Watching it grow — real measured output</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = <span class="ty">Vec</span>::<span class="fn">new</span>();
+<span class="k">let</span> <span class="k">mut</span> last = v.<span class="fn">capacity</span>();
+
+<span class="k">for</span> i <span class="k">in</span> <span class="nu">0</span>..<span class="nu">20</span> {
+    v.<span class="fn">push</span>(i);
+    <span class="k">if</span> v.<span class="fn">capacity</span>() != last {
+        last = v.<span class="fn">capacity</span>();
+        <span class="fn">println!</span>(<span class="st">"grew to {}"</span>, last);
+    }
+}</code></pre>
+  </div>
+
+  <div class="figure">
+<pre>capacity sequence:  0 → 4 → 8 → 16 → 32
+
+push #1   cap 0 → 4     allocate, copy 0 elements
+push #5   cap 4 → 8     allocate, copy 4 elements
+push #9   cap 8 → 16    allocate, copy 8 elements
+push #17  cap 16 → 32   allocate, copy 16 elements
+                        ...and 15 of those 20 pushes did nothing special</pre>
+    <p class="figcap">Measured on rustc 1.96. The exact numbers are an implementation detail — never write code that depends on them — but the doubling shape is stable and intentional.</p>
+  </div>
+
+  <h3>Why doubling, and why it is fast anyway</h3>
+  <p>Copying sounds expensive, and a single reallocation is. But because capacity <em>doubles</em>, reallocations get exponentially rarer as the vector grows. Pushing a million elements triggers about twenty reallocations, not a million.</p>
+
+  <p>Spread over all the pushes, the average cost of a single <code>push</code> is a constant — computer scientists call this <strong>amortized O(1)</strong>. Most pushes are just "write value, increment len". Occasionally one is expensive. The average stays flat.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">The practical takeaway</span>
+    <p><code>Vec::with_capacity(n)</code> skips the entire reallocation sequence. If you know you are about to push a thousand items, you turn ~10 allocations and ~1000 element-copies into exactly one allocation and zero copies. It costs you nothing to write.</p>
+  </div>
+
+  <h3>The consequence that bites: pointers move</h3>
+  <p>Step 4 above — "updates its ptr" — is the reason for a borrow error you will absolutely meet in Part 8. When a vector reallocates, <strong>every element physically moves to a new address</strong>. Any reference you were holding into the old buffer would now point at freed memory.</p>
+
+  <div class="figure">
+<pre>BEFORE push (cap 4, len 4)        AFTER push (cap 8, len 5)
+
+  ptr ●──→ 0x1000                   ptr ●──→ 0x2000   ← NEW address
+          ┌───┬───┬───┬───┐                          ┌───┬───┬───┬───┬───┬─
+          │ 1 │ 2 │ 3 │ 4 │                          │ 1 │ 2 │ 3 │ 4 │ 5 │
+          └───┴───┴───┴───┘                          └───┴───┴───┴───┴───┴─
+             ↑                                  0x1000 is FREED
+        &amp;v[0] pointed here                   a reference to it dangles</pre>
+    <p class="figcap">This is not a theoretical risk. In C++ this exact situation is a classic use-after-free bug. Rust's borrow checker makes it a compile error instead — that is what Part 8 is about.</p>
+  </div>
+
+  <h3>Reclaiming memory</h3>
+
+  <div class="code">
+    <div class="code-label">Capacity does not shrink on its own</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="ty">Vec</span>::<span class="fn">with_capacity</span>(<span class="nu">100</span>);
+v.<span class="fn">extend</span>(<span class="nu">0</span>..<span class="nu">5</span>);
+<span class="fn">println!</span>(<span class="st">"{} / {}"</span>, v.<span class="fn">len</span>(), v.<span class="fn">capacity</span>());  <span class="cm">// 5 / 100</span>
+
+v.<span class="fn">shrink_to_fit</span>();
+<span class="fn">println!</span>(<span class="st">"{} / {}"</span>, v.<span class="fn">len</span>(), v.<span class="fn">capacity</span>());  <span class="cm">// 5 / 5</span>
+
+<span class="cm">// Also note: clear() empties it but KEEPS the capacity —</span>
+<span class="cm">// deliberately, so you can refill without reallocating.</span>
+v.<span class="fn">clear</span>();
+<span class="fn">println!</span>(<span class="st">"{} / {}"</span>, v.<span class="fn">len</span>(), v.<span class="fn">capacity</span>());  <span class="cm">// 0 / 5</span></code></pre>
+  </div>
+
+  <p>You rarely need <code>shrink_to_fit</code>. It earns its keep when a vector was briefly huge and will now stay small for a long time.</p>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2>Reading elements</h2>
+  </div>
+
+  <p>Two ways to read, and choosing correctly between them is a real safety decision — not a style preference.</p>
+
+  <h3>Indexing: <code>v[i]</code></h3>
+
+  <div class="code">
+    <div class="code-label">Direct, and panics if wrong</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+
+<span class="fn">println!</span>(<span class="st">"{}"</span>, v[<span class="nu">0</span>]);   <span class="cm">// 10  — zero-based, like every C-family language</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, v[<span class="nu">2</span>]);   <span class="cm">// 30</span>
+
+<span class="fn">println!</span>(<span class="st">"{}"</span>, v[<span class="nu">99</span>]);  <span class="cm">// PANIC — program crashes here</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre>thread 'main' panicked at src/main.rs:5:20:
+index out of bounds: the len is 3 but the index is 99</pre>
+  </div>
+
+  <p>Note what did <em>not</em> happen: it did not read whatever byte happened to sit past the end. Rust bounds-checks every index. In C, <code>v[99]</code> on a 3-element array is undefined behaviour — it might return garbage, or crash, or silently corrupt something. In Rust it is a clean, immediate, well-described panic.</p>
+
+  <h3><code>.get(i)</code> — returns an <code>Option</code></h3>
+
+  <div class="code is-good">
+    <div class="code-label">The safe read</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+
+<span class="k">match</span> v.<span class="fn">get</span>(<span class="nu">99</span>) {
+    <span class="ty">Some</span>(value) =&gt; <span class="fn">println!</span>(<span class="st">"found {}"</span>, value),
+    <span class="ty">None</span>        =&gt; <span class="fn">println!</span>(<span class="st">"nothing at index 99"</span>),   <span class="cm">// ← runs</span>
+}
+
+<span class="cm">// Or with a fallback, if you just want a default:</span>
+<span class="k">let</span> safe = v.<span class="fn">get</span>(<span class="nu">99</span>).<span class="fn">copied</span>().<span class="fn">unwrap_or</span>(-<span class="nu">1</span>);   <span class="cm">// -1</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Connects to</span>
+    <p>This is your <strong><code>Option&lt;T&gt;</code></strong> topic reappearing in its natural habitat. <code>.get()</code> returns <code>Option&lt;&amp;T&gt;</code> because the compiler cannot know at compile time whether index <code>i</code> is in range — so it hands you the honest answer, "maybe a value, maybe nothing", and makes you handle both.</p>
+  </div>
+
+  <h3>Which to use</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Situation</th><th>Use</th><th>Because</th></tr></thead>
+      <tbody>
+        <tr><td>Index came from <code>0..v.len()</code></td><td><code>v[i]</code></td><td>Cannot be out of range; the check is noise</td></tr>
+        <tr><td>Index came from user input</td><td><code>.get(i)</code></td><td>Anything could arrive</td></tr>
+        <tr><td>Index came from a calculation</td><td><code>.get(i)</code></td><td>Off-by-one is the most common bug there is</td></tr>
+        <tr><td>Out of range means "broken program"</td><td><code>v[i]</code></td><td>Crashing loudly is correct</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The rule</span>
+    <p>Use <code>v[i]</code> when an out-of-range index would be a <em>bug in your code</em>. Use <code>.get(i)</code> when it would be <em>bad input</em>. Bugs should crash; bad input should be handled.</p>
+  </div>
+
+  <h3>Convenience readers</h3>
+
+  <div class="code">
+    <div class="code-label">All Option-returning, all safe on an empty vector</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+
+v.<span class="fn">first</span>()        <span class="cm">// Some(&amp;10)</span>
+v.<span class="fn">last</span>()         <span class="cm">// Some(&amp;30)   — much better than v[v.len() - 1],</span>
+                 <span class="cm">//               which panics on an empty vector</span>
+v.<span class="fn">len</span>()          <span class="cm">// 3</span>
+v.<span class="fn">is_empty</span>()     <span class="cm">// false       — clearer than v.len() == 0</span>
+v.<span class="fn">contains</span>(&amp;<span class="nu">20</span>)  <span class="cm">// true        — note the &amp;, it takes a reference</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2>Adding and removing</h2>
+  </div>
+
+  <p>Everything in this part requires the vector to be declared <code>mut</code>. If you forget, the compiler will tell you plainly.</p>
+
+  <h3>Adding</h3>
+
+  <div class="code">
+    <div class="code-label">push and insert</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">4</span>];
+
+v.<span class="fn">push</span>(<span class="nu">5</span>);           <span class="cm">// [1, 2, 4, 5]      — add to the END. Fast.</span>
+
+v.<span class="fn">insert</span>(<span class="nu">2</span>, <span class="nu">3</span>);      <span class="cm">// [1, 2, 3, 4, 5]   — insert AT index 2,</span>
+                        <span class="cm">//   shifting everything after it right. Slower.</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Cost</span>
+    <p><code>push</code> is O(1) amortized — it writes at the end. <code>insert(0, x)</code> is O(n) — every single element must shift right by one. Inserting at the front of a large vector in a loop is a classic accidental O(n²).</p>
+  </div>
+
+  <h3>Removing — and the one that reorders</h3>
+
+  <div class="code">
+    <div class="code-label">Three ways out</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+
+<span class="k">let</span> last = v.<span class="fn">pop</span>();       <span class="cm">// Some(3), v is now [1, 2]</span>
+                            <span class="cm">// Returns Option — None if empty, never panics.</span>
+
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="st">'a'</span>, <span class="st">'b'</span>, <span class="st">'c'</span>, <span class="st">'d'</span>, <span class="st">'e'</span>];
+<span class="k">let</span> x = v.<span class="fn">remove</span>(<span class="nu">1</span>);     <span class="cm">// x = 'b',  v = ['a', 'c', 'd', 'e']</span>
+                            <span class="cm">// ORDER PRESERVED. Shifts the rest left. O(n).</span>
+                            <span class="cm">// PANICS if the index is out of range.</span>
+
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="st">'a'</span>, <span class="st">'b'</span>, <span class="st">'c'</span>, <span class="st">'d'</span>, <span class="st">'e'</span>];
+<span class="k">let</span> y = v.<span class="fn">swap_remove</span>(<span class="nu">1</span>); <span class="cm">// y = 'b',  v = ['a', 'e', 'c', 'd']</span>
+                            <span class="cm">//                      ↑ the LAST element</span>
+                            <span class="cm">//                        was moved into the gap</span>
+                            <span class="cm">// ORDER DESTROYED, but O(1) — no shifting at all.</span></code></pre>
+  </div>
+
+  <div class="figure">
+<pre>remove(1)                         swap_remove(1)
+
+ a  b  c  d  e                     a  b  c  d  e
+    ✕                                 ✕        └──┐
+    ┌──┴──┴──┐  shift left               ┌────────┘  move last
+ a  c  d  e                        a  e  c  d        into the hole
+
+ O(n) — order kept                 O(1) — order changed</pre>
+    <p class="figcap">Both verified: <code>remove</code> gives <code>['a','c','d','e']</code>, <code>swap_remove</code> gives <code>['a','e','c','d']</code>.</p>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">When swap_remove is the right call</span>
+    <p>Whenever the vector represents an unordered <em>set</em> of things — active enemies in a game, pending jobs, connected clients. If nothing downstream depends on the order, <code>swap_remove</code> is free speed.</p>
+  </div>
+
+  <h3>Emptying</h3>
+
+  <div class="code">
+    <div class="code-label">truncate and clear</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+
+v.<span class="fn">truncate</span>(<span class="nu">2</span>);   <span class="cm">// [1, 2]  — keep the first 2, drop the rest.</span>
+                    <span class="cm">// Longer than the vector? Does nothing. Never panics.</span>
+
+v.<span class="fn">clear</span>();        <span class="cm">// []      — remove everything (capacity is kept)</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2>Bulk operations</h2>
+  </div>
+
+  <p>Operating on many elements at once. These replace loops you would otherwise write by hand — and they are both shorter and harder to get wrong.</p>
+
+  <h3><code>retain</code> — filter in place</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Keep everything matching the test</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>, <span class="nu">6</span>, <span class="nu">7</span>, <span class="nu">8</span>, <span class="nu">9</span>, <span class="nu">10</span>];
+
+v.<span class="fn">retain</span>(|x| x % <span class="nu">3</span> != <span class="nu">0</span>);
+<span class="cm">// [1, 2, 4, 5, 7, 8, 10]  — the multiples of 3 are gone</span></code></pre>
+  </div>
+
+  <p>The name is worth pausing on: <code>retain</code> keeps what matches, it does not remove what matches. Reading it as "remove" inverts your logic — an easy bug, and a silent one.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Do not do this instead</span>
+    <p>The obvious hand-written version — loop over indices calling <code>.remove(i)</code> — is wrong twice over. Removing shifts everything left, so you skip elements; and it is O(n²). <code>retain</code> is one pass, O(n), and correct. Reach for it every time.</p>
+  </div>
+
+  <h3><code>dedup</code> — and the trap in it</h3>
+
+  <div class="code">
+    <div class="code-label">dedup only removes CONSECUTIVE duplicates</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">3</span>, <span class="nu">2</span>, <span class="nu">1</span>, <span class="nu">1</span>, <span class="nu">2</span>];
+
+v.<span class="fn">dedup</span>();
+<span class="cm">// [3, 1, 3, 2, 1, 2]   ← the two 3s are STILL THERE.</span>
+<span class="cm">//                        Only the run of 1s collapsed.</span>
+
+<span class="cm">// The fix is almost always: sort first.</span>
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">3</span>, <span class="nu">2</span>, <span class="nu">1</span>, <span class="nu">1</span>, <span class="nu">2</span>];
+v.<span class="fn">sort</span>();
+v.<span class="fn">dedup</span>();
+<span class="cm">// [1, 2, 3]   ✓  verified</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Remember this pairing</span>
+    <p><code>.sort()</code> then <code>.dedup()</code>. Almost every time you want "unique elements", you want both. <code>dedup</code> alone is a bug waiting for unsorted input.</p>
+  </div>
+
+  <h3><code>drain</code> — remove a range and receive it</h3>
+
+  <div class="code">
+    <div class="code-label">Both sides of the operation are useful</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>, <span class="nu">6</span>];
+
+<span class="k">let</span> taken: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">drain</span>(<span class="nu">1</span>..<span class="nu">4</span>).<span class="fn">collect</span>();
+<span class="cm">// taken = [2, 3, 4]     ← you get the removed elements</span>
+<span class="cm">// v     = [1, 5, 6]     ← and the vector keeps the rest</span>
+
+<span class="cm">// drain(..) takes everything, leaving the vector empty</span>
+<span class="cm">// but keeping its capacity — handy for reusing a buffer.</span></code></pre>
+  </div>
+
+  <p><code>drain</code> is the tool when you need to <em>move</em> a chunk of elements somewhere else. Unlike <code>clone</code>, nothing is copied; the elements are handed over.</p>
+
+  <h3>Joining vectors</h3>
+
+  <div class="code">
+    <div class="code-label">extend, append, concat, join</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> a = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>];
+
+a.<span class="fn">extend</span>(<span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">4</span>]);            <span class="cm">// [1,2,3,4]  from any iterator</span>
+a.<span class="fn">extend_from_slice</span>(&amp;[<span class="nu">5</span>, <span class="nu">6</span>]);    <span class="cm">// [1,2,3,4,5,6]  from a slice</span>
+
+<span class="k">let</span> <span class="k">mut</span> b = <span class="fn">vec!</span>[<span class="nu">7</span>, <span class="nu">8</span>];
+a.<span class="fn">append</span>(&amp;<span class="k">mut</span> b);                <span class="cm">// a gets b's items; b is now EMPTY</span>
+
+<span class="cm">// Flattening a vector of vectors:</span>
+<span class="k">let</span> parts = <span class="fn">vec!</span>[<span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>], <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">4</span>]];
+<span class="k">let</span> flat = parts.<span class="fn">concat</span>();          <span class="cm">// [1, 2, 3, 4]</span>
+
+<span class="cm">// Joining strings with a separator:</span>
+<span class="k">let</span> words = <span class="fn">vec!</span>[<span class="st">"a"</span>, <span class="st">"b"</span>, <span class="st">"c"</span>];
+<span class="k">let</span> line = words.<span class="fn">join</span>(<span class="st">"-"</span>);          <span class="cm">// "a-b-c"</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">append empties its argument</span>
+    <p><code>a.append(&amp;mut b)</code> <em>moves</em> everything out of <code>b</code>. Afterwards <code>b</code> is a valid but empty vector. If you wanted to keep <code>b</code> intact, use <code>a.extend(b.iter().cloned())</code> or <code>a.extend_from_slice(&amp;b)</code>.</p>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Sorting and searching</h2>
+  </div>
+
+  <h3>The three sorts</h3>
+
+  <div class="code">
+    <div class="code-label">sort, sort_by, sort_by_key</div>
+<pre><code><span class="cm">// 1. Natural order — needs T: Ord</span>
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">4</span>, <span class="nu">1</span>, <span class="nu">5</span>];
+v.<span class="fn">sort</span>();                    <span class="cm">// [1, 1, 3, 4, 5]</span>
+
+<span class="cm">// 2. Custom comparison — you return an Ordering</span>
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">3</span>, <span class="nu">1</span>, <span class="nu">4</span>];
+v.<span class="fn">sort_by</span>(|a, b| b.<span class="fn">cmp</span>(a));   <span class="cm">// [4, 3, 1]  — note b.cmp(a): reversed</span>
+
+<span class="cm">// 3. Sort by a derived value — usually the clearest</span>
+<span class="k">let</span> <span class="k">mut</span> words = <span class="fn">vec!</span>[<span class="st">"hello"</span>, <span class="st">"hi"</span>, <span class="st">"greetings"</span>, <span class="st">"hey"</span>];
+words.<span class="fn">sort_by_key</span>(|w| w.<span class="fn">len</span>());
+<span class="cm">// ["hi", "hey", "hello", "greetings"]   ✓ verified</span></code></pre>
+  </div>
+
+  <h3>Floats will not sort</h3>
+
+  <div class="code is-bad">
+    <div class="code-label">This does not compile</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">3.5</span>, <span class="nu">1.2</span>, <span class="nu">9.9</span>];
+v.<span class="fn">sort</span>();</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0277]</span>: the trait bound `f64: Ord` is not satisfied
+ --&gt; src/main.rs:3:7
+  |
+3 |     v.sort();
+  |       ^^^^ the trait `Ord` is not implemented for `f64`</pre>
+  </div>
+
+  <p>The cause is <code>NaN</code>. Floating-point has a value meaning "not a number", and it compares <code>false</code> against everything — including itself. A type with a value like that cannot have a <em>total</em> order, so <code>f64</code> implements only <code>PartialOrd</code>, not <code>Ord</code>. Rust refuses to pretend otherwise.</p>
+
+  <div class="code is-good">
+    <div class="code-label">The fix</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">3.5</span>, <span class="nu">1.2</span>, <span class="nu">9.9</span>, <span class="nu">0.1</span>];
+v.<span class="fn">sort_by</span>(|a, b| a.<span class="fn">partial_cmp</span>(b).<span class="fn">unwrap</span>());
+<span class="cm">// [0.1, 1.2, 3.5, 9.9]   ✓ verified</span>
+
+<span class="cm">// The .unwrap() panics if a NaN is present. If NaN is possible,</span>
+<span class="cm">// use .total_cmp() instead — it defines a full order including NaN:</span>
+v.<span class="fn">sort_by</span>(|a, b| a.<span class="fn">total_cmp</span>(b));</code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Connects to</span>
+    <p>This is your <strong>traits</strong> topic doing real work. <code>Ord</code> and <code>PartialOrd</code> are traits; <code>sort</code> has a <code>T: Ord</code> bound; <code>f64</code> does not satisfy it. The error is not arbitrary — it is a trait bound failing, exactly as you learned.</p>
+  </div>
+
+  <h3>Binary search</h3>
+
+  <div class="code">
+    <div class="code-label">Fast, but only on sorted data</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">3</span>, <span class="nu">5</span>, <span class="nu">7</span>, <span class="nu">9</span>];
+
+v.<span class="fn">binary_search</span>(&amp;<span class="nu">7</span>);   <span class="cm">// Ok(3)   — found, at index 3</span>
+v.<span class="fn">binary_search</span>(&amp;<span class="nu">6</span>);   <span class="cm">// Err(3)  — not found; index 3 is where it</span>
+                          <span class="cm">//           WOULD go to keep the vector sorted</span></code></pre>
+  </div>
+
+  <p>That <code>Err</code> is not a failure — it is useful information. <code>match</code> on it to insert into a sorted vector in the right place.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Silent wrong answers</span>
+    <p><code>binary_search</code> on an <em>unsorted</em> vector compiles, runs, and returns nonsense. There is no warning. Sort first, always.</p>
+  </div>
+
+  <h3>Linear search</h3>
+
+  <div class="code">
+    <div class="code-label">Works on any vector, sorted or not</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+
+v.<span class="fn">contains</span>(&amp;<span class="nu">20</span>);                       <span class="cm">// true</span>
+v.<span class="fn">iter</span>().<span class="fn">position</span>(|&amp;x| x == <span class="nu">20</span>);      <span class="cm">// Some(1)  — the index</span>
+v.<span class="fn">iter</span>().<span class="fn">find</span>(|&amp;&amp;x| x &gt; <span class="nu">15</span>);          <span class="cm">// Some(&amp;20) — the value</span>
+v.<span class="fn">iter</span>().<span class="fn">any</span>(|&amp;x| x &gt; <span class="nu">25</span>);           <span class="cm">// true</span>
+v.<span class="fn">iter</span>().<span class="fn">all</span>(|&amp;x| x &gt; <span class="nu">5</span>);            <span class="cm">// true</span>
+v.<span class="fn">iter</span>().<span class="fn">max</span>();                        <span class="cm">// Some(&amp;30)</span>
+v.<span class="fn">iter</span>().<span class="fn">min</span>();                        <span class="cm">// Some(&amp;10)</span></code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Search</th><th>Cost</th><th>Requires</th></tr></thead>
+      <tbody>
+        <tr><td><code>.contains()</code> / <code>.position()</code></td><td>O(n)</td><td>Nothing</td></tr>
+        <tr><td><code>.binary_search()</code></td><td>O(log n)</td><td>Sorted, or you get garbage</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>For a vector of a few hundred items, the linear scan is genuinely fine. Sorting just to binary-search once is slower than scanning.</p>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2>Vec and the borrow checker</h2>
+  </div>
+
+  <p>This is the part that frustrates beginners most, so let us take it slowly. Every rule here exists to prevent a specific category of crash.</p>
+
+  <h3>The error everyone meets</h3>
+
+  <div class="code is-bad">
+    <div class="code-label">Looks harmless. Is not.</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> first = &amp;v[<span class="nu">0</span>];      <span class="cm">// borrow one element</span>
+v.<span class="fn">push</span>(<span class="nu">4</span>);              <span class="cm">// modify the vector</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, first); <span class="cm">// use the borrow</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0502]</span>: cannot borrow `v` as mutable because it is also
+              borrowed as immutable
+ --&gt; src/main.rs:4:5
+  |
+3 |     let first = &amp;v[0];
+  |                  - immutable borrow occurs here
+4 |     v.push(4);
+  |     ^^^^^^^^^ mutable borrow occurs here
+5 |     println!("{}", first);
+  |                    ----- immutable borrow later used here</pre>
+  </div>
+
+  <h3>Why this is not the compiler being difficult</h3>
+  <p>Look back at Part 3. <code>push</code> may reallocate. If it does, the heap buffer moves to a new address and the old one is freed. <code>first</code> points into the old buffer.</p>
+
+  <div class="figure">
+<pre>let first = &amp;v[0];        first ●──→ 0x1000 ┌───┬───┬───┐
+                                            │ 1 │ 2 │ 3 │
+                                            └───┴───┴───┘
+
+v.push(4);  → reallocates → new buffer at 0x2000, 0x1000 FREED
+
+println!("{}", first);    first ●──→ 0x1000 ╳ freed memory
+                                            USE AFTER FREE</pre>
+    <p class="figcap">In C or C++ this compiles, runs, and usually appears to work — until one day the timing changes and it reads corrupted data. Rust rejects it at compile time.</p>
+  </div>
+
+  <div class="keyline">The borrow checker is not stopping you from doing something safe. It is stopping you from writing a use-after-free — the bug that has caused decades of security vulnerabilities.</div>
+
+  <h3>The rule, stated plainly</h3>
+  <div class="note is-rule">
+    <span class="note-tag">The borrowing rule</span>
+    <p>At any moment you may have <strong>either</strong> any number of immutable references (<code>&amp;T</code>), <strong>or</strong> exactly one mutable reference (<code>&amp;mut T</code>) — <strong>never both</strong>. Reading <code>v[0]</code> borrows the whole vector, not just that element, because modifying the vector can move everything.</p>
+  </div>
+
+  <h3>Three fixes</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Pick whichever suits the situation</div>
+<pre><code><span class="cm">// FIX 1 — finish using the borrow before mutating.</span>
+<span class="cm">// The borrow ends at its last use, not at the end of the block.</span>
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> first = &amp;v[<span class="nu">0</span>];
+<span class="fn">println!</span>(<span class="st">"{}"</span>, first);   <span class="cm">// last use — borrow is over here</span>
+v.<span class="fn">push</span>(<span class="nu">4</span>);                <span class="cm">// ✓ fine now</span>
+
+<span class="cm">// FIX 2 — copy the value out, so no reference is held at all.</span>
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> first = v[<span class="nu">0</span>];         <span class="cm">// i32 is Copy — this is a value, not a borrow</span>
+v.<span class="fn">push</span>(<span class="nu">4</span>);                <span class="cm">// ✓ fine</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, first);   <span class="cm">// ✓ fine</span>
+
+<span class="cm">// FIX 3 — for non-Copy types, clone.</span>
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hi"</span>)];
+<span class="k">let</span> first = v[<span class="nu">0</span>].<span class="fn">clone</span>();  <span class="cm">// owns its own copy</span>
+v.<span class="fn">push</span>(<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"yo"</span>));
+<span class="fn">println!</span>(<span class="st">"{}"</span>, first);   <span class="cm">// ✓ fine</span></code></pre>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Non-lexical lifetimes</span>
+    <p>Fix 1 works because modern Rust ends a borrow at its <em>last use</em>, not at the closing brace. This is called NLL, and it is why a lot of older Rust advice about "adding extra scopes" is no longer necessary.</p>
+  </div>
+
+  <h3>You cannot move out of an index</h3>
+
+  <div class="code is-bad">
+    <div class="code-label">The other common one</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"a"</span>)];
+<span class="k">let</span> s = v[<span class="nu">0</span>];   <span class="cm">// try to take ownership of element 0</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0507]</span>: cannot move out of index of `Vec&lt;String&gt;`
+ --&gt; src/main.rs:3:13
+  |
+3 |     let s = v[0];
+  |             ^^^^ move occurs because value has type `String`,
+  |                  which does not implement the `Copy` trait
+  |
+help: consider borrowing here:        `&amp;v[0]`
+help: consider cloning the value:     `v[0].clone()`</pre>
+  </div>
+
+  <p>If this were allowed, the vector would have a hole in it — element 0 owned by <code>s</code>, but the vector still believing it has 1 element. Rust forbids it. Take a reference, clone it, or use <code>.remove(0)</code> to genuinely take it out.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Read the help lines</span>
+    <p>Notice that the compiler suggested both fixes, with exact syntax. Rust's error messages are unusually good — when you hit one, read past the red line to the <code>help:</code> section. The answer is very often written there.</p>
+  </div>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>Slices — Vec's other half</h2>
+  </div>
+
+  <p>A slice, written <code>&amp;[T]</code>, is a <em>view</em> into a contiguous run of elements. It does not own them. Understanding slices is what makes your functions reusable.</p>
+
+  <h3>The function-signature decision</h3>
+
+  <div class="split">
+    <div class="code is-bad">
+      <div class="code-label">Needlessly restrictive</div>
+<pre><code><span class="k">fn</span> <span class="fn">sum</span>(v: &amp;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>()
+}
+
+<span class="cm">// Accepts ONLY a &amp;Vec.</span>
+<span class="cm">// Arrays? No. Slices? No.</span></code></pre>
+    </div>
+    <div class="code is-good">
+      <div class="code-label">Idiomatic</div>
+<pre><code><span class="k">fn</span> <span class="fn">sum</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">i32</span> {
+    v.<span class="fn">iter</span>().<span class="fn">sum</span>()
+}
+
+<span class="cm">// Accepts &amp;Vec, arrays, and</span>
+<span class="cm">// sub-slices. Same speed.</span></code></pre>
+    </div>
+  </div>
+
+  <div class="code">
+    <div class="code-label">What the slice version buys you</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+<span class="k">let</span> arr = [<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+
+<span class="fn">sum</span>(&amp;v);          <span class="cm">// ✓ Vec derefs to slice automatically</span>
+<span class="fn">sum</span>(&amp;arr);        <span class="cm">// ✓ array too</span>
+<span class="fn">sum</span>(&amp;v[<span class="nu">1</span>..<span class="nu">3</span>]);    <span class="cm">// ✓ just part of it — no copying</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The rule</span>
+    <p>Take <code>&amp;[T]</code> in function parameters, not <code>&amp;Vec&lt;T&gt;</code>. Take <code>&amp;mut [T]</code> if you need to modify elements. Only take <code>&amp;Vec&lt;T&gt;</code> if you specifically need to call <code>push</code> or <code>pop</code> — things that change the <em>length</em>.</p>
+  </div>
+
+  <h3>Slicing syntax</h3>
+
+  <div class="code">
+    <div class="code-label">Ranges, all zero-cost</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+
+&amp;v[<span class="nu">1</span>..<span class="nu">3</span>]     <span class="cm">// [2, 3]        — 1 up to, NOT including, 3</span>
+&amp;v[<span class="nu">1</span>..=<span class="nu">3</span>]    <span class="cm">// [2, 3, 4]     — inclusive of 3</span>
+&amp;v[..<span class="nu">2</span>]      <span class="cm">// [1, 2]        — from the start</span>
+&amp;v[<span class="nu">3</span>..]      <span class="cm">// [4, 5]        — to the end</span>
+&amp;v[..]       <span class="cm">// [1,2,3,4,5]   — the whole thing</span>
+
+<span class="cm">// No data is copied. A slice is just a pointer + a length.</span></code></pre>
+  </div>
+
+  <div class="figure">
+<pre>let v = vec![1, 2, 3, 4, 5];
+let s = &amp;v[1..4];
+
+  v: ptr ●─┐  len 5  cap 5
+           ↓
+HEAP    ┌───┬───┬───┬───┬───┐
+        │ 1 │ 2 │ 3 │ 4 │ 5 │
+        └───┴───┴───┴───┴───┘
+              ↑
+  s: ptr ●────┘  len 3        s is 16 bytes: a pointer and a length.
+                              It borrows; it owns nothing.</pre>
+    <p class="figcap">Verified sizes: <code>Vec&lt;i32&gt;</code> = 24 bytes, <code>&amp;[i32]</code> = 16 bytes.</p>
+  </div>
+
+  <h3>Splitting and chunking</h3>
+
+  <div class="code">
+    <div class="code-label">Useful slice methods</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>, <span class="nu">6</span>, <span class="nu">7</span>];
+
+<span class="k">let</span> (left, right) = v.<span class="fn">split_at</span>(<span class="nu">2</span>);
+<span class="cm">// left = [1, 2],  right = [3, 4, 5, 6, 7]</span>
+
+<span class="k">let</span> groups: <span class="ty">Vec</span>&lt;&amp;[<span class="ty">i32</span>]&gt; = v.<span class="fn">chunks</span>(<span class="nu">3</span>).<span class="fn">collect</span>();
+<span class="cm">// [[1,2,3], [4,5,6], [7]]   ← last chunk is short, that's fine</span>
+
+<span class="k">let</span> pairs: <span class="ty">Vec</span>&lt;&amp;[<span class="ty">i32</span>]&gt; = v.<span class="fn">windows</span>(<span class="nu">3</span>).<span class="fn">collect</span>();
+<span class="cm">// [[1,2,3], [2,3,4], [3,4,5], ...]  ← OVERLAPPING, sliding</span>
+
+v.<span class="fn">reverse</span>();       <span class="cm">// in place (needs mut)</span>
+v.<span class="fn">swap</span>(<span class="nu">0</span>, <span class="nu">4</span>);      <span class="cm">// exchange two elements (needs mut)</span></code></pre>
+  </div>
+
+  <p><code>chunks</code> splits into non-overlapping groups; <code>windows</code> slides across with overlap. <code>windows(2)</code> is the natural way to compare each element with its neighbour.</p>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>The three iterators</h2>
+  </div>
+
+  <p>You know <code>for</code> loops already. What matters here is <em>which of three things</em> a loop does to your vector — because one of them consumes it.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Call</th><th>Yields</th><th>Afterwards</th></tr></thead>
+      <tbody>
+        <tr><td><code>.iter()</code></td><td><code>&amp;T</code></td><td>Vector still usable — read only</td></tr>
+        <tr><td><code>.iter_mut()</code></td><td><code>&amp;mut T</code></td><td>Vector still usable — you modified it</td></tr>
+        <tr><td><code>.into_iter()</code></td><td><code>T</code></td><td><strong>Vector is gone</strong> — consumed</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-label">All three, in one place</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter</span>() { <span class="fn">println!</span>(<span class="st">"{}"</span>, x); }   <span class="cm">// x: &amp;i32</span>
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, v);                          <span class="cm">// ✓ still here</span>
+
+<span class="k">let</span> <span class="k">mut</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">for</span> x <span class="k">in</span> v.<span class="fn">iter_mut</span>() { *x *= <span class="nu">10</span>; }       <span class="cm">// x: &amp;mut i32</span>
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, v);                          <span class="cm">// [10, 20, 30]</span>
+
+<span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">for</span> x <span class="k">in</span> v.<span class="fn">into_iter</span>() { <span class="fn">println!</span>(<span class="st">"{}"</span>, x); } <span class="cm">// x: i32 (owned)</span>
+<span class="cm">// v no longer exists</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The dereference</span>
+    <p>With <code>iter_mut</code> you must write <code>*x *= 10</code>, not <code>x *= 10</code>. <code>x</code> is a <em>reference to</em> an <code>i32</code>; the <code>*</code> reaches through it to the value. Forgetting the star is one of the most common early Rust mistakes.</p>
+  </div>
+
+  <h3>The shorthand you will see everywhere</h3>
+
+  <div class="code">
+    <div class="code-label">for over a vector directly</div>
+<pre><code><span class="k">for</span> x <span class="k">in</span> &amp;v          { }   <span class="cm">// same as v.iter()</span>
+<span class="k">for</span> x <span class="k">in</span> &amp;<span class="k">mut</span> v      { }   <span class="cm">// same as v.iter_mut()</span>
+<span class="k">for</span> x <span class="k">in</span> v           { }   <span class="cm">// same as v.into_iter()  ← CONSUMES</span></code></pre>
+  </div>
+
+  <div class="code is-bad">
+    <div class="code-label">The bug this shorthand causes</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">for</span> x <span class="k">in</span> v { <span class="fn">println!</span>(<span class="st">"{}"</span>, x); }   <span class="cm">// ← v moved here</span>
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, v);                  <span class="cm">// ← error</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `v`
+ --&gt; src/main.rs:4:22
+  |
+3 |     for x in v { println!("{}", x); }
+  |              - `v` moved due to this implicit call to `.into_iter()`
+4 |     println!("{:?}", v);
+  |                      ^ value borrowed here after move
+  |
+help: consider iterating over a slice of the `Vec&lt;i32&gt;`'s content
+      to avoid moving into the `for` loop
+  |
+3 |     for x in &amp;v { println!("{}", x); }
+  |              +</pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">One character</span>
+    <p>The whole fix is an <code>&amp;</code>. <strong>Default to <code>for x in &amp;v</code></strong> and only drop the <code>&amp;</code> when you genuinely want to consume the vector. If you are unsure, the <code>&amp;</code> is the safe choice — you can always add ownership later.</p>
+  </div>
+
+  <h3>When you actually want <code>into_iter</code></h3>
+
+  <div class="code is-good">
+    <div class="code-label">Moving out of a vector without cloning</div>
+<pre><code><span class="k">let</span> names = <span class="fn">vec!</span>[<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"ada"</span>), <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"grace"</span>)];
+
+<span class="cm">// Each String is MOVED out — no allocation, no clone.</span>
+<span class="k">let</span> upper: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = names
+    .<span class="fn">into_iter</span>()
+    .<span class="fn">map</span>(|s| s.<span class="fn">to_uppercase</span>())
+    .<span class="fn">collect</span>();
+
+<span class="cm">// With .iter() you would need .clone() on every element.</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>Iterator adapters</h2>
+  </div>
+
+  <p>This is where vectors become genuinely pleasant. Adapters let you describe <em>what</em> you want rather than writing the mechanics of a loop.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">Lazy</span>
+    <p>Adapters do <strong>nothing</strong> until something consumes them. <code>v.iter().map(...)</code> on its own performs zero work — it just builds a description. A consumer like <code>.collect()</code>, <code>.sum()</code>, or a <code>for</code> loop is what actually runs it. Rust warns you if you build an iterator and never use it.</p>
+  </div>
+
+  <h3>The essential four</h3>
+
+  <div class="code">
+    <div class="code-label">map, filter, enumerate, zip</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+
+<span class="cm">// MAP — transform every element</span>
+<span class="k">let</span> doubled: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>).<span class="fn">collect</span>();
+<span class="cm">// [2, 4, 6, 8, 10]</span>
+
+<span class="cm">// FILTER — keep the ones that pass</span>
+<span class="k">let</span> evens: <span class="ty">Vec</span>&lt;&amp;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">filter</span>(|x| **x % <span class="nu">2</span> == <span class="nu">0</span>).<span class="fn">collect</span>();
+<span class="cm">// [2, 4]</span>
+
+<span class="cm">// ENUMERATE — pair each with its index</span>
+<span class="k">for</span> (i, val) <span class="k">in</span> v.<span class="fn">iter</span>().<span class="fn">enumerate</span>() {
+    <span class="fn">println!</span>(<span class="st">"{i}: {val}"</span>);
+}
+
+<span class="cm">// ZIP — walk two iterators together; stops at the shorter one</span>
+<span class="k">let</span> names = <span class="fn">vec!</span>[<span class="st">"x"</span>, <span class="st">"y"</span>, <span class="st">"z"</span>];
+<span class="k">let</span> nums  = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> paired: <span class="ty">Vec</span>&lt;_&gt; = names.<span class="fn">iter</span>().<span class="fn">zip</span>(nums.<span class="fn">iter</span>()).<span class="fn">collect</span>();
+<span class="cm">// [("x", 1), ("y", 2), ("z", 3)]</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why filter needs two stars</span>
+    <p><code>v.iter()</code> yields <code>&amp;i32</code>. <code>filter</code> passes its closure a <em>reference to the item</em>, so you receive <code>&amp;&amp;i32</code> — hence <code>**x</code>. You can sidestep it by destructuring in the pattern: <code>.filter(|&amp;&amp;x| x % 2 == 0)</code>. Both are correct; the second reads better.</p>
+  </div>
+
+  <h3>Consumers</h3>
+
+  <div class="code">
+    <div class="code-label">These end a chain and produce a value</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>, <span class="nu">4</span>, <span class="nu">5</span>];
+
+<span class="k">let</span> total: <span class="ty">i32</span> = v.<span class="fn">iter</span>().<span class="fn">sum</span>();          <span class="cm">// 15</span>
+<span class="k">let</span> prod:  <span class="ty">i32</span> = v.<span class="fn">iter</span>().<span class="fn">product</span>();      <span class="cm">// 120</span>
+<span class="k">let</span> n            = v.<span class="fn">iter</span>().<span class="fn">count</span>();        <span class="cm">// 5</span>
+
+<span class="cm">// FOLD — the general one. Start with an accumulator, combine each item.</span>
+<span class="k">let</span> factorial: <span class="ty">i64</span> = (<span class="nu">1</span>..=<span class="nu">5i64</span>).<span class="fn">fold</span>(<span class="nu">1</span>, |acc, x| acc * x);
+<span class="cm">// 120  — sum() and product() are just fold with different starts</span></code></pre>
+  </div>
+
+  <h3>Chaining — the real payoff</h3>
+
+  <div class="split">
+    <div class="code">
+      <div class="code-label">Manual loop</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> out = <span class="ty">Vec</span>::<span class="fn">new</span>();
+<span class="k">for</span> n <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">10</span> {
+    <span class="k">if</span> n % <span class="nu">2</span> == <span class="nu">0</span> {
+        out.<span class="fn">push</span>(<span class="fn">format!</span>(<span class="st">"#{n}"</span>));
+    }
+}</code></pre>
+    </div>
+    <div class="code is-good">
+      <div class="code-label">Chained</div>
+<pre><code><span class="k">let</span> out: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = (<span class="nu">1</span>..=<span class="nu">10</span>)
+    .<span class="fn">filter</span>(|n| n % <span class="nu">2</span> == <span class="nu">0</span>)
+    .<span class="fn">map</span>(|n| <span class="fn">format!</span>(<span class="st">"#{n}"</span>))
+    .<span class="fn">collect</span>();</code></pre>
+    </div>
+  </div>
+
+  <p>Both produce <code>["#2", "#4", "#6", "#8", "#10"]</code>, and both compile to essentially the same machine code. The chain reads top to bottom as a description of intent: take the numbers, keep the even ones, format them, gather them up.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Zero cost</span>
+    <p>Chaining does not allocate intermediate vectors. <code>filter</code> then <code>map</code> does not build a filtered vector and then map over it — the compiler fuses the whole chain into a single loop. This is the same monomorphization you saw with generics, applied to iterators.</p>
+  </div>
+
+  <h3>More adapters worth knowing</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Adapter</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>.rev()</code></td><td>Iterate backwards</td></tr>
+        <tr><td><code>.take(n)</code></td><td>First n only</td></tr>
+        <tr><td><code>.skip(n)</code></td><td>Drop the first n</td></tr>
+        <tr><td><code>.step_by(n)</code></td><td>Every nth element</td></tr>
+        <tr><td><code>.chain(other)</code></td><td>Run one iterator, then another</td></tr>
+        <tr><td><code>.flatten()</code></td><td>Flatten nested iterators one level</td></tr>
+        <tr><td><code>.filter_map(f)</code></td><td>Filter and map at once; keeps the <code>Some</code>s</td></tr>
+        <tr><td><code>.peekable()</code></td><td>Look at the next item without consuming it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code">
+    <div class="code-label">filter_map — the parse idiom</div>
+<pre><code><span class="k">let</span> raw = <span class="fn">vec!</span>[<span class="st">"1"</span>, <span class="st">"two"</span>, <span class="st">"3"</span>, <span class="st">"four"</span>, <span class="st">"5"</span>];
+
+<span class="cm">// Parse each; silently drop whatever fails.</span>
+<span class="k">let</span> nums: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = raw.<span class="fn">iter</span>()
+    .<span class="fn">filter_map</span>(|s| s.<span class="fn">parse</span>().<span class="fn">ok</span>())
+    .<span class="fn">collect</span>();
+<span class="cm">// [1, 3, 5]</span></code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>Collecting</h2>
+  </div>
+
+  <p><code>.collect()</code> is unusual: it decides what to build based on the type you ask for. That makes it powerful and occasionally confusing.</p>
+
+  <div class="code">
+    <div class="code-label">The type annotation is the instruction</div>
+<pre><code><span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+
+<span class="cm">// Two equivalent ways to tell collect what to produce:</span>
+<span class="k">let</span> a: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>).<span class="fn">collect</span>();
+<span class="k">let</span> b = v.<span class="fn">iter</span>().<span class="fn">map</span>(|x| x * <span class="nu">2</span>).<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;&gt;();
+<span class="cm">//                                          ↑ "turbofish"</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0282]</span>: type annotations needed
+  |
+  |     let a = v.iter().map(|x| x * 2).collect();
+  |         ^ consider giving `a` a type</pre>
+  </div>
+  <p>If you see that error, you left out the annotation. <code>collect</code> genuinely does not know whether you want a <code>Vec</code>, a <code>HashSet</code>, or a <code>String</code>.</p>
+
+  <h3>Collecting into other containers</h3>
+
+  <div class="code">
+    <div class="code-label">Same call, different destinations</div>
+<pre><code><span class="k">use</span> std::collections::{<span class="ty">HashSet</span>, <span class="ty">HashMap</span>};
+
+<span class="k">let</span> v = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+
+<span class="k">let</span> set: <span class="ty">HashSet</span>&lt;<span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>().<span class="fn">copied</span>().<span class="fn">collect</span>();
+<span class="cm">// {1, 2, 3} — duplicates gone, order gone</span>
+
+<span class="k">let</span> map: <span class="ty">HashMap</span>&lt;<span class="ty">i32</span>, <span class="ty">i32</span>&gt; = v.<span class="fn">iter</span>()
+    .<span class="fn">map</span>(|&amp;x| (x, x * x))
+    .<span class="fn">collect</span>();
+<span class="cm">// {1: 1, 2: 4, 3: 9}  — pairs become key/value</span>
+
+<span class="k">let</span> s: <span class="ty">String</span> = <span class="fn">vec!</span>[<span class="st">'h'</span>, <span class="st">'i'</span>].<span class="fn">into_iter</span>().<span class="fn">collect</span>();
+<span class="cm">// "hi"</span></code></pre>
+  </div>
+
+  <h3>The clever one: collecting into <code>Result</code></h3>
+
+  <div class="code is-good">
+    <div class="code-label">All-or-nothing parsing</div>
+<pre><code><span class="cm">// Vec&lt;Result&lt;T, E&gt;&gt; can collect into Result&lt;Vec&lt;T&gt;, E&gt;.</span>
+<span class="cm">// If EVERY item is Ok, you get Ok(vec).</span>
+<span class="cm">// If ANY item is Err, you get that first Err — and it stops early.</span>
+
+<span class="k">let</span> good: <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, _&gt; =
+    <span class="fn">vec!</span>[<span class="st">"1"</span>, <span class="st">"2"</span>, <span class="st">"3"</span>].<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;()).<span class="fn">collect</span>();
+<span class="cm">// Ok([1, 2, 3])</span>
+
+<span class="k">let</span> bad: <span class="ty">Result</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt;, _&gt; =
+    <span class="fn">vec!</span>[<span class="st">"1"</span>, <span class="st">"x"</span>, <span class="st">"3"</span>].<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.<span class="fn">parse</span>::&lt;<span class="ty">i32</span>&gt;()).<span class="fn">collect</span>();
+<span class="cm">// Err(ParseIntError { .. })   — the "3" was never even parsed</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Why this matters</span>
+    <p>This is the difference between "parse these and skip the bad ones" (<code>filter_map</code>, Part 11) and "parse these, and if any fail the whole thing fails" (<code>collect</code> into <code>Result</code>). Both are one line. Choosing correctly is a real design decision about how strict your program should be.</p>
+  </div>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>Vectors of structs — the realistic case</h2>
+  </div>
+
+  <p>Almost every real program has a <code>Vec</code> of something you defined yourself. Here is the whole pattern working together.</p>
+
+  <div class="code">
+    <div class="code-label">A small student records system</div>
+<pre><code><span class="at">#[derive(Debug, Clone)]</span>
+<span class="k">struct</span> <span class="ty">Student</span> {
+    name:  <span class="ty">String</span>,
+    grade: <span class="ty">u32</span>,
+    marks: <span class="ty">f64</span>,
+}
+
+<span class="k">fn</span> <span class="fn">main</span>() {
+    <span class="k">let</span> <span class="k">mut</span> students = <span class="fn">vec!</span>[
+        <span class="ty">Student</span> { name: <span class="st">"Ada"</span>.<span class="fn">into</span>(),   grade: <span class="nu">10</span>, marks: <span class="nu">92.5</span> },
+        <span class="ty">Student</span> { name: <span class="st">"Ravi"</span>.<span class="fn">into</span>(),  grade: <span class="nu">11</span>, marks: <span class="nu">78.0</span> },
+        <span class="ty">Student</span> { name: <span class="st">"Meera"</span>.<span class="fn">into</span>(), grade: <span class="nu">10</span>, marks: <span class="nu">88.5</span> },
+    ];
+
+    <span class="cm">// FILTER — grade 10 only. .iter() so we keep the original.</span>
+    <span class="k">let</span> tenth: <span class="ty">Vec</span>&lt;&amp;<span class="ty">Student</span>&gt; = students
+        .<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|s| s.grade == <span class="nu">10</span>)
+        .<span class="fn">collect</span>();
+
+    <span class="cm">// AVERAGE — sum the marks, divide by the count</span>
+    <span class="k">let</span> total: <span class="ty">f64</span> = students.<span class="fn">iter</span>().<span class="fn">map</span>(|s| s.marks).<span class="fn">sum</span>();
+    <span class="k">let</span> avg = total / students.<span class="fn">len</span>() <span class="k">as</span> <span class="ty">f64</span>;
+
+    <span class="cm">// TOP SCORER — max_by, because f64 has no Ord (Part 7)</span>
+    <span class="k">let</span> top = students
+        .<span class="fn">iter</span>()
+        .<span class="fn">max_by</span>(|a, b| a.marks.<span class="fn">partial_cmp</span>(&amp;b.marks).<span class="fn">unwrap</span>());
+
+    <span class="cm">// SORT — highest marks first</span>
+    students.<span class="fn">sort_by</span>(|a, b| b.marks.<span class="fn">partial_cmp</span>(&amp;a.marks).<span class="fn">unwrap</span>());
+
+    <span class="cm">// MODIFY IN PLACE — 5 bonus marks for everyone, capped at 100</span>
+    <span class="k">for</span> s <span class="k">in</span> students.<span class="fn">iter_mut</span>() {
+        s.marks = (s.marks + <span class="nu">5.0</span>).<span class="fn">min</span>(<span class="nu">100.0</span>);
+    }
+
+    <span class="cm">// REMOVE — drop anyone below 80 (after the bonus)</span>
+    students.<span class="fn">retain</span>(|s| s.marks &gt;= <span class="nu">80.0</span>);
+}</code></pre>
+  </div>
+
+  <h3>Grouping — Vec plus HashMap</h3>
+
+  <div class="code">
+    <div class="code-label">The entry / or_insert_with idiom</div>
+<pre><code><span class="k">use</span> std::collections::<span class="ty">HashMap</span>;
+
+<span class="k">let</span> <span class="k">mut</span> by_grade: <span class="ty">HashMap</span>&lt;<span class="ty">u32</span>, <span class="ty">Vec</span>&lt;&amp;<span class="ty">Student</span>&gt;&gt; = <span class="ty">HashMap</span>::<span class="fn">new</span>();
+
+<span class="k">for</span> s <span class="k">in</span> &amp;students {
+    by_grade
+        .<span class="fn">entry</span>(s.grade)              <span class="cm">// look up this grade</span>
+        .<span class="fn">or_insert_with</span>(<span class="ty">Vec</span>::<span class="fn">new</span>)     <span class="cm">// if absent, start an empty Vec</span>
+        .<span class="fn">push</span>(s);                    <span class="cm">// then push into whichever Vec</span>
+}
+
+<span class="cm">// by_grade now maps 10 → [Ada, Meera], 11 → [Ravi]</span></code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Memorise this idiom</span>
+    <p><code>.entry(k).or_insert_with(Vec::new).push(v)</code> is <em>the</em> way to group items in Rust. It handles "first time seeing this key" and "seen it before" in a single expression, with no lookup done twice.</p>
+  </div>
+
+  <div class="note">
+    <span class="note-tag">Connects to</span>
+    <p>Notice how many previous topics are load-bearing here: <strong>structs</strong> for <code>Student</code>, <strong>derive</strong> for <code>Debug</code>/<code>Clone</code>, <strong>closures</strong> in every adapter, <strong>traits</strong> behind <code>sum</code> and <code>partial_cmp</code>, <strong>Option</strong> from <code>max_by</code>. This is what a real Rust program looks like — everything at once.</p>
+  </div>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>Nested vectors — grids and matrices</h2>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Vec of Vec</div>
+<pre><code><span class="cm">// A 2-row, 3-column grid of zeros</span>
+<span class="k">let</span> grid = <span class="fn">vec!</span>[<span class="fn">vec!</span>[<span class="nu">0u8</span>; <span class="nu">3</span>]; <span class="nu">2</span>];
+<span class="cm">//              ↑ inner: 3 wide   ↑ outer: 2 of them</span>
+<span class="cm">// [[0, 0, 0], [0, 0, 0]]</span>
+
+<span class="cm">// Read it as: grid[row][column]</span>
+<span class="k">let</span> <span class="k">mut</span> grid = <span class="fn">vec!</span>[<span class="fn">vec!</span>[<span class="nu">0</span>; <span class="nu">3</span>]; <span class="nu">2</span>];
+grid[<span class="nu">1</span>][<span class="nu">2</span>] = <span class="nu">9</span>;      <span class="cm">// row 1, column 2</span>
+
+<span class="cm">// Walk it</span>
+<span class="k">for</span> row <span class="k">in</span> &amp;grid {
+    <span class="k">for</span> cell <span class="k">in</span> row {
+        <span class="fn">print!</span>(<span class="st">"{} "</span>, cell);
+    }
+    <span class="fn">println!</span>();
+}</code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The dimension order trap</span>
+    <p><code>vec![vec![0; COLS]; ROWS]</code>. The <em>inner</em> number is the width, the <em>outer</em> is the height — which is the opposite of how you say it out loud ("a 2 by 3 grid"). Getting this backwards produces a grid that is silently transposed.</p>
+  </div>
+
+  <h3>The flat alternative</h3>
+
+  <div class="code is-good">
+    <div class="code-label">One allocation instead of ROWS+1</div>
+<pre><code><span class="k">struct</span> <span class="ty">Grid</span> {
+    data: <span class="ty">Vec</span>&lt;<span class="ty">u8</span>&gt;,   <span class="cm">// one flat vector</span>
+    cols: <span class="ty">usize</span>,
+}
+
+<span class="k">impl</span> <span class="ty">Grid</span> {
+    <span class="k">fn</span> <span class="fn">new</span>(rows: <span class="ty">usize</span>, cols: <span class="ty">usize</span>) -&gt; <span class="ty">Self</span> {
+        <span class="ty">Grid</span> { data: <span class="fn">vec!</span>[<span class="nu">0</span>; rows * cols], cols }
+    }
+    <span class="k">fn</span> <span class="fn">get</span>(&amp;<span class="k">self</span>, r: <span class="ty">usize</span>, c: <span class="ty">usize</span>) -&gt; <span class="ty">u8</span> {
+        <span class="k">self</span>.data[r * <span class="k">self</span>.cols + c]     <span class="cm">// ← the index formula</span>
+    }
+    <span class="k">fn</span> <span class="fn">set</span>(&amp;<span class="k">mut</span> <span class="k">self</span>, r: <span class="ty">usize</span>, c: <span class="ty">usize</span>, v: <span class="ty">u8</span>) {
+        <span class="k">self</span>.data[r * <span class="k">self</span>.cols + c] = v;
+    }
+}</code></pre>
+  </div>
+
+  <div class="figure">
+<pre>Vec&lt;Vec&lt;u8&gt;&gt;  — 3 separate heap blocks, scattered
+
+  outer ●──→ [ ●, ●, ● ]
+               │  │  └──→ [ . . . ]   somewhere
+               │  └─────→ [ . . . ]   somewhere else
+               └────────→ [ . . . ]   somewhere else again
+
+Vec&lt;u8&gt; flat   — 1 heap block, contiguous
+
+  data ●──→ [ . . . | . . . | . . . ]
+              row 0   row 1   row 2      cache-friendly</pre>
+    <p class="figcap">The flat layout is meaningfully faster for large grids because the CPU cache loads neighbouring memory together. For small grids, use whichever is clearer.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Use</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>Vec&lt;Vec&lt;T&gt;&gt;</code></td><td>Rows have different lengths, or the grid is small and clarity wins</td></tr>
+        <tr><td>Flat <code>Vec&lt;T&gt;</code> + <code>cols</code></td><td>True rectangle, performance matters, or you do lots of scanning</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Common errors — and what they actually mean</h2>
+  </div>
+
+  <p>Every one of these is real compiler output. Learn to recognise them by shape and you will fix them in seconds instead of minutes.</p>
+
+  <h3>E0502 — borrow conflict</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0502]</span>: cannot borrow `v` as mutable because it is also
+              borrowed as immutable</pre>
+  </div>
+  <p><strong>Cause:</strong> you held a reference into the vector and then modified it.<br>
+  <strong>Fix:</strong> finish with the reference first, or copy/clone the value out. See Part 8.</p>
+
+  <h3>E0507 — cannot move out of index</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0507]</span>: cannot move out of index of `Vec&lt;String&gt;`
+  = move occurs because value has type `String`,
+    which does not implement the `Copy` trait</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>let s = v[0];</code> on a non-<code>Copy</code> type.<br>
+  <strong>Fix:</strong> <code>&amp;v[0]</code> to borrow, <code>v[0].clone()</code> to copy, or <code>v.remove(0)</code> to genuinely take it.</p>
+
+  <h3>E0382 — borrow of moved value</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0382]</span>: borrow of moved value: `v`
+  = `v` moved due to this implicit call to `.into_iter()`</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>for x in v</code> consumed the vector, then you used it again.<br>
+  <strong>Fix:</strong> <code>for x in &amp;v</code>. See Part 10.</p>
+
+  <h3>E0277 — trait bound not satisfied</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0277]</span>: the trait bound `f64: Ord` is not satisfied</pre>
+  </div>
+  <p><strong>Cause:</strong> usually <code>.sort()</code> on floats.<br>
+  <strong>Fix:</strong> <code>.sort_by(|a, b| a.partial_cmp(b).unwrap())</code>. See Part 7.</p>
+
+  <h3>E0596 / E0384 — not mutable</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0596]</span>: cannot borrow `v` as mutable, as it is not
+              declared as mutable
+help: consider changing this to be mutable: `mut v`</pre>
+  </div>
+  <p><strong>Cause:</strong> you called <code>push</code>/<code>sort</code>/<code>remove</code> on a non-<code>mut</code> vector.<br>
+  <strong>Fix:</strong> <code>let mut v = ...</code>. The compiler tells you exactly this.</p>
+
+  <h3>E0282 — type annotations needed</h3>
+  <div class="errblock">
+<pre><span class="code-id">error[E0282]</span>: type annotations needed</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>.collect()</code> with nothing indicating the target type, or a bare <code>Vec::new()</code>.<br>
+  <strong>Fix:</strong> annotate the binding, or use the turbofish: <code>.collect::&lt;Vec&lt;i32&gt;&gt;()</code>.</p>
+
+  <h3>Runtime panic — index out of bounds</h3>
+  <div class="errblock">
+<pre>thread 'main' panicked at src/main.rs:5:20:
+index out of bounds: the len is 3 but the index is 99</pre>
+  </div>
+  <p><strong>Cause:</strong> <code>v[i]</code> where <code>i &gt;= v.len()</code>. This one compiles fine and fails when it runs.<br>
+  <strong>Fix:</strong> use <code>.get(i)</code> and handle the <code>None</code>. See Part 4.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">A habit worth building</span>
+    <p>Rust error messages carry <code>help:</code> lines with the exact corrected syntax, and <code>rustc --explain E0502</code> prints a full explanation with examples. Almost no other compiler does this as well. Reading the whole message, not just the first line, will save you hours.</p>
+  </div>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Cheat sheet</h2>
+  </div>
+
+  <h4>Creating</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">vec![1, 2, 3]</td><td>From values</td></tr>
+        <tr><td class="col-mono">vec![0; n]</td><td>n copies of 0</td></tr>
+        <tr><td class="col-mono">Vec::new()</td><td>Empty</td></tr>
+        <tr><td class="col-mono">Vec::with_capacity(n)</td><td>Empty, room for n</td></tr>
+        <tr><td class="col-mono">(1..=5).collect()</td><td>From an iterator</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Reading — none of these need mut</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">v[i]</td><td>Element; panics if out of range</td></tr>
+        <tr><td class="col-mono">v.get(i)</td><td><code>Option&lt;&amp;T&gt;</code>; never panics</td></tr>
+        <tr><td class="col-mono">v.first() / v.last()</td><td><code>Option&lt;&amp;T&gt;</code></td></tr>
+        <tr><td class="col-mono">v.len() / v.is_empty()</td><td>Count / emptiness</td></tr>
+        <tr><td class="col-mono">v.contains(&amp;x)</td><td>Is x present</td></tr>
+        <tr><td class="col-mono">v.capacity()</td><td>Room before reallocating</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Modifying — all need mut</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">v.push(x)</td><td>Add to end — O(1)</td></tr>
+        <tr><td class="col-mono">v.pop()</td><td>Remove last → <code>Option&lt;T&gt;</code></td></tr>
+        <tr><td class="col-mono">v.insert(i, x)</td><td>Insert at i — O(n)</td></tr>
+        <tr><td class="col-mono">v.remove(i)</td><td>Remove at i, keep order — O(n)</td></tr>
+        <tr><td class="col-mono">v.swap_remove(i)</td><td>Remove at i, order lost — O(1)</td></tr>
+        <tr><td class="col-mono">v.retain(|x| ...)</td><td>Keep matching elements</td></tr>
+        <tr><td class="col-mono">v.truncate(n)</td><td>Keep first n</td></tr>
+        <tr><td class="col-mono">v.clear()</td><td>Empty it, keep capacity</td></tr>
+        <tr><td class="col-mono">v.sort()</td><td>Ascending; needs <code>Ord</code></td></tr>
+        <tr><td class="col-mono">v.reverse()</td><td>Reverse in place</td></tr>
+        <tr><td class="col-mono">v.dedup()</td><td>Drop consecutive duplicates</td></tr>
+        <tr><td class="col-mono">v.extend(iter)</td><td>Append many</td></tr>
+        <tr><td class="col-mono">v.append(&amp;mut other)</td><td>Move all of other in</td></tr>
+        <tr><td class="col-mono">v.drain(range)</td><td>Remove a range, yield it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Iterating</h4>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td class="col-mono">for x in &amp;v</td><td><code>&amp;T</code> — read, vector survives</td></tr>
+        <tr><td class="col-mono">for x in &amp;mut v</td><td><code>&amp;mut T</code> — modify, vector survives</td></tr>
+        <tr><td class="col-mono">for x in v</td><td><code>T</code> — consumes the vector</td></tr>
+        <tr><td class="col-mono">.map(f) / .filter(p)</td><td>Transform / keep</td></tr>
+        <tr><td class="col-mono">.enumerate() / .zip(o)</td><td>With index / paired</td></tr>
+        <tr><td class="col-mono">.sum() / .count()</td><td>Reduce to one value</td></tr>
+        <tr><td class="col-mono">.collect()</td><td>Build a collection</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>The five things to remember</h4>
+  <div class="tree"><b>1.</b> <i>len</i> is what you have; <i>capacity</i> is what you have room for
+<b>2.</b> <i>&amp;v</i> in a for loop, unless you truly mean to consume it
+<b>3.</b> <i>.get(i)</i> for untrusted indices, <i>v[i]</i> only when it cannot be wrong
+<b>4.</b> Take <i>&amp;[T]</i> in function signatures, not <i>&amp;Vec&lt;T&gt;</i>
+<b>5.</b> <i>.sort()</i> then <i>.dedup()</i> — dedup alone only sees neighbours</div>
+
+  <div class="keyline">A vector is three numbers on the stack pointing at a block of heap. Every rule in this guide is a consequence of that one sentence.</div>
+
+  <div class="foot">
+    <p><b>Next topic.</b> Error handling — <code>Result</code>, the <code>?</code> operator, and custom error types. You have now seen <code>Result</code> appear twice in this guide (<code>binary_search</code> and <code>collect</code>), which makes it the natural next step.</p>
+    <p>Companion workbook: <b>vectors_practice.html</b> — 44 exercises with worked solutions.</p>
+    <p>All output in this guide was verified against rustc 1.96.0, edition 2021.</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy: highlight the section currently being read ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      visible[e.target.id] = e.isIntersecting;
+    });
+    // The topmost visible section wins.
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+
+</body>
+</html>
