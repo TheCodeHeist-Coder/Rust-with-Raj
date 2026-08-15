@@ -1,0 +1,1332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threading Fundamentals — CS Concepts for Interviews</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.75rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 1.85rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem; padding-left: 0.35rem;
+  font-size: 0.625rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.6vw, 3.9rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif); font-size: 1.28rem; line-height: 1.28;
+  font-weight: 700; letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem; max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono); font-size: 0.75rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.5rem 1rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 1.05rem 1.15rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); font-weight: 700; }
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure); margin: 1.5rem 0;
+  padding: 1rem 1.15rem; border-radius: 2px;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  font-size: 0.9688rem; line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block; font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto; margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; background: var(--surface); }
+th, td {
+  text-align: left; padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+th {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure --------------------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0; max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 2px; overflow-x: auto;
+}
+.figure pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; color: var(--ink-soft); white-space: pre;
+}
+.figcap {
+  font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-faint);
+  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1.15rem 1.3rem; margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto; white-space: pre; color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split ---------------------------------------------------------- */
+
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem; margin: 1.5rem 0; max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0; max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember); border-radius: 2px;
+  padding: 0.95rem 1.1rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.7813rem;
+  line-height: 1.6; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Keyline -------------------------------------------------------- */
+
+.keyline {
+  max-width: var(--measure); margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.45;
+  font-style: italic; color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<aside class="rail">
+  <p class="rail-brand">Threading · CS</p>
+  <p class="rail-sub">Fundamentals<br>16 parts</p>
+  <nav id="toc">
+    <div class="rail-group">Foundations</div>
+    <a href="#p1"><span class="n">01</span><span>Process vs thread</span></a>
+    <a href="#p2"><span class="n">02</span><span>Concurrency vs parallelism</span></a>
+    <a href="#p3"><span class="n">03</span><span>Why threads at all</span></a>
+    <a href="#p4"><span class="n">04</span><span>Amdahl's law</span></a>
+    <div class="rail-group">How they run</div>
+    <a href="#p5"><span class="n">05</span><span>The thread lifecycle</span></a>
+    <a href="#p6"><span class="n">06</span><span>User, kernel, M:N</span></a>
+    <div class="rail-group">What goes wrong</div>
+    <a href="#p7"><span class="n">07</span><span>Race conditions</span></a>
+    <a href="#p8"><span class="n">08</span><span>Critical sections</span></a>
+    <a href="#p9"><span class="n">09</span><span>Sync primitives</span></a>
+    <a href="#p10"><span class="n">10</span><span>Deadlock</span></a>
+    <div class="rail-group">Patterns</div>
+    <a href="#p11"><span class="n">11</span><span>The classic problems</span></a>
+    <a href="#p12"><span class="n">12</span><span>Atomics &amp; memory order</span></a>
+    <a href="#p13"><span class="n">13</span><span>Thread pools</span></a>
+    <a href="#p14"><span class="n">14</span><span>Shared vs message passing</span></a>
+    <a href="#p15"><span class="n">15</span><span>Threads vs async</span></a>
+    <div class="rail-group">Revision</div>
+    <a href="#p16"><span class="n">16</span><span>Interview quick reference</span></a>
+  </nav>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Computer Science · Interview fundamentals</p>
+  <h1>Threads:<br>the <em>concepts</em> first</h1>
+  <p class="standfirst">Before any language's syntax, there is a body of ideas every interviewer expects you to have: what a thread actually is, why shared state breaks, what a race condition really means, and the four conditions that produce deadlock. This guide is language-agnostic. The Rust follows after.</p>
+  <div class="masthead-meta">
+    <span><b>16</b> parts</span>
+    <span><b>Then:</b> rust_threads_guide.html</span>
+    <span><b>Level</b> CS undergrad → interview</span>
+    <span><b>Demos</b> measured on a 12-core machine</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>Process vs thread — the question you will be asked</h2>
+  </div>
+
+  <p>This is the most common opening question on the topic, so it is worth being able to answer it precisely rather than vaguely.</p>
+
+  <p>A <strong>process</strong> is a running program together with its own private address space. A <strong>thread</strong> is a unit of execution <em>inside</em> a process. One process can hold many threads, and they all share the same memory.</p>
+
+  <div class="figure">
+<pre>   PROCESS A                          PROCESS B
+ ┌────────────────────────────┐    ┌──────────────────┐
+ │ CODE │ GLOBALS │ HEAP      │    │ CODE │ … │ HEAP  │
+ │ ───────── shared ───────── │    │                  │
+ │  ┌────────┐  ┌────────┐    │    │  ┌────────┐      │
+ │  │Thread 1│  │Thread 2│    │    │  │Thread 1│      │
+ │  │ stack  │  │ stack  │    │    │  │ stack  │      │
+ │  │ regs   │  │ regs   │    │    │  │ regs   │      │
+ │  │ PC     │  │ PC     │    │    │  │ PC     │      │
+ │  └────────┘  └────────┘    │    │  └────────┘      │
+ └────────────────────────────┘    └──────────────────┘
+        isolated by the OS — separate address spaces</pre>
+    <p class="figcap">Threads share the heap and globals. Each has its own stack, registers, and program counter.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Process</th><th>Thread</th></tr></thead>
+      <tbody>
+        <tr><td>Address space</td><td>Private</td><td>Shared with siblings</td></tr>
+        <tr><td>Creation cost</td><td>High (new page tables)</td><td>Low (~stack + bookkeeping)</td></tr>
+        <tr><td>Context switch</td><td>Expensive (TLB flush)</td><td>Cheaper (same page tables)</td></tr>
+        <tr><td>Communication</td><td>IPC: pipes, sockets, shared memory</td><td>Just read the same variable</td></tr>
+        <tr><td>Crash blast radius</td><td>One process dies</td><td>Usually the whole process dies</td></tr>
+        <tr><td>Owns</td><td>Memory, file handles, sockets</td><td>Stack, registers, PC, thread-local storage</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keyline">Threads share memory by default. That is the whole reason they are fast, and the whole reason they are dangerous.</div>
+
+  <h3>What each thread owns privately</h3>
+
+  <p>Interviewers like this follow-up. Each thread has its own:</p>
+
+  <ul>
+    <li><strong>Stack</strong> — so local variables are private and function calls do not interfere</li>
+    <li><strong>Registers and program counter</strong> — so each can be at a different instruction</li>
+    <li><strong>Thread-local storage</strong> — opt-in per-thread globals</li>
+  </ul>
+
+  <p>Everything else — the heap, globals, open files, sockets — is shared. When two threads touch the same heap object without coordination, you get the bugs the rest of this guide is about.</p>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2>Concurrency vs parallelism</h2>
+  </div>
+
+  <p>These get used interchangeably in conversation and are <em>not</em> the same thing. Getting this right signals that you actually understand the field.</p>
+
+  <div class="keyline"><strong>Concurrency</strong> is dealing with many things at once. <strong>Parallelism</strong> is doing many things at once.</div>
+
+  <div class="figure">
+<pre>CONCURRENT, not parallel (1 core, interleaved):
+
+  core 0:  [A][B][A][B][A][B][A]      time ──►
+
+PARALLEL (2 cores, simultaneous):
+
+  core 0:  [AAAAAAAAAAAAAAAAAA]
+  core 1:  [BBBBBBBBBBBBBBBBBB]      time ──►
+
+BOTH (4 tasks, 2 cores):
+
+  core 0:  [A][C][A][C][A][C]
+  core 1:  [B][D][B][D][B][D]        time ──►</pre>
+    <p class="figcap">Concurrency is a structuring choice; parallelism is a hardware outcome.</p>
+  </div>
+
+  <p>Concurrency is about <em>structure</em> — your program is organised as independent tasks that may be in progress at the same time. Parallelism is about <em>execution</em> — those tasks genuinely run simultaneously on different cores.</p>
+
+  <p>A single-core machine can be concurrent but never parallel. A concurrent program is what <em>allows</em> parallelism when cores are available.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">The interview answer</span>
+    <p>"Concurrency is about dealing with lots of things at once; parallelism is about doing lots of things at once." That is Rob Pike's formulation, and it is the one people expect. Follow it with the single-core example to show you understand why they are separable.</p>
+  </div>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>Why threads at all — the two motivations</h2>
+  </div>
+
+  <p>There are exactly two reasons to reach for threads, and they call for different designs.</p>
+
+  <h3>1. CPU-bound work — you want more cores</h3>
+
+  <p>Image processing, simulation, compilation. The work is genuinely computational, and splitting it across cores makes it finish sooner. Here you want roughly <em>one thread per core</em>; more threads than cores just adds context-switching overhead.</p>
+
+  <h3>2. I/O-bound work — you want to stop waiting</h3>
+
+  <p>Web servers, database clients, file processing. Threads spend most of their time <em>blocked</em> waiting on the network or disk. One thread waiting does not consume CPU, so you can profitably have far more threads than cores.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>CPU-bound</th><th>I/O-bound</th></tr></thead>
+      <tbody>
+        <tr><td>Bottleneck</td><td>Processor time</td><td>Waiting on external things</td></tr>
+        <tr><td>Ideal thread count</td><td>≈ number of cores</td><td>Can far exceed cores</td></tr>
+        <tr><td>Speedup from threads</td><td>Real, up to core count</td><td>Real, often dramatic</td></tr>
+        <tr><td>Modern alternative</td><td>SIMD, GPU</td><td><code>async</code>/await, event loops</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Why this distinction matters in an interview</span>
+    <p>If asked "how many threads should a server use?", the answer depends entirely on which kind of work it does. Saying "one per core" for an I/O-heavy service is wrong, and saying "hundreds" for a CPU-bound batch job is also wrong. Ask which kind it is — that itself is a good sign.</p>
+  </div>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2>Amdahl's law — the ceiling on speedup</h2>
+  </div>
+
+  <p>You cannot make a program infinitely fast by adding cores, and there is a formula for exactly how far you can get. If a fraction <em>P</em> of your program is parallelisable and you have <em>N</em> processors:</p>
+
+  <div class="figure">
+<pre>                    1
+  Speedup  =  ─────────────────
+               (1 - P)  +  P/N
+
+
+  P = 0.95 (95% parallel), N → ∞  ⟹  max speedup = 20×
+  P = 0.90                        ⟹  max speedup = 10×
+  P = 0.50                        ⟹  max speedup =  2×
+
+  The serial 5% is what caps you at 20×, no matter how many cores.</pre>
+    <p class="figcap">The serial fraction, not the core count, sets the ceiling.</p>
+  </div>
+
+  <p>The consequence is counter-intuitive and worth stating out loud: <strong>the part you cannot parallelise determines your limit.</strong> Halving the parallel part barely helps once <em>N</em> is large; shrinking the serial part is what matters.</p>
+
+  <h3>What this looks like in practice</h3>
+
+  <p>Here is a real measurement — four CPU-bound tasks, run sequentially and then on four threads:</p>
+
+  <div class="code">
+    <div class="code-label">Measured on a 12-core machine</div>
+<pre><code>cores            = 12
+sequential (4x)  = 21.02ms
+parallel   (4x)  = 10.77ms
+speedup          = 1.95x</code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why 1.95× and not 4×</span>
+    <p>Four threads on twelve cores, yet under 2×. Thread creation costs real time, the threads contend for memory bandwidth and shared cache, and the measurement itself has serial parts. <strong>Real speedup is always below the theoretical ceiling.</strong> Anyone claiming linear scaling has not measured. Being honest about this in an interview is a strong signal.</p>
+  </div>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2>The thread lifecycle</h2>
+  </div>
+
+  <p>Every threading system has roughly the same state machine, and interviewers draw it often.</p>
+
+  <div class="figure">
+<pre>                    ┌─────────┐
+       spawn ──────►│   NEW   │
+                    └────┬────┘
+                         │ scheduled
+                         ▼
+    ┌──────────┐    ┌─────────┐    dispatched   ┌──────────┐
+    │  READY   │◄───┤ RUNNABLE├──────────────► │ RUNNING  │
+    │(in queue)│    └─────────┘                 └────┬─────┘
+    └────▲─────┘                                     │
+         │ I/O done,                     blocks on:  │
+         │ lock released,                 lock, I/O, │
+         │ notified                       sleep      │
+         │                                           ▼
+         │                                    ┌──────────┐
+         └────────────────────────────────────┤ BLOCKED  │
+                                              └──────────┘
+                                                   │
+                    ┌────────────┐  returns/panics │
+                    │ TERMINATED │◄────────────────┘
+                    └────────────┘</pre>
+    <p class="figcap">A thread is only ever consuming CPU in RUNNING. Blocked threads are free.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>State</th><th>Meaning</th><th>Using CPU?</th></tr></thead>
+      <tbody>
+        <tr><td>New</td><td>Created, not yet scheduled</td><td>No</td></tr>
+        <tr><td>Runnable / Ready</td><td>Able to run, waiting for a core</td><td>No</td></tr>
+        <tr><td>Running</td><td>Executing on a core right now</td><td>Yes</td></tr>
+        <tr><td>Blocked / Waiting</td><td>Waiting on I/O, a lock, or a signal</td><td>No</td></tr>
+        <tr><td>Terminated</td><td>Finished or crashed</td><td>No</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>This is why I/O-bound programs can run hundreds of threads: a blocked thread costs memory for its stack but no CPU at all.</p>
+
+  <h3>Context switching</h3>
+
+  <p>When the scheduler moves a core from one thread to another it must save the first thread's registers and program counter, then load the second's. That costs on the order of a microsecond, plus a less visible cost: the new thread's data is not in cache, so it runs slowly at first.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Thrashing</span>
+    <p>More threads is not more throughput. Past a point, the machine spends its time switching rather than working. This is why thread <em>pools</em> exist — a fixed set of threads pulling from a queue, instead of one thread per task.</p>
+  </div>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2>User threads, kernel threads, and the M:N question</h2>
+  </div>
+
+  <p>A question that separates people who have read about threads from people who have only used them.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Model</th><th>How</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1:1</strong> (kernel)</td><td>Each language thread is one OS thread</td><td>True parallelism; creation is expensive. Rust, C++, Java.</td></tr>
+        <tr><td><strong>N:1</strong> (green)</td><td>Many language threads on one OS thread</td><td>Very cheap; one blocking call stalls everyone; no parallelism.</td></tr>
+        <tr><td><strong>M:N</strong> (hybrid)</td><td>M language threads over N OS threads</td><td>Cheap and parallel; complex runtime. Go's goroutines.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Rust made a deliberate choice here: <strong>1:1</strong>. Early Rust had green threads and removed them before 1.0, because an M:N runtime imposes overhead on every program — including ones embedding Rust in C, or running without an OS. Rust's <code>async</code> gives you the cheap-task model as a library instead, so you only pay when you use it.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">A good thing to say</span>
+    <p>"Rust uses 1:1 threads so <code>thread::spawn</code> is a real OS thread, and gets M:N-style cheap concurrency through <code>async</code> instead. Go bakes M:N into its runtime — that is why goroutines are cheap but you cannot easily embed Go in a C program."</p>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Race conditions — the core problem</h2>
+  </div>
+
+  <div class="keyline">A <strong>race condition</strong> is when the result depends on the unpredictable timing of two or more threads.</div>
+
+  <p>The classic case is the lost update. <code>counter += 1</code> looks like one action. It is three:</p>
+
+  <div class="figure">
+<pre>  counter += 1   compiles to roughly:
+
+     1.  LOAD   counter → register     (read)
+     2.  ADD    register, 1            (modify)
+     3.  STORE  register → counter     (write)
+
+  Two threads interleaving, counter starts at 0:
+
+   Thread A            Thread B           counter
+   ─────────           ─────────          ───────
+   LOAD  → 0                                 0
+                       LOAD  → 0             0
+   ADD   → 1                                 0
+                       ADD   → 1             0
+   STORE → 1                                 1
+                       STORE → 1             1   ← should be 2!
+
+  One increment vanished. This is a LOST UPDATE.</pre>
+    <p class="figcap">Read-modify-write is not atomic. Interleaving destroys one of the updates.</p>
+  </div>
+
+  <h3>This is not theoretical — here it is measured</h3>
+
+  <p>Four threads, each incrementing a shared counter 100,000 times with a separate load and store. The correct answer is 400,000:</p>
+
+  <div class="code">
+    <div class="code-label">Real measured output</div>
+<pre><code>load+store (racy pair): 136210  (expected 400000)
+fetch_add (atomic RMW): 400000  (expected 400000)</code></pre>
+  </div>
+
+  <p><strong>Roughly two-thirds of the increments disappeared.</strong> Not a rare glitch under load — the normal outcome. And note the number is not reproducible: run it again and you get a different one, which is exactly what makes these bugs so hard to find.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why race bugs are so nasty</span>
+    <p>They are <em>non-deterministic</em>. They may appear once in ten thousand runs, vanish under a debugger (which changes timing), and only show up in production under load. This is why the whole apparatus of locks and atomics exists — you cannot test your way out of a race, you have to make it structurally impossible.</p>
+  </div>
+
+  <h3>Race condition vs data race</h3>
+
+  <p>A distinction interviewers like, and most candidates blur:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Data race</th><th>Race condition</th></tr></thead>
+      <tbody>
+        <tr><td>Definition</td><td>Two threads access the same memory concurrently, ≥1 writes, no synchronisation</td><td>Correctness depends on timing</td></tr>
+        <tr><td>Scope</td><td>A specific memory-level bug</td><td>A general logic-level bug</td></tr>
+        <tr><td>Example</td><td>Unsynchronised <code>counter += 1</code></td><td>Check-then-act: "is the file there? then open it"</td></tr>
+        <tr><td>Rust prevents?</td><td><strong>Yes</strong> — in safe code, at compile time</td><td><strong>No</strong> — it is a logic error</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>All data races are race conditions; not all race conditions are data races. Rust's guarantee is precisely the first row — which is a strong guarantee, but it does not make your concurrent logic correct.</p>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2>Critical sections and mutual exclusion</h2>
+  </div>
+
+  <p>A <strong>critical section</strong> is a region of code that must not be executed by more than one thread at a time. The fix for the lost update is to make the read-modify-write one indivisible unit.</p>
+
+  <div class="figure">
+<pre>  Thread A ──►┌───────────────────────┐──►
+              │ ACQUIRE LOCK          │
+              │   read  counter       │  critical section:
+              │   modify              │  only one thread
+              │   write counter       │  in here at a time
+              │ RELEASE LOCK          │
+              └───────────────────────┘
+                        ▲
+  Thread B ─────────────┘ blocked here until A releases</pre>
+    <p class="figcap">Mutual exclusion serialises the critical section, and only the critical section.</p>
+  </div>
+
+  <p>Any correct mutual-exclusion mechanism must provide three properties — a classic exam question:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Property</th><th>Means</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Mutual exclusion</strong></td><td>At most one thread in the critical section</td></tr>
+        <tr><td><strong>Progress</strong></td><td>If nobody is inside, someone waiting gets in (no needless stalling)</td></tr>
+        <tr><td><strong>Bounded waiting</strong></td><td>A waiting thread eventually gets in (no starvation)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Keep critical sections small</span>
+    <p>Everything inside the lock is serialised — it is your Amdahl's-law serial fraction. Never do I/O, sleep, or expensive computation while holding a lock. Acquire, touch the shared data, release.</p>
+  </div>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>The synchronisation primitives</h2>
+  </div>
+
+  <p>Six tools. Know what each is for and you can answer almost any design question on this topic.</p>
+
+  <h3>1. Mutex (mutual exclusion lock)</h3>
+  <p>One holder at a time. <code>lock()</code> blocks until free; <code>unlock()</code> releases. The default choice for protecting shared data.</p>
+
+  <h3>2. Semaphore</h3>
+  <p>A counter with <code>wait</code> (decrement, block at zero) and <code>signal</code> (increment). Permits <em>N</em> concurrent holders rather than one — use it to cap resource usage, such as "at most 10 simultaneous connections."</p>
+
+  <div class="figure">
+<pre>  MUTEX:      one key, one holder
+              ┌───┐
+     ────────►│ 1 │────────►   binary: locked / unlocked
+              └───┘
+
+  SEMAPHORE:  N permits
+              ┌───┐
+     ────────►│ 3 │────────►   three threads may pass;
+              └───┘            the fourth blocks
+
+  A mutex is (almost) a semaphore initialised to 1 — but a mutex
+  also has an OWNER, so only the locker may unlock it.</pre>
+    <p class="figcap">A binary semaphore and a mutex differ in ownership, which matters for correctness.</p>
+  </div>
+
+  <h3>3. Condition variable</h3>
+  <p>Lets a thread <em>wait for a condition</em> rather than spinning. Always paired with a mutex: <code>wait()</code> atomically releases the lock and sleeps; <code>notify()</code> wakes a waiter.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Always wait in a loop</span>
+    <p><code>while !condition { cv.wait(); }</code> — never <code>if</code>. Because of <em>spurious wakeups</em> (a thread can wake without a notification) and because another thread may have consumed the condition before you re-acquire the lock. This is a favourite interview detail.</p>
+  </div>
+
+  <h3>4. Read-write lock</h3>
+  <p>Many concurrent readers, or one exclusive writer. Worth it when reads greatly outnumber writes; otherwise the extra bookkeeping costs more than a plain mutex.</p>
+
+  <h3>5. Atomic operations</h3>
+  <p>Single indivisible instructions provided by the CPU — <code>fetch_add</code>, <code>compare_and_swap</code>. No OS involvement, no blocking. Only good for single values, but far faster than a lock.</p>
+
+  <h3>6. Barrier</h3>
+  <p>A rendezvous point: every thread waits until all <em>N</em> arrive, then all proceed. Used in phase-based algorithms — simulation steps, parallel matrix passes.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Primitive</th><th>Use when</th><th>Cost</th></tr></thead>
+      <tbody>
+        <tr><td>Mutex</td><td>Protecting a data structure</td><td>Blocking, syscall on contention</td></tr>
+        <tr><td>Semaphore</td><td>Limiting to N concurrent users</td><td>Blocking</td></tr>
+        <tr><td>Condvar</td><td>Waiting for a state change</td><td>Blocking, needs a mutex</td></tr>
+        <tr><td>RwLock</td><td>Read-heavy shared data</td><td>Blocking, more overhead than mutex</td></tr>
+        <tr><td>Atomic</td><td>One counter or flag</td><td>Non-blocking, very fast</td></tr>
+        <tr><td>Barrier</td><td>Phase synchronisation</td><td>Blocking</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>Deadlock — the four conditions</h2>
+  </div>
+
+  <p>Guaranteed interview material. <strong>Deadlock</strong> is when threads wait on each other in a cycle, so none can proceed. It requires <em>all four</em> of Coffman's conditions simultaneously:</p>
+
+  <div class="keyline">1. Mutual exclusion &nbsp;·&nbsp; 2. Hold and wait &nbsp;·&nbsp; 3. No preemption &nbsp;·&nbsp; 4. Circular wait</div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Condition</th><th>Meaning</th><th>Break it by</th></tr></thead>
+      <tbody>
+        <tr><td>Mutual exclusion</td><td>Resources cannot be shared</td><td>Using lock-free structures</td></tr>
+        <tr><td>Hold and wait</td><td>Holding one, waiting for another</td><td>Acquiring all locks at once, or none</td></tr>
+        <tr><td>No preemption</td><td>Cannot forcibly take a lock away</td><td>Timeouts — <code>try_lock</code></td></tr>
+        <tr><td>Circular wait</td><td>A waits on B, B waits on A</td><td><strong>Global lock ordering</strong> ← the usual fix</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="figure">
+<pre>       Thread 1                     Thread 2
+       ────────                     ────────
+    lock(A)  ✓                   lock(B)  ✓
+       │                             │
+    lock(B)  ✗ blocked           lock(A)  ✗ blocked
+       │                             │
+       └──────────┐     ┌────────────┘
+                  ▼     ▼
+              ┌─────────────┐
+              │  A held by 1│◄──── 2 wants A
+              │  B held by 2│◄──── 1 wants B
+              └─────────────┘
+                CIRCULAR WAIT — neither can ever proceed</pre>
+    <p class="figcap">The classic two-lock deadlock. Both threads hold what the other needs.</p>
+  </div>
+
+  <h3>Demonstrated with a real run</h3>
+
+  <p>Two threads taking two locks in opposite orders. Using <code>try_lock</code> instead of <code>lock</code> so the program reports the situation rather than hanging forever:</p>
+
+  <div class="code">
+    <div class="code-label">Real measured output</div>
+<pre><code>t1: could NOT get B (would deadlock with lock())
+t2: got both</code></pre>
+  </div>
+
+  <p>Thread 1 held A and could not get B. With a blocking <code>lock()</code> both threads would have hung permanently — no error, no crash, just a program that stops responding.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">The fix worth memorising</span>
+    <p><strong>Establish a global lock ordering.</strong> If every thread always takes A before B, a cycle is impossible. In practice: order locks by address, by ID, or by a documented convention — and write the convention down.</p>
+  </div>
+
+  <h3>Related failures that are not deadlock</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Failure</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Livelock</strong></td><td>Threads keep changing state in response to each other but make no progress — two people stepping aside in a corridor, forever.</td></tr>
+        <tr><td><strong>Starvation</strong></td><td>A thread is runnable but never scheduled — often a low-priority thread starved by high-priority ones.</td></tr>
+        <tr><td><strong>Priority inversion</strong></td><td>A low-priority thread holds a lock a high-priority thread needs, so the high-priority one waits on the low one. Famously nearly ended the Mars Pathfinder mission.</td></tr>
+        <tr><td><strong>Convoying</strong></td><td>Threads bunch up behind one slow lock holder, destroying throughput.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>The classic problems</h2>
+  </div>
+
+  <p>These are the named problems that appear on exams and in interviews. Each isolates one difficulty.</p>
+
+  <h3>Producer–consumer (bounded buffer)</h3>
+  <p>Producers add items to a fixed-size queue; consumers remove them. Producers must block when full, consumers when empty.</p>
+
+  <div class="figure">
+<pre>   Producers                BUFFER (size 4)              Consumers
+   ─────────         ┌────┬────┬────┬────┐              ─────────
+     P1 ──┐          │ i1 │ i2 │    │    │          ┌──► C1
+     P2 ──┼─── put ─►└────┴────┴────┴────┘── take ──┤
+     P3 ──┘            ▲              ▲              └──► C2
+                       │              │
+              block if FULL    block if EMPTY
+
+   Needs: a mutex (protect the queue) + two condvars
+          (not-full, not-empty), or a semaphore for each.</pre>
+    <p class="figcap">The foundational pattern for pipelines, work queues, and message passing.</p>
+  </div>
+
+  <p>This is the single most important pattern in practice — thread pools, logging systems, and job queues are all producer–consumer. In Rust it is largely solved for you by channels, which is why part 12 of the Rust guide leans on them.</p>
+
+  <h3>Readers–writers</h3>
+  <p>Many readers may share, but a writer needs exclusivity. The interesting part is the policy: reader-preference starves writers, writer-preference starves readers, so real implementations aim for fairness.</p>
+
+  <h3>Dining philosophers</h3>
+  <p>Five philosophers, five forks, each needs the two adjacent forks to eat. If all pick up their left fork simultaneously, everyone holds one and waits forever — a pure demonstration of circular wait.</p>
+
+  <div class="figure">
+<pre>            P0
+        f0      f1
+      P4          P1        Each philosopher needs
+        f4      f2          BOTH adjacent forks.
+            P3  f3  P2
+                          All grab left first → deadlock.
+
+   FIXES:
+   • Order the forks: everyone takes the lower-numbered one first.
+     (One philosopher becomes left-handed — breaks the cycle.)
+   • Allow at most 4 to sit at once (semaphore) — breaks hold-and-wait.
+   • Pick up both atomically, or neither.</pre>
+    <p class="figcap">The canonical illustration of breaking circular wait.</p>
+  </div>
+
+  <h3>Sleeping barber</h3>
+  <p>A barber sleeps when there are no customers; customers wait if chairs are free and leave if not. Models a server with a bounded request queue — the pattern behind connection backlogs.</p>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>Atomics, and why <code>volatile</code> is not the answer</h2>
+  </div>
+
+  <p>An <strong>atomic operation</strong> completes indivisibly — no other thread can observe it half-done. Modern CPUs provide these as single instructions.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Operation</th><th>Does</th></tr></thead>
+      <tbody>
+        <tr><td><code>load</code> / <code>store</code></td><td>Read or write indivisibly</td></tr>
+        <tr><td><code>fetch_add</code></td><td>Read, add, write — as one unit</td></tr>
+        <tr><td><code>compare_and_swap</code> (CAS)</td><td>"If the value is still X, set it to Y" — the foundation of lock-free code</td></tr>
+        <tr><td><code>swap</code></td><td>Exchange and return the old value</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Part 7's measurement showed exactly why the distinction matters: a separate load and store lost two-thirds of the increments, while <code>fetch_add</code> — the same logical operation, but atomic — gave the exact answer.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag"><code>volatile</code> does not make things thread-safe</span>
+    <p>A very common misconception, and a good interview trap. In C/C++, <code>volatile</code> tells the compiler not to cache a value in a register. It says <em>nothing</em> about atomicity or about CPU memory ordering, so <code>volatile int x; x++;</code> is still a data race. Use real atomics. (Java's <code>volatile</code> is a different and stronger thing — it does impose ordering.)</p>
+  </div>
+
+  <h3>Memory ordering, briefly</h3>
+
+  <p>Compilers and CPUs reorder instructions for speed. Single-threaded code cannot tell; multithreaded code very much can. Memory orderings let you say how much reordering is acceptable:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ordering</th><th>Guarantee</th><th>Use for</th></tr></thead>
+      <tbody>
+        <tr><td><code>Relaxed</code></td><td>Atomic, but no ordering with other operations</td><td>Counters where only the total matters</td></tr>
+        <tr><td><code>Acquire</code> / <code>Release</code></td><td>Pairs up to create a happens-before edge</td><td>Lock implementations, publishing data</td></tr>
+        <tr><td><code>SeqCst</code></td><td>One global order all threads agree on</td><td>The safe default when unsure</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Practical advice</span>
+    <p>Use <code>SeqCst</code> unless you have measured and understand exactly why you need weaker ordering. <code>Relaxed</code> on a pure counter is the one common exception — you only care that the final total is right, not when each increment became visible.</p>
+  </div>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>Thread pools and work queues</h2>
+  </div>
+
+  <p>Creating a thread per task does not scale: creation costs milliseconds and thousands of threads thrash. A <strong>thread pool</strong> creates <em>N</em> workers once and feeds them tasks from a shared queue.</p>
+
+  <div class="figure">
+<pre>   submit ──►┌──────────────────────────────┐
+             │  TASK QUEUE  [t1][t2][t3][t4]│
+             └──────┬──────┬──────┬─────────┘
+                    │      │      │
+              ┌─────▼─┐ ┌──▼───┐ ┌▼─────┐
+              │Worker1│ │Worker2│ │Worker3│   fixed set of threads,
+              └───────┘ └───────┘ └───────┘   created once, reused
+
+   Each worker loops: take a task, run it, repeat.
+   This IS producer-consumer, with tasks as the items.</pre>
+    <p class="figcap">Bounded threads, unbounded tasks. The standard shape for servers.</p>
+  </div>
+
+  <h3>How many workers?</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Workload</th><th>Rule of thumb</th></tr></thead>
+      <tbody>
+        <tr><td>CPU-bound</td><td><code>N = number of cores</code></td></tr>
+        <tr><td>I/O-bound</td><td><code>N = cores × (1 + wait time / compute time)</code></td></tr>
+        <tr><td>Mixed</td><td>Measure. Separate pools per workload type.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>For I/O-heavy work the multiplier can be large — if a task waits 90% of the time, you want roughly ten threads per core.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">Work stealing</span>
+    <p>An advanced refinement worth knowing by name: each worker has its own queue, and idle workers <em>steal</em> from busy ones' tails. This avoids contention on a single shared queue. It is how Rayon, Go's scheduler, and Java's ForkJoinPool all work.</p>
+  </div>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>Shared memory vs message passing</h2>
+  </div>
+
+  <p>Two philosophies for getting threads to cooperate. Interviewers ask you to compare them.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Shared memory</th><th>Message passing</th></tr></thead>
+      <tbody>
+        <tr><td>Model</td><td>Threads read/write the same data under locks</td><td>Threads own their data, send copies</td></tr>
+        <tr><td>Primitive</td><td>Mutex, RwLock, atomics</td><td>Channels, queues</td></tr>
+        <tr><td>Strength</td><td>No copying; efficient for large data</td><td>No locks to get wrong; easy to reason about</td></tr>
+        <tr><td>Weakness</td><td>Deadlock, races, subtle bugs</td><td>Copying costs; can hide backpressure</td></tr>
+        <tr><td>Slogan</td><td>—</td><td>"Do not communicate by sharing memory; share memory by communicating."</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Neither is universally better. Message passing is easier to get right and should be your default; shared memory wins when the data is large or the access pattern is genuinely random.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Rust supports both, safely</span>
+    <p>Most languages let you use both and hope. Rust makes both <em>safe</em>: channels move ownership so the sender provably cannot touch the data afterwards, and <code>Mutex&lt;T&gt;</code> puts the data <em>inside</em> the lock so you cannot access it without locking. That second idea is genuinely unusual and worth mentioning in an interview.</p>
+  </div>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Threads vs async — the modern question</h2>
+  </div>
+
+  <p>Increasingly asked, because every modern language has both.</p>
+
+  <div class="figure">
+<pre>  THREADS (preemptive):
+    The OS interrupts a thread whenever it likes.
+    Each thread needs a full stack (~8 MB virtual, ~8 KB real).
+    10,000 threads = heavy.
+
+  ASYNC (cooperative):
+    A task yields ONLY at an await point.
+    A task is a small state machine — hundreds of bytes.
+    10,000 tasks = fine.
+
+    ┌──────────────────────────────────────────┐
+    │  async runtime (a few OS threads)        │
+    │   ┌────┐┌────┐┌────┐┌────┐┌────┐         │
+    │   │task││task││task││task││task│  …10k   │
+    │   └────┘└────┘└────┘└────┘└────┘         │
+    └──────────────────────────────────────────┘</pre>
+    <p class="figcap">Async multiplexes many tasks onto few threads. It does not add cores.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Use threads when</th><th>Use async when</th></tr></thead>
+      <tbody>
+        <tr><td>Work is CPU-bound</td><td>Work is I/O-bound</td></tr>
+        <tr><td>You need real parallelism</td><td>You need many concurrent waits</td></tr>
+        <tr><td>Tasks are few and long-lived</td><td>Tasks are many and short</td></tr>
+        <tr><td>Code is simpler without a runtime</td><td>You are writing a network service</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The trap</span>
+    <p>Async does <em>not</em> make CPU-bound work faster — there are no extra cores involved. Worse, a long computation inside an async task blocks the whole executor thread and stalls every other task on it. CPU-bound work belongs on threads (or a dedicated blocking pool), even inside an async program.</p>
+  </div>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Interview quick reference</h2>
+  </div>
+
+  <h3>Definitions you should be able to give instantly</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Term</th><th>One-line answer</th></tr></thead>
+      <tbody>
+        <tr><td>Thread</td><td>A unit of execution inside a process, sharing its memory but with its own stack and registers</td></tr>
+        <tr><td>Concurrency</td><td>Dealing with many things at once (structure)</td></tr>
+        <tr><td>Parallelism</td><td>Doing many things at once (execution)</td></tr>
+        <tr><td>Race condition</td><td>Correctness depends on unpredictable timing</td></tr>
+        <tr><td>Data race</td><td>Concurrent unsynchronised access, at least one a write</td></tr>
+        <tr><td>Critical section</td><td>Code at most one thread may execute at a time</td></tr>
+        <tr><td>Deadlock</td><td>Cyclic waiting; needs all four Coffman conditions</td></tr>
+        <tr><td>Livelock</td><td>Threads active but making no progress</td></tr>
+        <tr><td>Starvation</td><td>A thread never gets scheduled</td></tr>
+        <tr><td>Mutex</td><td>A lock with one owner at a time</td></tr>
+        <tr><td>Semaphore</td><td>A counter permitting N concurrent holders</td></tr>
+        <tr><td>Condition variable</td><td>Wait for a condition; always used with a mutex and a <code>while</code> loop</td></tr>
+        <tr><td>Atomic</td><td>An indivisible operation, no lock needed</td></tr>
+        <tr><td>Thread pool</td><td>Fixed workers consuming a task queue</td></tr>
+        <tr><td>Amdahl's law</td><td>Speedup is capped by the serial fraction</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Questions you should expect</h3>
+
+  <ol>
+    <li><strong>Process vs thread?</strong> → Part 01's table. Lead with the address space.</li>
+    <li><strong>Concurrency vs parallelism?</strong> → Pike's line, then the single-core example.</li>
+    <li><strong>What is a race condition? Give an example.</strong> → <code>counter += 1</code> as three steps, with the interleaving diagram.</li>
+    <li><strong>How do you prevent one?</strong> → Mutex, atomics, or eliminate the sharing entirely.</li>
+    <li><strong>What are the four conditions for deadlock?</strong> → Mutual exclusion, hold-and-wait, no preemption, circular wait.</li>
+    <li><strong>How do you avoid deadlock?</strong> → Global lock ordering is the main answer; then timeouts, and taking all locks at once.</li>
+    <li><strong>Mutex vs semaphore?</strong> → Ownership, and binary vs counting.</li>
+    <li><strong>Why <code>while</code> and not <code>if</code> around <code>cv.wait()</code>?</strong> → Spurious wakeups and lost conditions.</li>
+    <li><strong>How many threads for a server?</strong> → Ask CPU-bound or I/O-bound first.</li>
+    <li><strong>Threads or async?</strong> → I/O-bound → async; CPU-bound → threads.</li>
+    <li><strong>Is <code>volatile</code> enough?</strong> → No. It prevents caching in a register, not races.</li>
+    <li><strong>Why is 8 threads not 8× faster?</strong> → Amdahl's law, plus contention and thread overhead. Cite a real number: 4 threads gave 1.95×.</li>
+  </ol>
+
+  <h3>The measured numbers from this guide</h3>
+
+  <div class="code">
+    <div class="code-label">All real output, useful to quote</div>
+<pre><code>lost updates:  136210 / 400000 correct   (racy load+store)
+atomic RMW:    400000 / 400000 correct   (fetch_add)
+speedup:       1.95x on 4 threads, 12-core machine
+deadlock:      t1 could not acquire B while holding A</code></pre>
+  </div>
+
+  <div class="foot">
+    <p><b>Next.</b> <b>rust_threads_guide.html</b> — how these concepts appear in Rust, and why the borrow checker turns most of Part 07 into compile errors rather than production incidents.</p>
+    <p>The ownership guide is the prerequisite: <code>Send</code>, <code>Sync</code>, and <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> only make sense once moves and borrows do.</p>
+    <p>Demonstrations were compiled and run on rustc 1.96.0; the concepts are language-agnostic.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

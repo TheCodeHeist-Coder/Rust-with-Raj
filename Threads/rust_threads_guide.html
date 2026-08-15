@@ -1,0 +1,1437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threads in Rust — The Complete Guide</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.75rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 1.85rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem; padding-left: 0.35rem;
+  font-size: 0.625rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.6vw, 3.9rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif); font-size: 1.28rem; line-height: 1.28;
+  font-weight: 700; letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem; max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono); font-size: 0.75rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.5rem 1rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 1.05rem 1.15rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); font-weight: 700; }
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure); margin: 1.5rem 0;
+  padding: 1rem 1.15rem; border-radius: 2px;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  font-size: 0.9688rem; line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block; font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto; margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; background: var(--surface); }
+th, td {
+  text-align: left; padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+th {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure --------------------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0; max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 2px; overflow-x: auto;
+}
+.figure pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; color: var(--ink-soft); white-space: pre;
+}
+.figcap {
+  font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-faint);
+  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1.15rem 1.3rem; margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto; white-space: pre; color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split ---------------------------------------------------------- */
+
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem; margin: 1.5rem 0; max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0; max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember); border-radius: 2px;
+  padding: 0.95rem 1.1rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.7813rem;
+  line-height: 1.6; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Keyline -------------------------------------------------------- */
+
+.keyline {
+  max-width: var(--measure); margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.45;
+  font-style: italic; color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<aside class="rail">
+  <p class="rail-brand">Threads in Rust</p>
+  <p class="rail-sub">Complete guide<br>18 parts</p>
+  <nav id="toc">
+    <div class="rail-group">Getting started</div>
+    <a href="#p1"><span class="n">01</span><span>Spawning &amp; joining</span></a>
+    <a href="#p2"><span class="n">02</span><span>The <code>move</code> closure</span></a>
+    <a href="#p3"><span class="n">03</span><span>Trap: move copies</span></a>
+    <div class="rail-group">The type system</div>
+    <a href="#p4"><span class="n">04</span><span>Send &amp; Sync</span></a>
+    <a href="#p5"><span class="n">05</span><span>Arc</span></a>
+    <a href="#p6"><span class="n">06</span><span>Mutex</span></a>
+    <div class="rail-group">Going wrong</div>
+    <a href="#p7"><span class="n">07</span><span>Deadlock &amp; poisoning</span></a>
+    <div class="rail-group">More primitives</div>
+    <a href="#p8"><span class="n">08</span><span>RwLock</span></a>
+    <a href="#p9"><span class="n">09</span><span>Atomics</span></a>
+    <a href="#p10"><span class="n">10</span><span>Channels</span></a>
+    <a href="#p11"><span class="n">11</span><span>Scoped threads</span></a>
+    <a href="#p12"><span class="n">12</span><span>Condvar</span></a>
+    <div class="rail-group">In practice</div>
+    <a href="#p13"><span class="n">13</span><span>A worker pool</span></a>
+    <a href="#p14"><span class="n">14</span><span>Measuring speedup</span></a>
+    <a href="#p15"><span class="n">15</span><span>Choosing the tool</span></a>
+    <a href="#p16"><span class="n">16</span><span>Panics</span></a>
+    <div class="rail-group">Revision</div>
+    <a href="#p17"><span class="n">17</span><span>Every error, decoded</span></a>
+    <a href="#p18"><span class="n">18</span><span>Cheat sheet</span></a>
+  </nav>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Learning notes</p>
+  <h1>Threads:<br>fearless, and <em>why</em></h1>
+  <p class="standfirst">Every concept in the fundamentals guide — races, deadlock, shared state — is a runtime hazard in C and Java. In Rust most of them are compile errors, and the mechanism is not new: it is ownership and borrowing, applied across threads. This is where that investment pays.</p>
+  <div class="masthead-meta">
+    <span><b>18</b> parts</span>
+    <span><b>Before:</b> cs_threading_fundamentals.html</span>
+    <span><b>Practice:</b> rust_threads_practice.html</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>Spawning and joining</h2>
+  </div>
+
+  <p><code>thread::spawn</code> takes a closure and runs it on a new OS thread. It returns a <code>JoinHandle</code>, and <code>.join()</code> waits for the thread to finish and gives you its return value.</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">use</span> std::thread;
+
+<span class="k">let</span> h = thread::<span class="fn">spawn</span>(|| {
+    <span class="k">let</span> <span class="k">mut</span> s = <span class="nu">0</span><span class="ty">u64</span>;
+    <span class="k">for</span> i <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">1000</span> { s += i; }
+    s                            <span class="cm">// the thread's return value</span>
+});
+
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, h.<span class="fn">join</span>().<span class="fn">unwrap</span>());   <span class="cm">// → 500500</span></code></pre>
+  </div>
+
+  <p>Two things are worth noticing immediately. <code>join()</code> returns a <code>Result</code>, not the value directly — because the thread might have panicked (part 16). And a thread's return value comes back through the handle, which is how Rust avoids needing a shared "result" variable.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">1:1 threads</span>
+    <p>As covered in the fundamentals guide, <code>thread::spawn</code> creates a genuine OS thread — not a green thread or a task. It costs real memory (a full stack) and real time to create. For thousands of concurrent waits you want <code>async</code>, not thousands of spawns.</p>
+  </div>
+
+  <h3>Detached threads</h3>
+
+  <p>If you never call <code>join</code>, the thread is <em>detached</em>. When <code>main</code> returns, the process exits and any still-running threads are killed abruptly:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Output is unpredictable — the thread may never finish</div>
+<pre><code>thread::<span class="fn">spawn</span>(|| {
+    <span class="k">for</span> i <span class="k">in</span> <span class="nu">1</span>..<span class="nu">10</span> {
+        <span class="fn">println!</span>(<span class="st">"spawned: {i}"</span>);
+        thread::<span class="fn">sleep</span>(<span class="ty">Duration</span>::<span class="fn">from_millis</span>(<span class="nu">1</span>));
+    }
+});
+<span class="cm">// main ends here — the spawned thread is cut off mid-loop</span></code></pre>
+  </div>
+
+  <div class="keyline">If you care that a thread finished, you must <code>join</code> it.</div>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2><code>move</code> — the first error you will hit</h2>
+  </div>
+
+  <p>Try to use a local variable inside a spawned closure and the compiler stops you:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> data = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+thread::<span class="fn">spawn</span>(|| { <span class="fn">println!</span>(<span class="st">"{:?}"</span>, data); });</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0373]</span>: closure may outlive the current function, but it borrows `data`, which is owned by the current function
+ --&gt; te1.rs:4:19
+  |
+4 |     thread::spawn(|| { println!("{:?}", data); });
+  |                   ^^                    ---- `data` is borrowed here
+  |                   |
+  |                   may outlive borrowed value `data`
+  |
+note: function requires argument type to outlive `'static`
+help: to force the closure to take ownership of `data` (and any other referenced variables), use the `move` keyword
+  |
+4 |     thread::spawn(move || { println!("{:?}", data); });
+  |                   ++++</pre>
+  </div>
+
+  <p>Read the reasoning, because it is the whole design in one sentence: the closure <strong>may outlive the current function</strong>. Nothing forces the spawned thread to finish before <code>main</code> returns, so a borrow of a local would become a dangling reference — exactly the E0106 problem from the ownership guide, now across threads.</p>
+
+  <div class="code is-good">
+    <div class="code-label">The fix — verified output <code>6</code></div>
+<pre><code><span class="k">let</span> data = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+<span class="k">let</span> h = thread::<span class="fn">spawn</span>(<span class="k">move</span> || data.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;());
+<span class="fn">println!</span>(<span class="st">"{}"</span>, h.<span class="fn">join</span>().<span class="fn">unwrap</span>());</code></pre>
+  </div>
+
+  <p><code>move</code> forces the closure to take ownership of everything it captures. Now the vector belongs to the thread, lives as long as the thread does, and <code>main</code> can no longer touch it — try, and you get the familiar E0382.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">The <code>'static</code> bound</span>
+    <p><code>spawn</code> requires <code>F: Send + 'static</code>. <code>'static</code> here does <em>not</em> mean "lives forever" — it means "contains no borrows of anything that could die first." Owned data satisfies it. This is why <code>move</code> is the answer.</p>
+  </div>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>The trap: <code>move</code> copies, it does not share</h2>
+  </div>
+
+  <p>Here is a program that <em>compiles</em>, emits only a warning, and is completely wrong. Predict the output before reading on:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Compiles. Prints <code>0</code>.</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> counter = <span class="nu">0</span>;
+<span class="k">let</span> <span class="k">mut</span> hs = <span class="fn">vec!</span>[];
+<span class="k">for</span> _ <span class="k">in</span> <span class="nu">0</span>..<span class="nu">5</span> {
+    hs.<span class="fn">push</span>(thread::<span class="fn">spawn</span>(<span class="k">move</span> || { counter += <span class="nu">1</span>; }));
+}
+<span class="k">for</span> h <span class="k">in</span> hs { h.<span class="fn">join</span>().<span class="fn">unwrap</span>(); }
+<span class="fn">println!</span>(<span class="st">"{counter}"</span>);       <span class="cm">// → 0, not 5</span></code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">warning</span>: value captured by `counter` is never read
+ --&gt; te3.rs:6:41
+  |
+6 |         hs.push(thread::spawn(move || { counter += 1; }));
+  |                                         ^^^^^^^
+  |
+  = help: did you mean to capture by reference instead?</pre>
+  </div>
+
+  <p><code>i32</code> is <code>Copy</code>. So <code>move</code> gives each of the five threads <em>its own private copy</em> of <code>counter</code>, each increments its own to 1, and all five are discarded. The original never changes.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Why this matters</span>
+    <p>This is the one place Rust will let a threading mistake through, and it is worth understanding exactly why: there is no <em>unsafety</em> here — no race, no shared memory, nothing to protect. It is a pure logic error. Rust prevents data races, not wrong programs. The compiler still hints: <em>"did you mean to capture by reference instead?"</em></p>
+  </div>
+
+  <p>To actually share, you need shared ownership plus synchronisation — which is parts 4 and 5.</p>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2><code>Send</code> and <code>Sync</code> — the two marker traits</h2>
+  </div>
+
+  <p>These are how Rust encodes thread safety <em>in the type system</em>. Two traits, no methods, both usually derived automatically.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Trait</th><th>Means</th><th>Test</th></tr></thead>
+      <tbody>
+        <tr><td><code>Send</code></td><td>Safe to <strong>move</strong> to another thread</td><td>Can I transfer ownership across a thread boundary?</td></tr>
+        <tr><td><code>Sync</code></td><td>Safe to <strong>share by reference</strong> between threads</td><td>Is <code>&amp;T</code> <code>Send</code>?</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Almost every type is both, automatically — if all your fields are <code>Send</code>, your struct is <code>Send</code>. The interesting cases are the exceptions:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Type</th><th><code>Send</code></th><th><code>Sync</code></th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>i32</code>, <code>String</code>, <code>Vec&lt;T&gt;</code></td><td>✓</td><td>✓</td><td>Plain data</td></tr>
+        <tr><td><code>Rc&lt;T&gt;</code></td><td>✗</td><td>✗</td><td>Non-atomic refcount — two threads could corrupt it</td></tr>
+        <tr><td><code>Arc&lt;T&gt;</code></td><td>✓</td><td>✓</td><td>Atomic refcount</td></tr>
+        <tr><td><code>RefCell&lt;T&gt;</code></td><td>✓</td><td>✗</td><td>Non-atomic borrow flag; movable but not shareable</td></tr>
+        <tr><td><code>Mutex&lt;T&gt;</code></td><td>✓</td><td>✓</td><td>That is its entire job</td></tr>
+        <tr><td>Raw pointers</td><td>✗</td><td>✗</td><td>No guarantees at all</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Seeing the error</h3>
+
+  <p>Try to send an <code>Rc</code> to another thread:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> d = <span class="ty">Rc</span>::<span class="fn">new</span>(<span class="nu">5</span>);
+<span class="k">let</span> d2 = <span class="ty">Rc</span>::<span class="fn">clone</span>(&amp;d);
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || { <span class="fn">println!</span>(<span class="st">"{}"</span>, d2); });</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0277]</span>: `Rc&lt;i32&gt;` cannot be sent between threads safely
+   --&gt; te2.rs:6:19
+    |
+  6 |     thread::spawn(move || { println!("{}", d2); }).join().unwrap();
+    |     ------------- -------^^^^^^^^^^^^^^^^^^^^^^^^
+    |     |             |
+    |     |             `Rc&lt;i32&gt;` cannot be sent between threads safely
+    |
+    = help: within `{closure@te2.rs:6:19: 6:26}`, the trait `Send` is not implemented for `Rc&lt;i32&gt;`
+note: required by a bound in `spawn`
+    |
+125 | pub fn spawn&lt;F, T&gt;(f: F) -&gt; JoinHandle&lt;T&gt;
+    |        ----- required by a bound in this function
+...
+128 |     F: Send + 'static,
+    |        ^^^^ required by this bound in `spawn`</pre>
+  </div>
+
+  <p>The error points straight at <code>spawn</code>'s signature: <code>F: Send + 'static</code>. <code>Rc</code>'s reference count is a plain integer, incremented non-atomically — two threads cloning at once could lose an increment and free memory that is still in use. So <code>Rc</code> is deliberately not <code>Send</code>, and the compiler enforces it.</p>
+
+  <h3>The <code>Sync</code> half</h3>
+
+  <p><code>RefCell</code> shows the other trait. It <em>is</em> <code>Send</code> — you may move one to another thread — but it is not <code>Sync</code>, so it cannot be <em>shared</em>. Wrapping it in an <code>Arc</code> tries to share it, and fails:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> d = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">RefCell</span>::<span class="fn">new</span>(<span class="nu">5</span>));
+<span class="k">let</span> d2 = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;d);
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || { *d2.<span class="fn">borrow_mut</span>() += <span class="nu">1</span>; });</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0277]</span>: `RefCell&lt;i32&gt;` cannot be shared between threads safely
+   --&gt; te5.rs:7:19
+    |
+  7 |     thread::spawn(move || { *d2.borrow_mut() += 1; }).join().unwrap();
+    |     ------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `RefCell&lt;i32&gt;` cannot be shared between threads safely
+    |
+    = help: the trait `Sync` is not implemented for `RefCell&lt;i32&gt;`
+    = note: if you want to do aliasing and mutation between multiple threads, use `std::sync::RwLock` instead
+    = note: required for `Arc&lt;RefCell&lt;i32&gt;&gt;` to implement `Send`</pre>
+  </div>
+
+  <p>Two details worth reading closely. The compiler names the replacement outright — <em>"use <code>std::sync::RwLock</code> instead"</em>. And the last line shows the traits composing: <code>Arc&lt;T&gt;</code> is only <code>Send</code> when <code>T</code> is <code>Sync</code>, which is exactly why <code>Arc</code> cannot be used to smuggle a non-<code>Sync</code> type across a thread boundary.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">This is the whole trick</span>
+    <p>"Fearless concurrency" is not a runtime checker. It is two marker traits and the ownership rules you already know. Thread safety became a <em>type</em> property, so misuse is a type error — caught at compile time, with zero runtime cost.</p>
+  </div>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2><code>Arc</code> — shared ownership across threads</h2>
+  </div>
+
+  <p><code>Arc&lt;T&gt;</code> is an <strong>A</strong>tomically <strong>R</strong>eference <strong>C</strong>ounted pointer. Multiple owners of one value; the value is dropped when the last <code>Arc</code> goes away.</p>
+
+  <div class="figure">
+<pre>   Thread 1        Thread 2        Thread 3
+      │               │               │
+   ┌──▼───┐        ┌──▼───┐        ┌──▼───┐
+   │ Arc  │        │ Arc  │        │ Arc  │      each is a clone
+   └──┬───┘        └──┬───┘        └──┬───┘
+      └───────────────┼───────────────┘
+                      ▼
+            ┌───────────────────┐
+            │  count: 3         │  ← atomic, safe to update
+            │  data:  T         │     from any thread
+            └───────────────────┘
+        dropped when count reaches 0</pre>
+    <p class="figcap"><code>Arc::clone</code> copies the pointer and bumps the count — it does not copy the data.</p>
+  </div>
+
+  <p><code>Arc::clone(&amp;x)</code> is cheap: one atomic increment. It is deliberately written as <code>Arc::clone(&amp;x)</code> rather than <code>x.clone()</code> by convention, so readers can see at a glance that no deep copy is happening.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag"><code>Rc</code> vs <code>Arc</code></span>
+    <p>Same API, different refcount. <code>Rc</code> uses a plain integer — faster, single-threaded only. <code>Arc</code> uses an atomic — slightly slower, thread-safe. Use <code>Rc</code> until the compiler tells you otherwise; it will.</p>
+  </div>
+
+  <p>But <code>Arc</code> alone only gives you shared <em>reading</em>. <code>Arc&lt;T&gt;</code> hands out <code>&amp;T</code>, never <code>&amp;mut T</code> — because that would be multiple mutable aliases, exactly what the borrow rules forbid. To mutate, you need part 6.</p>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2><code>Mutex</code> — and the idea that makes it safe</h2>
+  </div>
+
+  <p>Rust's <code>Mutex</code> has a design most languages do not: <strong>the data lives inside the lock.</strong></p>
+
+  <div class="figure">
+<pre>  OTHER LANGUAGES:              RUST:
+
+    Mutex  m;                     Mutex&lt;Vec&lt;i32&gt;&gt;
+    Vec    data;                        │
+      ↑        ↑                        └── the data is INSIDE
+      │        │
+   two separate things.          You cannot reach the data
+   Nothing forces you to         without locking, because
+   lock before touching          lock() is the only way to
+   the data. Forgetting          get a reference to it.
+   is a silent race.
+                                 Forgetting is impossible.</pre>
+    <p class="figcap">In Rust, the lock owns the data. This is the structural difference.</p>
+  </div>
+
+  <p><code>lock()</code> returns a <code>Result&lt;MutexGuard&lt;T&gt;&gt;</code>. The guard derefs to <code>&amp;mut T</code>, and <strong>unlocks automatically when it is dropped</strong> — the <code>Drop</code> trait from the ownership guide, doing real work. There is no <code>unlock()</code> to forget.</p>
+
+  <div class="code is-good">
+    <div class="code-label">The canonical counter — verified output <code>8000</code></div>
+<pre><code><span class="k">use</span> std::sync::{<span class="ty">Arc</span>, <span class="ty">Mutex</span>};
+<span class="k">use</span> std::thread;
+
+<span class="k">let</span> c = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="nu">0</span>));
+<span class="k">let</span> <span class="k">mut</span> hs = <span class="fn">vec!</span>[];
+
+<span class="k">for</span> _ <span class="k">in</span> <span class="nu">0</span>..<span class="nu">8</span> {
+    <span class="k">let</span> c = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;c);          <span class="cm">// each thread gets its own handle</span>
+    hs.<span class="fn">push</span>(thread::<span class="fn">spawn</span>(<span class="k">move</span> || {
+        <span class="k">for</span> _ <span class="k">in</span> <span class="nu">0</span>..<span class="nu">1000</span> {
+            *c.<span class="fn">lock</span>().<span class="fn">unwrap</span>() += <span class="nu">1</span>;    <span class="cm">// lock, mutate, auto-unlock</span>
+        }
+    }));
+}
+<span class="k">for</span> h <span class="k">in</span> hs { h.<span class="fn">join</span>().<span class="fn">unwrap</span>(); }
+<span class="fn">println!</span>(<span class="st">"{}"</span>, *c.<span class="fn">lock</span>().<span class="fn">unwrap</span>());   <span class="cm">// → 8000, exactly, every time</span></code></pre>
+  </div>
+
+  <p>Compare that with the fundamentals guide's measurement, where an unsynchronised version lost two-thirds of its increments. Here it is 8000 every run, and the compiler would not have let you write the broken version.</p>
+
+  <h3>Reading the type</h3>
+
+  <div class="keyline"><code>Arc&lt;Mutex&lt;T&gt;&gt;</code> = shared ownership (<code>Arc</code>) of exclusive access (<code>Mutex</code>) to data (<code>T</code>).</div>
+
+  <p>The nesting order matters and follows from what each piece does. <code>Arc</code> must be outermost so every thread can hold a handle; <code>Mutex</code> is inside because the thing being protected is the data. <code>Mutex&lt;Arc&lt;T&gt;&gt;</code> would be a lock protecting a pointer — almost never what you want.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Keep the guard's life short</span>
+    <p>The lock is held until the guard drops. <code>let g = m.lock().unwrap();</code> at the top of a long function holds it for the whole function. Prefer <code>*m.lock().unwrap() += 1;</code>, where the temporary guard drops at the end of the statement, or wrap the critical section in a <code>{ }</code> block.</p>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Deadlock is still possible</h2>
+  </div>
+
+  <p>An important honesty point. Rust prevents data races — it does <strong>not</strong> prevent deadlock. All four Coffman conditions are still available to you.</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Two locks, opposite orders — verified with <code>try_lock</code></div>
+<pre><code><span class="cm">// Thread 1: lock A, then B</span>
+<span class="k">let</span> _g = a1.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">let</span> _h = b1.<span class="fn">lock</span>().<span class="fn">unwrap</span>();     <span class="cm">// waits for thread 2</span>
+
+<span class="cm">// Thread 2: lock B, then A</span>
+<span class="k">let</span> _g = b2.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">let</span> _h = a2.<span class="fn">lock</span>().<span class="fn">unwrap</span>();     <span class="cm">// waits for thread 1  → DEADLOCK</span></code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-label">Real output using <code>try_lock</code> so it reports instead of hanging</div>
+<pre><code>t1: could NOT get B (would deadlock with lock())
+t2: got both</code></pre>
+  </div>
+
+  <p>With blocking <code>lock()</code> calls that program hangs forever — no panic, no error, just silence. The fixes are the ones from the fundamentals guide: <strong>global lock ordering</strong> first, <code>try_lock</code> with a timeout second.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">The self-deadlock</span>
+    <p>Rust's <code>Mutex</code> is <em>not</em> reentrant. Locking it twice from the same thread deadlocks that thread against itself. In particular, calling a method that locks while already holding the lock is a real and easy mistake.</p>
+  </div>
+
+  <h3>Poisoning</h3>
+
+  <p>This is why <code>lock()</code> returns a <code>Result</code>. If a thread panics while holding a lock, the mutex is <strong>poisoned</strong> — the data may be in a half-updated state, so every later <code>lock()</code> returns <code>Err</code>:</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="cm">// A thread panics while holding the lock:</span>
+poisoned = <span class="k">true</span>
+
+<span class="cm">// You can still recover the value if you decide it is sound:</span>
+<span class="k">let</span> val = <span class="k">match</span> m.<span class="fn">lock</span>() {
+    <span class="ty">Ok</span>(g) =&gt; *g,
+    <span class="ty">Err</span>(p) =&gt; *p.<span class="fn">into_inner</span>(),   <span class="cm">// deliberate override</span>
+};
+<span class="cm">// recovered value = 0</span></code></pre>
+  </div>
+
+  <p>Most code writes <code>.lock().unwrap()</code>, which propagates the panic — usually the right call, since a poisoned lock means something already went wrong.</p>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2><code>RwLock</code> — many readers or one writer</h2>
+  </div>
+
+  <p>When reads vastly outnumber writes, a <code>Mutex</code> serialises readers unnecessarily. <code>RwLock</code> lets them run concurrently:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Four threads reading at once — verified <code>[3, 3, 3, 3]</code></div>
+<pre><code><span class="k">use</span> std::sync::<span class="ty">RwLock</span>;
+
+<span class="k">let</span> rw = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">RwLock</span>::<span class="fn">new</span>(<span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>]));
+
+<span class="k">let</span> rw = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;rw);
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || rw.<span class="fn">read</span>().<span class="fn">unwrap</span>().<span class="fn">len</span>());   <span class="cm">// shared read</span>
+
+<span class="cm">// and for writing:</span>
+rw.<span class="fn">write</span>().<span class="fn">unwrap</span>().<span class="fn">push</span>(<span class="nu">4</span>);                       <span class="cm">// exclusive</span></code></pre>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th><code>Mutex</code></th><th><code>RwLock</code></th></tr></thead>
+      <tbody>
+        <tr><td>Concurrent readers</td><td>No</td><td>Yes</td></tr>
+        <tr><td>Overhead</td><td>Lower</td><td>Higher</td></tr>
+        <tr><td>Best when</td><td>Writes are common</td><td>Reads dominate heavily</td></tr>
+        <tr><td>Guard types</td><td><code>lock()</code></td><td><code>read()</code> / <code>write()</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Not automatically faster</span>
+    <p><code>RwLock</code> does more bookkeeping than <code>Mutex</code>. If writes are frequent, or critical sections are tiny, a plain <code>Mutex</code> often wins. Measure before switching — and be aware that a steady stream of readers can starve a waiting writer.</p>
+  </div>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>Atomics — locks for a single value</h2>
+  </div>
+
+  <p>For one counter or flag, a mutex is overkill. Atomic types do the whole read-modify-write in a single CPU instruction:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>8000</code></div>
+<pre><code><span class="k">use</span> std::sync::atomic::{<span class="ty">AtomicUsize</span>, <span class="ty">Ordering</span>};
+
+<span class="k">let</span> a = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">AtomicUsize</span>::<span class="fn">new</span>(<span class="nu">0</span>));
+
+<span class="cm">// in each of 8 threads, 1000 times:</span>
+a.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+
+<span class="fn">println!</span>(<span class="st">"{}"</span>, a.<span class="fn">load</span>(<span class="ty">Ordering</span>::<span class="ty">SeqCst</span>));   <span class="cm">// → 8000</span></code></pre>
+  </div>
+
+  <p>Note there is no <code>Mutex</code> and no <code>&amp;mut</code> — <code>fetch_add</code> takes <code>&amp;self</code>. Atomics provide <em>interior mutability</em>: they can be modified through a shared reference, safely, because the hardware guarantees indivisibility.</p>
+
+  <h3>Why the operation must be atomic, not just the accesses</h3>
+
+  <p>This is the measurement from the fundamentals guide, and it is worth repeating here in Rust terms. Both versions below are perfectly safe Rust with no data race — yet only one is correct:</p>
+
+  <div class="code">
+    <div class="code-label">Real measured output, 4 threads × 100,000 increments</div>
+<pre><code><span class="cm">// let v = a.load(Relaxed); a.store(v + 1, Relaxed);</span>
+load+store (racy pair): <span class="er">136210</span>  (expected 400000)
+
+<span class="cm">// a.fetch_add(1, Relaxed);</span>
+fetch_add (atomic RMW): <span class="ok">400000</span>  (expected 400000)</code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The lesson</span>
+    <p>Two atomic operations are not one atomic operation. A load followed by a store leaves a window where another thread can intervene — the classic lost update, losing two-thirds of the work here. Use a single read-modify-write (<code>fetch_add</code>, <code>compare_exchange</code>) and the window disappears. <strong>This is a logic error Rust cannot catch for you.</strong></p>
+  </div>
+
+  <h3>Which ordering?</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Ordering</th><th>Use for</th></tr></thead>
+      <tbody>
+        <tr><td><code>Relaxed</code></td><td>Pure counters — you only care about the final total</td></tr>
+        <tr><td><code>Acquire</code>/<code>Release</code></td><td>Publishing data: release on write, acquire on read</td></tr>
+        <tr><td><code>SeqCst</code></td><td>The default when you are not certain</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Start with <code>SeqCst</code>. Drop to <code>Relaxed</code> only for independent counters, and only when you can articulate why the ordering does not matter.</p>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>Channels — message passing</h2>
+  </div>
+
+  <p>The other philosophy from the fundamentals guide: instead of sharing data under a lock, <em>send</em> it. <code>mpsc</code> stands for <strong>multi-producer, single-consumer</strong>.</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>[0, 10, 20]</code> after sorting</div>
+<pre><code><span class="k">use</span> std::sync::mpsc;
+
+<span class="k">let</span> (tx, rx) = mpsc::<span class="fn">channel</span>();
+
+<span class="k">for</span> i <span class="k">in</span> <span class="nu">0</span>..<span class="nu">3</span> {
+    <span class="k">let</span> tx = tx.<span class="fn">clone</span>();          <span class="cm">// one sender per producer</span>
+    thread::<span class="fn">spawn</span>(<span class="k">move</span> || { tx.<span class="fn">send</span>(i * <span class="nu">10</span>).<span class="fn">unwrap</span>(); });
+}
+<span class="fn">drop</span>(tx);                        <span class="cm">// drop the original — see below</span>
+
+<span class="k">let</span> got: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = rx.<span class="fn">iter</span>().<span class="fn">collect</span>();</code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The <code>drop(tx)</code> that everyone forgets</span>
+    <p><code>rx.iter()</code> ends only when <em>every</em> sender has been dropped. If you keep the original <code>tx</code> alive in <code>main</code>, the receiver waits forever and your program hangs. Either <code>drop(tx)</code> explicitly, or make sure the last clone goes out of scope.</p>
+  </div>
+
+  <h3>Ownership makes this safe</h3>
+
+  <div class="keyline"><code>send</code> takes the value <strong>by value</strong>. Once sent, you provably cannot touch it.</div>
+
+  <p>This is the ownership system doing concurrency work. In a language with shared references, sending a pointer and then modifying the original is a classic race. In Rust, <code>send(data)</code> moves <code>data</code>, and any later use is E0382. The channel is safe not because of runtime checks but because of the move.</p>
+
+  <h3>Bounded channels and backpressure</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>[1, 2, 3, 4]</code></div>
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">sync_channel</span>::&lt;<span class="ty">u32</span>&gt;(<span class="nu">2</span>);   <span class="cm">// capacity 2</span>
+<span class="cm">// send() now BLOCKS when the buffer is full</span></code></pre>
+  </div>
+
+  <p><code>channel()</code> is unbounded — a fast producer can exhaust memory. <code>sync_channel(n)</code> blocks the producer when full, which is <strong>backpressure</strong>: the queue length becomes self-limiting. For anything long-running, prefer bounded.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Behaviour</th></tr></thead>
+      <tbody>
+        <tr><td><code>recv()</code></td><td>Blocks until a message or all senders drop</td></tr>
+        <tr><td><code>try_recv()</code></td><td>Returns immediately, <code>Err</code> if empty</td></tr>
+        <tr><td><code>recv_timeout(d)</code></td><td>Blocks up to a duration</td></tr>
+        <tr><td><code>rx.iter()</code></td><td>Blocking iterator; ends when all senders drop</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>Scoped threads — borrowing across threads</h2>
+  </div>
+
+  <p>Everything so far required <code>move</code> and owned data, because a thread might outlive the function. <code>thread::scope</code> removes that requirement by <em>guaranteeing</em> the threads finish before the scope ends.</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>60</code> — note: no <code>Arc</code>, no <code>move</code>, no clone</div>
+<pre><code><span class="k">let</span> local = <span class="fn">vec!</span>[<span class="nu">10</span>, <span class="nu">20</span>, <span class="nu">30</span>];
+
+<span class="k">let</span> total: <span class="ty">i32</span> = thread::<span class="fn">scope</span>(|s| {
+    <span class="k">let</span> a = s.<span class="fn">spawn</span>(|| local[<span class="nu">0</span>] + local[<span class="nu">1</span>]);   <span class="cm">// borrows!</span>
+    <span class="k">let</span> b = s.<span class="fn">spawn</span>(|| local[<span class="nu">2</span>]);              <span class="cm">// borrows!</span>
+    a.<span class="fn">join</span>().<span class="fn">unwrap</span>() + b.<span class="fn">join</span>().<span class="fn">unwrap</span>()
+});
+<span class="cm">// local is still usable here</span></code></pre>
+  </div>
+
+  <p>Both closures borrow <code>local</code> immutably, which is fine — many readers, no writer. <code>scope</code> joins any unjoined threads before returning, so the borrows provably cannot outlive the data. Stabilised in Rust 1.63; before that this needed an external crate.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Reach for this first</span>
+    <p>If your threads are short-lived and confined to one function — the common case for parallelising a computation — scoped threads are simpler and cheaper than <code>Arc</code>. Use <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> when threads genuinely outlive the spawning scope.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Use</th><th>When</th></tr></thead>
+      <tbody>
+        <tr><td><code>thread::scope</code></td><td>Threads finish inside this function; you want to borrow locals</td></tr>
+        <tr><td><code>Arc&lt;T&gt;</code></td><td>Threads outlive the scope; read-only sharing</td></tr>
+        <tr><td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code></td><td>Threads outlive the scope; shared mutation</td></tr>
+        <tr><td>Channels</td><td>Handing work off; no shared state at all</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>Condvar — waiting for a condition</h2>
+  </div>
+
+  <p>Spinning on a flag burns CPU. A condition variable lets a thread sleep until something changes. It is always paired with a <code>Mutex</code>:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>signalled = true</code></div>
+<pre><code><span class="k">use</span> std::sync::<span class="ty">Condvar</span>;
+
+<span class="k">let</span> pair = <span class="ty">Arc</span>::<span class="fn">new</span>((<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="k">false</span>), <span class="ty">Condvar</span>::<span class="fn">new</span>()));
+
+<span class="cm">// Waiter:</span>
+<span class="k">let</span> (lock, cv) = &amp;*pair;
+<span class="k">let</span> <span class="k">mut</span> ready = lock.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">while</span> !*ready {                       <span class="cm">// while, NOT if</span>
+    ready = cv.<span class="fn">wait</span>(ready).<span class="fn">unwrap</span>();
+}
+
+<span class="cm">// Signaller, on another thread:</span>
+*lock.<span class="fn">lock</span>().<span class="fn">unwrap</span>() = <span class="k">true</span>;
+cv.<span class="fn">notify_one</span>();</code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag"><code>while</code>, never <code>if</code></span>
+    <p>The exact point flagged in the fundamentals guide, now in Rust. <code>wait</code> can return <em>spuriously</em> without any notification, and another thread may consume the condition before you re-acquire the lock. Re-checking in a loop is the only correct form.</p>
+  </div>
+
+  <p>Note how <code>wait</code> works with ownership: it <em>consumes</em> the guard and returns a new one. That is Rust encoding "the lock is released while waiting, and re-acquired on wake" directly in the type signature — you cannot accidentally use the guard while it is released.</p>
+
+  <div class="code is-good">
+    <div class="code-label">Bounded buffer built on Condvar — verified <code>[1, 2, 3, 4]</code></div>
+<pre><code><span class="k">let</span> (m, cv) = &amp;*q;
+<span class="k">let</span> <span class="k">mut</span> g = m.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">while</span> g.<span class="fn">is_empty</span>() { g = cv.<span class="fn">wait</span>(g).<span class="fn">unwrap</span>(); }
+<span class="k">while</span> <span class="k">let</span> <span class="ty">Some</span>(v) = g.<span class="fn">pop_front</span>() { got.<span class="fn">push</span>(v); }</code></pre>
+  </div>
+
+  <p>That is the producer–consumer problem from the fundamentals guide, implemented. In practice you would use a channel — but knowing how to build one from a mutex and a condvar is standard interview material.</p>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>Building a worker pool</h2>
+  </div>
+
+  <p>The pattern behind every server. <em>N</em> workers share one receiver and pull jobs from it:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>[1, 4, 9, 16, 25, 36]</code></div>
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">channel</span>::&lt;<span class="ty">u32</span>&gt;();
+<span class="k">let</span> rx = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(rx));       <span class="cm">// share the single consumer</span>
+<span class="k">let</span> results = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="ty">Vec</span>::<span class="fn">new</span>()));
+
+<span class="k">for</span> id <span class="k">in</span> <span class="nu">0</span>..<span class="nu">3</span> {
+    <span class="k">let</span> rx = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;rx);
+    <span class="k">let</span> results = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;results);
+    workers.<span class="fn">push</span>(thread::<span class="fn">spawn</span>(<span class="k">move</span> || {
+        <span class="k">loop</span> {
+            <span class="k">let</span> job = { rx.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">recv</span>() };   <span class="cm">// ← guard drops here</span>
+            <span class="k">match</span> job {
+                <span class="ty">Ok</span>(n) =&gt; { results.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">push</span>((id, n*n)); }
+                <span class="ty">Err</span>(_) =&gt; <span class="k">break</span>,                    <span class="cm">// channel closed</span>
+            }
+        }
+    }));
+}
+<span class="k">for</span> i <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">6</span> { tx.<span class="fn">send</span>(i).<span class="fn">unwrap</span>(); }
+<span class="fn">drop</span>(tx);                                     <span class="cm">// closes the channel → workers exit</span></code></pre>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The inner block is load-bearing</span>
+    <p><code>let job = { rx.lock().unwrap().recv() };</code> — those braces matter enormously. They drop the mutex guard <em>before</em> processing the job. Without them the lock is held for the whole loop body and your three workers run strictly one at a time, silently. This is the most common way a Rust worker pool ends up with no parallelism at all.</p>
+  </div>
+
+  <p>Note the shutdown mechanism: dropping <code>tx</code> closes the channel, <code>recv()</code> returns <code>Err</code>, and every worker breaks out of its loop. No sentinel values, no flags — just ownership.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">In production, use Rayon</span>
+    <p>For data parallelism, <code>rayon</code> turns <code>.iter()</code> into <code>.par_iter()</code> and handles pooling and work-stealing for you. Build a pool by hand once to understand it, then use the library.</p>
+  </div>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>Does it actually go faster?</h2>
+  </div>
+
+  <p>Worth measuring rather than assuming. Four CPU-bound tasks, sequential versus four threads:</p>
+
+  <div class="code">
+    <div class="code-label">Real measurement, 12-core machine, <code>rustc -O</code></div>
+<pre><code>cores            = 12
+sequential (4x)  = 21.02ms
+parallel   (4x)  = 10.77ms
+speedup          = 1.95x</code></pre>
+  </div>
+
+  <p>Just under 2× from four threads on twelve cores. Amdahl's law, plus thread-creation cost, plus memory-bandwidth contention. Real parallel speedup is always below the theoretical ceiling.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Beware the optimiser when benchmarking</span>
+    <p>My first attempt at this measurement reported <strong>94 nanoseconds</strong> for 160 million iterations — because <code>rustc -O</code> noticed the result was unused and deleted the entire loop. If a benchmark looks impossibly fast, it did not run. Use <code>std::hint::black_box</code> around inputs and results to stop the optimiser removing the work.</p>
+  </div>
+
+  <div class="code is-good">
+    <div class="code-label">How to benchmark honestly</div>
+<pre><code><span class="k">use</span> std::hint::black_box;
+
+<span class="k">let</span> t = <span class="ty">Instant</span>::<span class="fn">now</span>();
+<span class="fn">black_box</span>(<span class="fn">work</span>(<span class="fn">black_box</span>(seed)));      <span class="cm">// opaque to the optimiser</span>
+<span class="k">let</span> elapsed = t.<span class="fn">elapsed</span>();</code></pre>
+  </div>
+
+  <p><code>thread::available_parallelism()</code> reports usable cores — the right default for sizing a pool.</p>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Choosing the right tool</h2>
+  </div>
+
+  <p>The decision table. Most threading design questions reduce to picking a row here.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Situation</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td>Split a computation over local data</td><td><code>thread::scope</code></td></tr>
+        <tr><td>Read-only data, threads outlive scope</td><td><code>Arc&lt;T&gt;</code></td></tr>
+        <tr><td>Shared mutable state</td><td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code></td></tr>
+        <tr><td>Read-heavy shared state</td><td><code>Arc&lt;RwLock&lt;T&gt;&gt;</code></td></tr>
+        <tr><td>A single counter or flag</td><td><code>Arc&lt;AtomicUsize&gt;</code></td></tr>
+        <tr><td>Pipeline / handing work off</td><td>Channels</td></tr>
+        <tr><td>Wait for a state change</td><td><code>Condvar</code></td></tr>
+        <tr><td>Many jobs, bounded threads</td><td>Worker pool, or <code>rayon</code></td></tr>
+        <tr><td>Data-parallel iterator</td><td><code>rayon</code>'s <code>par_iter</code></td></tr>
+        <tr><td>Thousands of concurrent I/O waits</td><td><code>async</code>, not threads</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keyline">Prefer message passing to shared state. Prefer scoped threads to <code>Arc</code>. Reach for a lock only when the data genuinely must be shared and mutated.</div>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Panics, and what survives them</h2>
+  </div>
+
+  <p>A panic in a spawned thread does <strong>not</strong> kill the process. It unwinds that thread only, and <code>join()</code> reports it:</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="k">let</span> h = thread::<span class="fn">spawn</span>(|| <span class="fn">panic!</span>(<span class="st">"boom"</span>));
+<span class="fn">println!</span>(<span class="st">"{}"</span>, h.<span class="fn">join</span>().<span class="fn">is_err</span>());   <span class="cm">// → true</span>
+
+<span class="cm">// stderr also shows:</span>
+<span class="cm">// thread '&lt;unnamed&gt;' panicked at t1.rs:67:30: boom</span></code></pre>
+  </div>
+
+  <p>This is why <code>join()</code> returns <code>Result</code>. If you never join, a panicking thread dies silently and your program carries on with work half-done — a good reason to join even when you do not need the value.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Event</th><th>Consequence</th></tr></thead>
+      <tbody>
+        <tr><td>Spawned thread panics</td><td>That thread dies; <code>join()</code> returns <code>Err</code></td></tr>
+        <tr><td>Panic while holding a <code>Mutex</code></td><td>The mutex is poisoned</td></tr>
+        <tr><td>Main thread panics or returns</td><td>Process exits; other threads are killed</td></tr>
+        <tr><td>Panicking thread is never joined</td><td>Failure is silent</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ PART 17 ============ -->
+<section id="p17">
+  <div class="part-head">
+    <span class="part-num">PART 17</span>
+    <h2>Every error, decoded</h2>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Says</th><th>Means</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>E0373</code></td>
+          <td>closure may outlive the current function</td>
+          <td>Borrowing a local in a spawned closure</td>
+          <td>Add <code>move</code>, or use <code>thread::scope</code></td>
+        </tr>
+        <tr>
+          <td><code>E0277</code></td>
+          <td><code>Rc&lt;T&gt;</code> cannot be sent between threads</td>
+          <td>Type is not <code>Send</code></td>
+          <td><code>Arc</code> instead of <code>Rc</code></td>
+        </tr>
+        <tr>
+          <td><code>E0277</code></td>
+          <td><code>RefCell&lt;T&gt;</code> cannot be shared between threads</td>
+          <td>Type is not <code>Sync</code></td>
+          <td><code>Mutex</code> or <code>RwLock</code> instead of <code>RefCell</code></td>
+        </tr>
+        <tr>
+          <td><code>E0382</code></td>
+          <td>use of moved value</td>
+          <td>Moved into a closure, or sent down a channel</td>
+          <td><code>Arc::clone</code> before the loop; clone per thread</td>
+        </tr>
+        <tr>
+          <td><code>E0502</code></td>
+          <td>cannot borrow as mutable</td>
+          <td>Holding a guard longer than you meant</td>
+          <td>Scope the guard in a <code>{ }</code> block</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The single-threaded → threaded translation</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Single-threaded</th><th>Threaded</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><code>Rc&lt;T&gt;</code></td><td><code>Arc&lt;T&gt;</code></td><td>Atomic refcount</td></tr>
+        <tr><td><code>RefCell&lt;T&gt;</code></td><td><code>Mutex&lt;T&gt;</code></td><td>Blocking instead of panicking</td></tr>
+        <tr><td><code>Rc&lt;RefCell&lt;T&gt;&gt;</code></td><td><code>Arc&lt;Mutex&lt;T&gt;&gt;</code></td><td>The standard shared-mutable pair</td></tr>
+        <tr><td><code>Cell&lt;i32&gt;</code></td><td><code>AtomicI32</code></td><td>Hardware-level atomicity</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>That table is most of the practical knowledge. When single-threaded code needs to become concurrent, these are the substitutions — and the compiler will tell you which ones you missed.</p>
+</section>
+
+<!-- ============ PART 18 ============ -->
+<section id="p18">
+  <div class="part-head">
+    <span class="part-num">PART 18</span>
+    <h2>Cheat sheet</h2>
+  </div>
+
+  <h3>Spawn and join</h3>
+  <div class="code">
+<pre><code><span class="k">let</span> h = thread::<span class="fn">spawn</span>(<span class="k">move</span> || { <span class="cm">/* work */</span> <span class="nu">42</span> });
+<span class="k">let</span> v = h.<span class="fn">join</span>().<span class="fn">unwrap</span>();          <span class="cm">// Result — Err if it panicked</span>
+
+thread::<span class="fn">scope</span>(|s| {                     <span class="cm">// can borrow locals</span>
+    s.<span class="fn">spawn</span>(|| { <span class="cm">/* borrows fine */</span> });
+});                                     <span class="cm">// all joined here</span></code></pre>
+  </div>
+
+  <h3>Shared state</h3>
+  <div class="code">
+<pre><code><span class="k">let</span> c = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="nu">0</span>));
+<span class="k">let</span> c2 = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;c);            <span class="cm">// per thread, before the move</span>
+*c2.<span class="fn">lock</span>().<span class="fn">unwrap</span>() += <span class="nu">1</span>;           <span class="cm">// guard drops at end of statement</span>
+
+<span class="k">let</span> rw = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">RwLock</span>::<span class="fn">new</span>(v));
+rw.<span class="fn">read</span>().<span class="fn">unwrap</span>();                  <span class="cm">// many at once</span>
+rw.<span class="fn">write</span>().<span class="fn">unwrap</span>();                 <span class="cm">// exclusive</span>
+
+<span class="k">let</span> a = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">AtomicUsize</span>::<span class="fn">new</span>(<span class="nu">0</span>));
+a.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);   <span class="cm">// one instruction</span></code></pre>
+  </div>
+
+  <h3>Channels</h3>
+  <div class="code">
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">channel</span>();          <span class="cm">// unbounded</span>
+<span class="k">let</span> (tx, rx) = mpsc::<span class="fn">sync_channel</span>(<span class="nu">10</span>);   <span class="cm">// bounded — backpressure</span>
+<span class="k">let</span> tx2 = tx.<span class="fn">clone</span>();                    <span class="cm">// multi-producer</span>
+<span class="fn">drop</span>(tx);                                 <span class="cm">// ← or rx.iter() hangs forever</span>
+<span class="k">for</span> msg <span class="k">in</span> rx { <span class="cm">/* until all senders drop */</span> }</code></pre>
+  </div>
+
+  <h3>The four rules that prevent most bugs</h3>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td>1</td><td>Keep critical sections tiny — never do I/O holding a lock</td></tr>
+        <tr><td>2</td><td>Always take multiple locks in the same global order</td></tr>
+        <tr><td>3</td><td>Use <code>while</code>, never <code>if</code>, around <code>cv.wait()</code></td></tr>
+        <tr><td>4</td><td><code>drop(tx)</code> before draining a channel</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">What Rust does and does not give you</span>
+    <p><strong>Prevented at compile time:</strong> data races, sending non-<code>Send</code> types, use-after-free across threads, forgetting to lock.<br>
+    <strong>Still your problem:</strong> deadlock, livelock, starvation, lost updates from non-atomic operation pairs, and every logic error. Rust makes concurrency <em>memory-safe</em>, not automatically <em>correct</em>.</p>
+  </div>
+
+  <div class="foot">
+    <p><b>Practice.</b> Companion workbook: <b>rust_threads_practice.html</b> — exercises with worked solutions and a capstone.</p>
+    <p><b>Prerequisite recap.</b> Everything here rests on ownership: <code>move</code> closures, <code>Send</code>/<code>Sync</code> as trait bounds, guards that unlock via <code>Drop</code>, and channels that are safe because <code>send</code> takes ownership.</p>
+    <p><b>Next.</b> <code>async</code>/<code>await</code> for I/O-bound concurrency, or <code>rayon</code> for data parallelism. Both build directly on this.</p>
+    <p>All output verified against rustc 1.96.0, edition 2021, on a 12-core machine.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

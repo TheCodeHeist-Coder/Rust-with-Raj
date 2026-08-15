@@ -1,0 +1,1853 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Threads in Rust — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Shares the palette and identity of the Rust learning-notes series.
+   Denser register: this is a workbook, not a reference.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.progress { margin: 1.5rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill { height: 100%; width: 0%; background: var(--rust); transition: width 0.25s ease; }
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.15rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+.howto {
+  max-width: calc(var(--measure) + 10ch);
+  margin: 0 0 3.5rem; padding: 1.35rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust); border-radius: 2px;
+}
+.howto h2 {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.85rem; font-weight: 700;
+}
+.howto ol { margin: 0; padding-left: 1.3rem; font-size: 0.9688rem; }
+.howto li { margin-bottom: 0.45rem; }
+.howto li:last-child { margin-bottom: 0; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.set-head h2 {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-underline-offset: 2px; }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 3px; margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch); overflow: hidden;
+}
+.ex-head {
+  display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; gap: 0.7rem;
+  padding: 0.7rem 1rem; background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked { background: var(--oxide); border-color: var(--oxide); }
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-out { border-left-color: var(--oxide); }
+.code.is-bad { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint ----------------------------------------------------------- */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint.is-win { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.hint.is-win .hint-tag { color: var(--oxide); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong); border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line { border-bottom: 1px solid var(--rule-strong); height: 1.5rem; }
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none; padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before { content: "▸"; color: var(--rust); font-size: 0.8rem; }
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+.set-note { max-width: var(--measure); margin: 0 0 1.5rem; font-size: 0.9688rem; color: var(--ink-soft); }
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<aside class="rail">
+  <p class="rail-brand">Threads in Rust</p>
+  <p class="rail-sub">32 exercises<br>+ 6-part capstone</p>
+  <nav id="toc">
+    <div class="rail-group">Sets</div>
+    <a href="#s1"><span class="n">01</span><span>Spawning &amp; joining</span></a>
+    <a href="#s2"><span class="n">02</span><span>Arc</span></a>
+    <a href="#s3"><span class="n">03</span><span>Mutex</span></a>
+    <a href="#s4"><span class="n">04</span><span>Atomics</span></a>
+    <a href="#s5"><span class="n">05</span><span>Channels</span></a>
+    <a href="#s6"><span class="n">06</span><span>Scoped, RwLock, Condvar</span></a>
+    <a href="#s7"><span class="n">07</span><span>Putting it together</span></a>
+
+    <div class="rail-group">Final</div>
+    <a href="#cap"><span class="n">★</span><span>Capstone: job scheduler</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 0 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Practice workbook</p>
+  <h1>Threads:<br><em>32 exercises</em></h1>
+  <p class="standfirst">Concurrency bugs do not reproduce on demand — one passing run proves nothing. Run every program here several times. The exercises that look like they work are the ones worth studying hardest.</p>
+  <div class="masthead-meta">
+    <span><b>32</b> exercises + capstone</span>
+    <span><b>Guide:</b> rust_threads_guide.html</span>
+    <span><b>Concepts:</b> cs_threading_fundamentals.html</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<div class="howto">
+  <h2>How to use this workbook</h2>
+  <ol>
+    <li>Write your attempt <strong>before</strong> opening the solution.</li>
+    <li>Compile and run: <code>rustc --edition 2021 -O practice.rs &amp;&amp; ./practice</code></li>
+    <li>Run each threaded program <strong>several times</strong>. Concurrency bugs are non-deterministic — one passing run proves nothing.</li>
+    <li>When the compiler rejects you, name the trait it is complaining about. <code>Send</code>, <code>Sync</code>, and <code>'static</code> account for nearly every threading error.</li>
+  </ol>
+</div>
+
+<!-- ============ SET 1 ============ -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 01</span>
+    <h2>Spawning and joining</h2>
+  </div>
+  <p class="set-note">Getting work onto a thread and results back off it.</p>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Return a value from a thread</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Spawn a thread that sums <code>1..=100</code> and get the answer back in <code>main</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>5050</code></div>
+<pre><code>thread::<span class="fn">spawn</span>(|| (<span class="nu">1</span>..=<span class="nu">100</span><span class="ty">u64</span>).<span class="fn">sum</span>::&lt;<span class="ty">u64</span>&gt;())
+    .<span class="fn">join</span>()
+    .<span class="fn">unwrap</span>()</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why <code>unwrap</code></span>
+          <p><code>join()</code> returns <code>Result</code> because the thread might have panicked. The closure's final expression is the thread's return value — no shared variable needed.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Spawn several, collect all</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Spawn four threads computing <code>i * i</code> for <code>i</code> in <code>0..4</code>, and collect the results in order.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[0, 1, 4, 9]</code></div>
+<pre><code><span class="k">let</span> hs: <span class="ty">Vec</span>&lt;_&gt; = (<span class="nu">0</span>..<span class="nu">4</span>)
+    .<span class="fn">map</span>(|i| thread::<span class="fn">spawn</span>(<span class="k">move</span> || i * i))
+    .<span class="fn">collect</span>();                          <span class="cm">// collect FIRST</span>
+
+hs.<span class="fn">into_iter</span>().<span class="fn">map</span>(|h| h.<span class="fn">join</span>().<span class="fn">unwrap</span>()).<span class="fn">collect</span>()</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The <code>collect()</code> is essential</span>
+          <p>Without it, laziness means each thread is spawned and immediately joined — fully sequential, no parallelism at all. You must spawn <em>all</em> the threads before joining any. This is the single most common way to accidentally write serial code.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Move data into a thread</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum a local <code>Vec&lt;i32&gt;</code> inside a spawned thread. Predict the compiler error if you forget one keyword.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>6</code></div>
+<pre><code><span class="k">let</span> d = <span class="fn">vec!</span>[<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>];
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || d.<span class="fn">iter</span>().<span class="fn">sum</span>()).<span class="fn">join</span>().<span class="fn">unwrap</span>()</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Without <code>move</code>: E0373</span>
+          <p><em>"closure may outlive the current function."</em> Nothing guarantees the thread finishes before <code>main</code> returns, so borrowing a local is rejected. <code>move</code> transfers ownership and satisfies <code>'static</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.4">
+    <div class="ex-head">
+      <span class="ex-id">1.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Detect a panicked thread</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Spawn a thread that panics. Show that <code>main</code> survives, and detect the failure.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>true</code></div>
+<pre><code>thread::<span class="fn">spawn</span>(|| <span class="fn">panic!</span>(<span class="st">"x"</span>)).<span class="fn">join</span>().<span class="fn">is_err</span>()</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Silent failure</span>
+          <p>A panic in a spawned thread does not kill the process — it unwinds only that thread. If you never <code>join</code>, the failure is invisible and your program continues with work half-done. Join even when you do not need the value.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.5">
+    <div class="ex-head">
+      <span class="ex-id">1.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">How many cores?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Print the number of threads the machine can usefully run in parallel.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — <code>12</code> on the test machine</div>
+<pre><code>thread::<span class="fn">available_parallelism</span>().<span class="fn">unwrap</span>().<span class="fn">get</span>()</code></pre>
+        </div>
+        <p>The right default for sizing a CPU-bound worker pool. It respects cgroup limits, so it is correct inside containers where <code>num_cpus</code> may not be.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.6">
+    <div class="ex-head">
+      <span class="ex-id">1.6</span><span class="pill med">medium</span>
+      <span class="ex-title">Predict: what does this print?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This compiles with only a warning. Predict the output before running.</p>
+      <div class="code is-bad">
+        <div class="code-label">Compiles — but is it right?</div>
+<pre><code><span class="k">let</span> <span class="k">mut</span> counter = <span class="nu">0</span>;
+<span class="k">let</span> <span class="k">mut</span> hs = <span class="fn">vec!</span>[];
+<span class="k">for</span> _ <span class="k">in</span> <span class="nu">0</span>..<span class="nu">5</span> {
+    hs.<span class="fn">push</span>(thread::<span class="fn">spawn</span>(<span class="k">move</span> || { counter += <span class="nu">1</span>; }));
+}
+<span class="k">for</span> h <span class="k">in</span> hs { h.<span class="fn">join</span>().<span class="fn">unwrap</span>(); }
+<span class="fn">println!</span>(<span class="st">"{counter}"</span>);</code></pre>
+      </div>
+      <div class="answer-lines">
+        <p>Prints</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Prints <code>0</code></div>
+<pre><code><span class="cm">// i32 is Copy, so `move` gives each thread its OWN copy.</span>
+<span class="cm">// Five private counters each reach 1, then are discarded.</span>
+<span class="cm">// The original never changes.</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Rust does not catch this</span>
+          <p>There is no unsafety here — no sharing, no race, nothing to protect. It is a pure logic error, and Rust prevents data races, not wrong programs. The compiler does hint: <em>"did you mean to capture by reference instead?"</em> The real fix is <code>Arc&lt;Mutex&lt;i32&gt;&gt;</code> or an atomic.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 2 ============ -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 02</span>
+    <h2><code>Arc</code> — sharing ownership</h2>
+  </div>
+  <p class="set-note">Many threads, one value, no copying.</p>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Share a vector for reading</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Three threads each read the length of one shared <code>Vec</code>. No cloning of the data itself.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>15</code> (3 × 5)</div>
+<pre><code><span class="k">let</span> data = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="fn">vec!</span>[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>,<span class="nu">4</span>,<span class="nu">5</span>]);
+
+<span class="k">let</span> hs: <span class="ty">Vec</span>&lt;_&gt; = (<span class="nu">0</span>..<span class="nu">3</span>).<span class="fn">map</span>(|_| {
+    <span class="k">let</span> d = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;data);      <span class="cm">// clone the HANDLE, not the data</span>
+    thread::<span class="fn">spawn</span>(<span class="k">move</span> || d.<span class="fn">len</span>())
+}).<span class="fn">collect</span>();</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The clone-before-move idiom</span>
+          <p><code>Arc::clone</code> must happen <em>outside</em> the closure — inside, the original would already have been moved. This two-line pattern appears in every threaded Rust program.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Count the references</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Create an <code>Arc</code>, clone it once, and print the strong count. Predict the number.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>2</code></div>
+<pre><code><span class="k">let</span> a = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="nu">5</span>);
+<span class="k">let</span> _b = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;a);
+<span class="ty">Arc</span>::<span class="fn">strong_count</span>(&amp;a)      <span class="cm">// → 2</span></code></pre>
+        </div>
+        <p>The value is dropped when this reaches zero. Each <code>Arc::clone</code> is one atomic increment; each drop is one atomic decrement.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Index into shared data per thread</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>vec![10, 20, 30]</code>, spawn one thread per index that returns that element. Sum the results.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>60</code></div>
+<pre><code><span class="k">let</span> data = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="fn">vec!</span>[<span class="nu">10</span>,<span class="nu">20</span>,<span class="nu">30</span>]);
+<span class="k">let</span> hs: <span class="ty">Vec</span>&lt;_&gt; = (<span class="nu">0</span>..<span class="nu">3</span>).<span class="fn">map</span>(|i| {
+    <span class="k">let</span> d = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;data);
+    thread::<span class="fn">spawn</span>(<span class="k">move</span> || d[i])
+}).<span class="fn">collect</span>();</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why no lock is needed</span>
+          <p>Every thread only <em>reads</em>. <code>Arc&lt;T&gt;</code> hands out <code>&amp;T</code>, and many shared references are always safe — the borrowing rule from single-threaded Rust, unchanged. Locks are only for mutation.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.4">
+    <div class="ex-head">
+      <span class="ex-id">2.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Why not <code>Rc</code>?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Replace <code>Arc</code> with <code>Rc</code> in 2.1 and read the error. Name the trait and explain the underlying danger.</p>
+      <div class="answer-lines">
+        <p>Trait, and why</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">E0277: <code>Rc&lt;i32&gt;</code> cannot be sent between threads safely</div>
+<pre><code><span class="cm">// = help: the trait `Send` is not implemented for `Rc&lt;i32&gt;`</span>
+<span class="cm">// note: required by a bound in `spawn`</span>
+<span class="cm">//   F: Send + 'static</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The real danger</span>
+          <p><code>Rc</code>'s refcount is a plain integer, incremented non-atomically. Two threads cloning simultaneously hit exactly the lost-update race from the fundamentals guide — the count ends too low, the value is freed while still in use, and you have a use-after-free. <code>Arc</code> pays for an atomic counter to make this impossible.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 3 ============ -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 03</span>
+    <h2><code>Mutex</code> — shared mutation</h2>
+  </div>
+  <p class="set-note">The <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> pattern, and the ways it goes wrong.</p>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">The shared counter, done right</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Eight threads each increment a shared counter 1000 times. Fix exercise 1.6 properly. Run it several times — the answer must be identical every run.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>8000</code>, every run</div>
+<pre><code><span class="k">let</span> c = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="nu">0</span>));
+
+<span class="k">let</span> hs: <span class="ty">Vec</span>&lt;_&gt; = (<span class="nu">0</span>..<span class="nu">8</span>).<span class="fn">map</span>(|_| {
+    <span class="k">let</span> c = <span class="ty">Arc</span>::<span class="fn">clone</span>(&amp;c);
+    thread::<span class="fn">spawn</span>(<span class="k">move</span> || {
+        <span class="k">for</span> _ <span class="k">in</span> <span class="nu">0</span>..<span class="nu">1000</span> {
+            *c.<span class="fn">lock</span>().<span class="fn">unwrap</span>() += <span class="nu">1</span>;   <span class="cm">// guard drops at ';'</span>
+        }
+    })
+}).<span class="fn">collect</span>();</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Read the type aloud</span>
+          <p><code>Arc&lt;Mutex&lt;i32&gt;&gt;</code> — shared ownership of exclusive access to an integer. <code>Arc</code> outside so every thread holds a handle; <code>Mutex</code> inside because the data is what needs protecting.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Collect into a shared vector</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Five threads each push their index into one shared <code>Vec</code>. Why must you sort the result before asserting on it?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[0, 1, 2, 3, 4]</code> after sorting</div>
+<pre><code><span class="k">let</span> v = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="ty">Vec</span>::<span class="fn">new</span>()));
+<span class="cm">// each thread: v.lock().unwrap().push(i);</span>
+<span class="k">let</span> <span class="k">mut</span> out = v.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">clone</span>();
+out.<span class="fn">sort</span>();</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Order is never guaranteed</span>
+          <p>The mutex guarantees the pushes do not corrupt each other. It says nothing about which thread gets the lock first — that is the scheduler's choice and it varies per run. Never assert on the order of concurrently produced results.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Parallel word count</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Split <code>["a","b","a","c","b","a"]</code> into chunks, count words across threads into one shared <code>HashMap</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[("a", 3), ("b", 2), ("c", 1)]</code></div>
+<pre><code><span class="k">let</span> m = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="ty">HashMap</span>::<span class="fn">new</span>()));
+
+<span class="cm">// per thread, over its own chunk:</span>
+<span class="k">for</span> w <span class="k">in</span> chunk {
+    *m.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">entry</span>(w).<span class="fn">or_insert</span>(<span class="nu">0</span><span class="ty">usize</span>) += <span class="nu">1</span>;
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">A better design</span>
+          <p>This locks once per <em>word</em> — heavy contention. Faster: give each thread its own local <code>HashMap</code>, then merge the maps at the end under one lock. Map-reduce, and the general lesson is to <strong>lock once per batch, not once per item</strong>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Poison a mutex</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Panic inside a thread while holding a lock, then show the mutex is poisoned from <code>main</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>poisoned=true</code></div>
+<pre><code><span class="k">let</span> _ = thread::<span class="fn">spawn</span>(<span class="k">move</span> || {
+    <span class="k">let</span> _g = m2.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+    <span class="fn">panic!</span>(<span class="st">"poison"</span>);
+}).<span class="fn">join</span>();
+
+<span class="k">let</span> poisoned = m.<span class="fn">lock</span>().<span class="fn">is_err</span>();   <span class="cm">// bind, do not tail-return</span>
+poisoned</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">A real error I hit writing this</span>
+          <p>Writing <code>m.lock().is_err()</code> as the function's tail expression gives <strong>E0597: <code>m</code> does not live long enough</strong> — the temporary guard outlives <code>m</code> at the end of scope. Bind the boolean to a variable first. Temporary lifetimes in tail position are a genuine trap.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.5">
+    <div class="ex-head">
+      <span class="ex-id">3.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">Find the accidental serialisation</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This worker pool compiles and produces correct results, but runs no faster than one thread. Why?</p>
+      <div class="code is-bad">
+        <div class="code-label">Correct, but serial</div>
+<pre><code>thread::<span class="fn">spawn</span>(<span class="k">move</span> || <span class="k">loop</span> {
+    <span class="k">let</span> guard = rx.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+    <span class="k">match</span> guard.<span class="fn">recv</span>() {
+        <span class="ty">Ok</span>(job) =&gt; <span class="fn">expensive_work</span>(job),   <span class="cm">// still holding the lock!</span>
+        <span class="ty">Err</span>(_) =&gt; <span class="k">break</span>,
+    }
+})</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">The fix: drop the guard before working</div>
+<pre><code>thread::<span class="fn">spawn</span>(<span class="k">move</span> || <span class="k">loop</span> {
+    <span class="k">let</span> job = { rx.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">recv</span>() };   <span class="cm">// ← braces!</span>
+    <span class="k">match</span> job {
+        <span class="ty">Ok</span>(job) =&gt; <span class="fn">expensive_work</span>(job),        <span class="cm">// lock released</span>
+        <span class="ty">Err</span>(_) =&gt; <span class="k">break</span>,
+    }
+})</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Critical sections again</span>
+          <p><code>guard</code> lives until the end of the loop body, so each worker holds the lock while doing its work — the others queue behind it. The braces confine the guard to just the <code>recv()</code>. This is Amdahl's law in miniature: your serial fraction was accidentally 100%, and nothing warns you.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 4 ============ -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 04</span>
+    <h2>Atomics</h2>
+  </div>
+  <p class="set-note">Lock-free counters, and the trap that catches everyone.</p>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">An atomic counter</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Redo the 8×1000 counter with <code>AtomicUsize</code> instead of a mutex.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>8000</code></div>
+<pre><code><span class="k">let</span> a = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">AtomicUsize</span>::<span class="fn">new</span>(<span class="nu">0</span>));
+<span class="cm">// per thread:</span>
+a.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+<span class="cm">// read:</span>
+a.<span class="fn">load</span>(<span class="ty">Ordering</span>::<span class="ty">SeqCst</span>)</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Note the <code>&amp;self</code></span>
+          <p><code>fetch_add</code> mutates through a <em>shared</em> reference. Atomics provide interior mutability, safely, because the hardware guarantees indivisibility. No <code>&amp;mut</code>, no lock, no blocking.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">Reproduce a lost update</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Using only safe Rust, write two versions of a 4×50,000 counter: one with a separate <code>load</code> then <code>store</code>, one with <code>fetch_add</code>. Run several times.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Verified — expected 200000</div>
+<pre><code><span class="cm">// RACY: two separate atomic operations</span>
+<span class="k">let</span> v = a.<span class="fn">load</span>(<span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+a.<span class="fn">store</span>(v + <span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+<span class="cm">// → racy=162176  (lost 37824)</span>
+
+<span class="cm">// CORRECT: one atomic read-modify-write</span>
+b.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+<span class="cm">// → atomic=200000</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Two atomic operations ≠ one atomic operation</span>
+          <p>There is a window between the load and the store where another thread can intervene — the classic lost update. <strong>Rust cannot catch this</strong>: both versions are safe code with no data race. It is a logic error.</p>
+          <p>Run it repeatedly and you get a different number every time — one earlier run of this same program gave <code>136210</code> out of 400,000. That non-reproducibility is exactly what makes race bugs so expensive to find.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span><span class="pill med">medium</span>
+      <span class="ex-title">A shutdown flag</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Use an <code>AtomicBool</code> to signal from one thread to another. Which orderings pair up?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>true</code></div>
+<pre><code><span class="k">let</span> flag = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">AtomicBool</span>::<span class="fn">new</span>(<span class="k">false</span>));
+
+<span class="cm">// signaller:</span>
+f.<span class="fn">store</span>(<span class="k">true</span>, <span class="ty">Ordering</span>::<span class="ty">Release</span>);
+
+<span class="cm">// observer:</span>
+flag.<span class="fn">load</span>(<span class="ty">Ordering</span>::<span class="ty">Acquire</span>)</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Release/Acquire pair</span>
+          <p><code>Release</code> on the write, <code>Acquire</code> on the read. Together they create a happens-before edge: everything the signaller did <em>before</em> the store is visible to any thread that observes it via the load. This is how you publish data safely without a lock.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Mutex or atomic?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>No code — decide. For each, write <code>Atomic</code>, <code>Mutex</code>, or <code>RwLock</code>:</p>
+      <div class="answer-lines">
+        <p>a) a request counter</p>
+        <div class="line"></div>
+        <p>b) a shared <code>HashMap</code> cache, read constantly, written rarely</p>
+        <div class="line"></div>
+        <p>c) a <code>Vec</code> that threads push to</p>
+        <div class="line"></div>
+        <p>d) a "should we stop?" flag</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answers</div>
+<pre><code><span class="cm">// a) Atomic  — one integer, fetch_add</span>
+<span class="cm">// b) RwLock  — reads dominate heavily</span>
+<span class="cm">// c) Mutex   — a whole data structure, writes are the point</span>
+<span class="cm">// d) Atomic  — one bool, AtomicBool</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The rule</span>
+          <p>One machine-word value → atomic. A data structure → mutex. A data structure read far more than written → rwlock. If a single atomic can express it, it will be faster than any lock.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 5 ============ -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 05</span>
+    <h2>Channels</h2>
+  </div>
+  <p class="set-note">Message passing — sharing memory by communicating.</p>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Many producers, one consumer</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Four threads each send <code>i*i</code>. Collect everything in <code>main</code>. There is one line beginners always forget.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[0, 1, 4, 9]</code></div>
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">channel</span>();
+<span class="k">for</span> i <span class="k">in</span> <span class="nu">0</span>..<span class="nu">4</span> {
+    <span class="k">let</span> tx = tx.<span class="fn">clone</span>();
+    thread::<span class="fn">spawn</span>(<span class="k">move</span> || tx.<span class="fn">send</span>(i*i).<span class="fn">unwrap</span>());
+}
+<span class="fn">drop</span>(tx);                         <span class="cm">// ← THE forgotten line</span>
+<span class="k">let</span> <span class="k">mut</span> v: <span class="ty">Vec</span>&lt;<span class="ty">i32</span>&gt; = rx.<span class="fn">iter</span>().<span class="fn">collect</span>();</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Without <code>drop(tx)</code> it hangs forever</span>
+          <p><code>rx.iter()</code> ends only when <em>every</em> sender is dropped. The original <code>tx</code> is still alive in <code>main</code>, so the receiver waits for a message that will never come. No error, no panic — just a hung program.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Producer and consumer threads</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>One thread produces <code>1..=5</code>, a second consumes and sums them. <code>main</code> waits for both.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>15</code></div>
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">channel</span>();
+<span class="k">let</span> p = thread::<span class="fn">spawn</span>(<span class="k">move</span> || { <span class="k">for</span> i <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">5</span> { tx.<span class="fn">send</span>(i).<span class="fn">unwrap</span>(); } });
+<span class="k">let</span> c = thread::<span class="fn">spawn</span>(<span class="k">move</span> || rx.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;());
+p.<span class="fn">join</span>().<span class="fn">unwrap</span>();
+c.<span class="fn">join</span>().<span class="fn">unwrap</span>()</code></pre>
+        </div>
+        <p>No <code>drop(tx)</code> needed here — <code>tx</code> was moved into the producer thread and dies when that closure ends.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Backpressure with a bounded channel</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Use a channel with capacity 2 and send 4 items. What happens to the producer on the third send?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[1, 2, 3, 4]</code></div>
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">sync_channel</span>::&lt;<span class="ty">u32</span>&gt;(<span class="nu">2</span>);
+<span class="cm">// send() BLOCKS when the buffer is full,</span>
+<span class="cm">// resuming when the consumer takes one.</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why bounded is usually right</span>
+          <p>An unbounded channel lets a fast producer queue millions of items and exhaust memory. A bounded one applies <strong>backpressure</strong> — the producer is forced to slow to the consumer's pace. For any long-running system, prefer <code>sync_channel</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">A two-stage pipeline</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Chain two channels: stage 1 emits <code>1..=4</code>, stage 2 multiplies by 10, <code>main</code> collects.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[10, 20, 30, 40]</code></div>
+<pre><code><span class="k">let</span> (tx1, rx1) = mpsc::<span class="fn">channel</span>::&lt;<span class="ty">u32</span>&gt;();
+<span class="k">let</span> (tx2, rx2) = mpsc::<span class="fn">channel</span>::&lt;<span class="ty">u32</span>&gt;();
+
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || { <span class="k">for</span> i <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">4</span> { tx1.<span class="fn">send</span>(i).<span class="fn">unwrap</span>(); } });
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || { <span class="k">for</span> v <span class="k">in</span> rx1 { tx2.<span class="fn">send</span>(v*<span class="nu">10</span>).<span class="fn">unwrap</span>(); } });
+
+<span class="k">let</span> v: <span class="ty">Vec</span>&lt;<span class="ty">u32</span>&gt; = rx2.<span class="fn">iter</span>().<span class="fn">collect</span>();</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Shutdown cascades for free</span>
+          <p>When stage 1 finishes, <code>tx1</code> drops, so <code>for v in rx1</code> ends, so <code>tx2</code> drops, so <code>main</code>'s loop ends. Each stage closes the next automatically — ownership doing your shutdown logic with no flags or sentinels.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.5">
+    <div class="ex-head">
+      <span class="ex-id">5.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Why is <code>send</code> safe?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>No code. Explain why sending a <code>Vec</code> down a channel and then using it in the sender cannot compile — and which error you get.</p>
+      <div class="answer-lines">
+        <p>Error, and the reason</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">E0382: use of moved value</div>
+<pre><code>tx.<span class="fn">send</span>(data).<span class="fn">unwrap</span>();
+<span class="fn">println!</span>(<span class="st">"{data:?}"</span>);   <span class="cm">// error: value used after move</span></code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Ownership doing concurrency work</span>
+          <p><code>send</code> takes the value <strong>by value</strong>. Once sent, the receiver owns it and the sender provably cannot touch it — so there is no shared mutable state and nothing to race on. In C++ you would send a pointer and hope nobody modifies the original. Here it is a compile error, using the same move rule from the ownership guide.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 6 ============ -->
+<section id="s6">
+  <div class="set-head">
+    <span class="set-num">SET 06</span>
+    <h2>Scoped threads, RwLock, Condvar</h2>
+  </div>
+  <p class="set-note">Borrowing across threads, read-heavy sharing, and waiting properly.</p>
+
+  <article class="ex" data-ex="6.1">
+    <div class="ex-head">
+      <span class="ex-id">6.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">Borrow a local from two threads</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum <code>vec![1,2,3,4]</code> using two threads that <em>borrow</em> it — no <code>Arc</code>, no <code>move</code>, no clone.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>10</code></div>
+<pre><code><span class="k">let</span> local = <span class="fn">vec!</span>[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>,<span class="nu">4</span>];
+
+thread::<span class="fn">scope</span>(|s| {
+    <span class="k">let</span> a = s.<span class="fn">spawn</span>(|| local[<span class="nu">0</span>]+local[<span class="nu">1</span>]);
+    <span class="k">let</span> b = s.<span class="fn">spawn</span>(|| local[<span class="nu">2</span>]+local[<span class="nu">3</span>]);
+    a.<span class="fn">join</span>().<span class="fn">unwrap</span>() + b.<span class="fn">join</span>().<span class="fn">unwrap</span>()
+})</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Why the borrow is allowed</span>
+          <p><code>scope</code> guarantees every thread is joined before it returns, so the borrows cannot outlive <code>local</code>. That removes the <code>'static</code> requirement entirely. For short-lived parallelism inside one function, this is simpler and cheaper than <code>Arc</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.2">
+    <div class="ex-head">
+      <span class="ex-id">6.2</span><span class="pill med">medium</span>
+      <span class="ex-title">Split a slice and sum in parallel</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum <code>1..=8</code> by splitting the slice in half and summing each half on its own thread.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>36</code></div>
+<pre><code><span class="k">let</span> mid = data.<span class="fn">len</span>()/<span class="nu">2</span>;
+thread::<span class="fn">scope</span>(|s| {
+    <span class="k">let</span> (l, r) = data.<span class="fn">split_at</span>(mid);
+    <span class="k">let</span> a = s.<span class="fn">spawn</span>(<span class="k">move</span> || l.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;());
+    <span class="k">let</span> b = s.<span class="fn">spawn</span>(<span class="k">move</span> || r.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">i32</span>&gt;());
+    a.<span class="fn">join</span>().<span class="fn">unwrap</span>() + b.<span class="fn">join</span>().<span class="fn">unwrap</span>()
+})</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Disjoint borrows, again</span>
+          <p><code>split_at</code> proves the halves do not overlap — the same reasoning as <code>split_at_mut</code> in the ownership guide. Here <code>move</code> moves the <em>slice references</em>, which are <code>Copy</code>, not the data.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.3">
+    <div class="ex-head">
+      <span class="ex-id">6.3</span><span class="pill easy">easy</span>
+      <span class="ex-title">Four concurrent readers</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Four threads read a shared <code>Vec</code> through an <code>RwLock</code> simultaneously.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[3, 3, 3, 3]</code></div>
+<pre><code><span class="k">let</span> rw = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">RwLock</span>::<span class="fn">new</span>(<span class="fn">vec!</span>[<span class="nu">1</span>,<span class="nu">2</span>,<span class="nu">3</span>]));
+<span class="cm">// per thread:</span>
+rw.<span class="fn">read</span>().<span class="fn">unwrap</span>().<span class="fn">len</span>()      <span class="cm">// concurrent</span>
+<span class="cm">// to write:</span>
+rw.<span class="fn">write</span>().<span class="fn">unwrap</span>().<span class="fn">push</span>(<span class="nu">4</span>);   <span class="cm">// exclusive</span></code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Not automatically faster</span>
+          <p><code>RwLock</code> does more bookkeeping than <code>Mutex</code>. It only wins when reads heavily dominate and critical sections are non-trivial. A steady stream of readers can also starve a waiting writer. Measure before switching.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="6.4">
+    <div class="ex-head">
+      <span class="ex-id">6.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Wait for a signal</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Block until another thread sets a flag, using <code>Condvar</code> — no spinning, no sleeping.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>true</code></div>
+<pre><code><span class="k">let</span> pair = <span class="ty">Arc</span>::<span class="fn">new</span>((<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="k">false</span>), <span class="ty">Condvar</span>::<span class="fn">new</span>()));
+
+<span class="cm">// waiter</span>
+<span class="k">let</span> (l, c) = &amp;*pair;
+<span class="k">let</span> <span class="k">mut</span> g = l.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">while</span> !*g { g = c.<span class="fn">wait</span>(g).<span class="fn">unwrap</span>(); }   <span class="cm">// while, NOT if</span>
+
+<span class="cm">// signaller</span>
+*l.<span class="fn">lock</span>().<span class="fn">unwrap</span>() = <span class="k">true</span>;
+c.<span class="fn">notify_one</span>();</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Why <code>while</code></span>
+          <p>Spurious wakeups are real — <code>wait</code> may return with no notification at all. And another thread may consume the condition before you re-acquire the lock. Re-checking in a loop is the only correct form, in every language.</p>
+          <p>Notice <code>wait</code> consumes the guard and returns a new one. That is Rust encoding "the lock is released while waiting" directly in the type system.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 7 ============ -->
+<section id="s7">
+  <div class="set-head">
+    <span class="set-num">SET 07</span>
+    <h2>Putting it together</h2>
+  </div>
+  <p class="set-note">The patterns you will actually reach for.</p>
+
+  <article class="ex" data-ex="7.1">
+    <div class="ex-head">
+      <span class="ex-id">7.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">A worker pool</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Three workers share one job queue, square each number <code>1..=6</code>, and collect results. Workers must exit cleanly when the work runs out.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[1, 4, 9, 16, 25, 36]</code></div>
+<pre><code><span class="k">let</span> (tx, rx) = mpsc::<span class="fn">channel</span>::&lt;<span class="ty">u32</span>&gt;();
+<span class="k">let</span> rx = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(rx));      <span class="cm">// share the consumer</span>
+<span class="k">let</span> out = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(<span class="ty">Vec</span>::<span class="fn">new</span>()));
+
+<span class="cm">// each worker:</span>
+thread::<span class="fn">spawn</span>(<span class="k">move</span> || <span class="k">loop</span> {
+    <span class="k">let</span> job = { rx.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">recv</span>() };   <span class="cm">// braces matter</span>
+    <span class="k">match</span> job {
+        <span class="ty">Ok</span>(n) =&gt; out.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">push</span>(n*n),
+        <span class="ty">Err</span>(_) =&gt; <span class="k">break</span>,                     <span class="cm">// channel closed</span>
+    }
+});
+
+<span class="k">for</span> i <span class="k">in</span> <span class="nu">1</span>..=<span class="nu">6</span> { tx.<span class="fn">send</span>(i).<span class="fn">unwrap</span>(); }
+<span class="fn">drop</span>(tx);                                   <span class="cm">// triggers shutdown</span></code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Shutdown by ownership</span>
+          <p>Dropping <code>tx</code> closes the channel, <code>recv()</code> returns <code>Err</code>, every worker breaks. No sentinel values, no shutdown flag, no timeout — the type system handles it.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.2">
+    <div class="ex-head">
+      <span class="ex-id">7.2</span><span class="pill med">medium</span>
+      <span class="ex-title">Parallel map over chunks</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Sum <code>1..=8</code> by giving each chunk of 2 to its own scoped thread, then summing the partial results.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>36</code></div>
+<pre><code><span class="k">let</span> sums: <span class="ty">Vec</span>&lt;<span class="ty">u64</span>&gt; = thread::<span class="fn">scope</span>(|s| {
+    data.<span class="fn">chunks</span>(<span class="nu">2</span>)
+        .<span class="fn">map</span>(|c| s.<span class="fn">spawn</span>(<span class="k">move</span> || c.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">u64</span>&gt;()))
+        .<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()          <span class="cm">// spawn ALL first</span>
+        .<span class="fn">into_iter</span>()
+        .<span class="fn">map</span>(|h| h.<span class="fn">join</span>().<span class="fn">unwrap</span>())
+        .<span class="fn">collect</span>()
+});
+sums.<span class="fn">iter</span>().<span class="fn">sum</span>::&lt;<span class="ty">u64</span>&gt;()</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The <code>collect</code> in the middle</span>
+          <p>Same trap as 1.2. Without it, iterator laziness spawns and joins each thread one at a time — perfectly correct, entirely sequential. In production, <code>rayon</code>'s <code>par_iter()</code> does all of this for you.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.3">
+    <div class="ex-head">
+      <span class="ex-id">7.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">Write a deadlock, then fix it</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Two mutexes, two threads, opposite lock orders. Write it, confirm it hangs, then fix it two different ways.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-bad">
+          <div class="code-label">Hangs forever</div>
+<pre><code><span class="cm">// thread 1</span>
+<span class="k">let</span> _a = a.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">let</span> _b = b.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="cm">// thread 2</span>
+<span class="k">let</span> _b = b.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">let</span> _a = a.<span class="fn">lock</span>().<span class="fn">unwrap</span>();   <span class="cm">// circular wait</span></code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Fix 1 — global lock ordering (preferred)</div>
+<pre><code><span class="cm">// BOTH threads take A before B, always.</span>
+<span class="k">let</span> _a = a.<span class="fn">lock</span>().<span class="fn">unwrap</span>();
+<span class="k">let</span> _b = b.<span class="fn">lock</span>().<span class="fn">unwrap</span>();</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Fix 2 — <code>try_lock</code>, verified output</div>
+<pre><code><span class="k">match</span> b.<span class="fn">try_lock</span>() {
+    <span class="ty">Ok</span>(_) =&gt; <span class="fn">println!</span>(<span class="st">"got both"</span>),
+    <span class="ty">Err</span>(_) =&gt; <span class="fn">println!</span>(<span class="st">"could NOT get B — backing off"</span>),
+}
+<span class="cm">// t1: could NOT get B (would deadlock with lock())</span>
+<span class="cm">// t2: got both</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Rust does not save you here</span>
+          <p>Deadlock is not a memory-safety violation, so the borrow checker has nothing to say about it. All four Coffman conditions remain available. Global lock ordering breaks circular wait and is the fix you should reach for; <code>try_lock</code> breaks no-preemption but needs a back-off strategy.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="7.4">
+    <div class="ex-head">
+      <span class="ex-id">7.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Choose the primitive</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>No code — decide. Name the tool for each:</p>
+      <div class="answer-lines">
+        <p>a) parallelise a sum over a local <code>Vec</code></p>
+        <div class="line"></div>
+        <p>b) 10,000 concurrent HTTP requests</p>
+        <div class="line"></div>
+        <p>c) a background logger receiving messages</p>
+        <div class="line"></div>
+        <p>d) config read by every thread, never written</p>
+        <div class="line"></div>
+        <p>e) a progress counter across workers</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answers</div>
+<pre><code><span class="cm">// a) thread::scope       — local data, short-lived threads</span>
+<span class="cm">// b) async, not threads  — I/O-bound, far too many for OS threads</span>
+<span class="cm">// c) a channel           — one consumer, many producers</span>
+<span class="cm">// d) Arc&lt;T&gt;              — read-only, no lock needed at all</span>
+<span class="cm">// e) Arc&lt;AtomicUsize&gt;    — a single integer</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Note (d)</span>
+          <p>Read-only shared data needs <code>Arc</code> alone — no <code>Mutex</code>. Wrapping immutable config in a lock is a common reflex that costs performance and buys nothing.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ CAPSTONE ============ -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone: a concurrent job scheduler</h2>
+  </div>
+  <p class="set-note">A download manager: a shared job queue, a worker pool, atomic statistics, and a results channel. Build it one part at a time.</p>
+
+  <div class="code">
+    <div class="code-label">Given</div>
+<pre><code><span class="at">#[derive(Debug, Clone)]</span>
+<span class="k">struct</span> <span class="ty">Job</span> { id: <span class="ty">u32</span>, url: <span class="ty">String</span>, size_kb: <span class="ty">u32</span> }
+
+<span class="at">#[derive(Debug)]</span>
+<span class="k">enum</span> <span class="ty">Outcome</span> {
+    <span class="ty">Done</span>   { id: <span class="ty">u32</span>, worker: <span class="ty">usize</span>, kb: <span class="ty">u32</span> },
+    <span class="ty">Failed</span> { id: <span class="ty">u32</span>, why: <span class="ty">String</span> },
+}
+
+<span class="k">struct</span> <span class="ty">Stats</span> {
+    completed: <span class="ty">AtomicUsize</span>,
+    failed:    <span class="ty">AtomicUsize</span>,
+    bytes_kb:  <span class="ty">AtomicUsize</span>,
+}
+
+<span class="cm">// 12 jobs; every job whose id is divisible by 5 fails.</span></code></pre>
+  </div>
+
+  <article class="ex" data-ex="cap.1">
+    <div class="ex-head">
+      <span class="ex-id">C.1</span><span class="pill med">medium</span>
+      <span class="ex-title">Shared statistics</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make <code>Stats</code> shareable across workers. Why atomics rather than <code>Mutex&lt;Stats&gt;</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> stats = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Stats</span> {
+    completed: <span class="ty">AtomicUsize</span>::<span class="fn">new</span>(<span class="nu">0</span>),
+    failed:    <span class="ty">AtomicUsize</span>::<span class="fn">new</span>(<span class="nu">0</span>),
+    bytes_kb:  <span class="ty">AtomicUsize</span>::<span class="fn">new</span>(<span class="nu">0</span>),
+});
+<span class="cm">// no Mutex anywhere — each field updates independently</span>
+stats.completed.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why atomics win here</span>
+          <p>Each counter is independent — no invariant links them, so no thread ever needs a consistent snapshot of all three at once. <code>Mutex&lt;Stats&gt;</code> would serialise every update for no benefit. <code>Relaxed</code> is right because we only care about the final totals.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.2">
+    <div class="ex-head">
+      <span class="ex-id">C.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">The shared job queue</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Make one <code>Receiver</code> usable by four workers. Note the type you need and why.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="k">let</span> (job_tx, job_rx) = mpsc::<span class="fn">channel</span>::&lt;<span class="ty">Job</span>&gt;();
+<span class="k">let</span> job_rx = <span class="ty">Arc</span>::<span class="fn">new</span>(<span class="ty">Mutex</span>::<span class="fn">new</span>(job_rx));</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why the <code>Mutex</code> is required</span>
+          <p><code>mpsc</code> is <em>multi-producer, single-consumer</em> — the <code>Receiver</code> cannot be cloned. To let several workers pull from it, they must share one receiver under a lock. (Crates like <code>crossbeam-channel</code> provide true MPMC channels and skip this.)</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.3">
+    <div class="ex-head">
+      <span class="ex-id">C.3</span><span class="pill hard">hard</span>
+      <span class="ex-title">The worker loop</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write the worker: take a job, do the work, report the outcome, update stats. The lock must be held for as little as possible.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code>thread::<span class="fn">spawn</span>(<span class="k">move</span> || <span class="k">loop</span> {
+    <span class="cm">// Lock ONLY to take a job — guard drops at the ';'</span>
+    <span class="k">let</span> job = { job_rx.<span class="fn">lock</span>().<span class="fn">unwrap</span>().<span class="fn">recv</span>() };
+    <span class="k">let</span> job = <span class="k">match</span> job { <span class="ty">Ok</span>(j) =&gt; j, <span class="ty">Err</span>(_) =&gt; <span class="k">break</span> };
+
+    thread::<span class="fn">sleep</span>(<span class="ty">Duration</span>::<span class="fn">from_millis</span>(<span class="nu">2</span>));   <span class="cm">// the "download"</span>
+
+    <span class="k">if</span> job.id % <span class="nu">5</span> == <span class="nu">0</span> {
+        stats.failed.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+        res_tx.<span class="fn">send</span>(<span class="ty">Outcome</span>::<span class="ty">Failed</span> { id: job.id, why: <span class="st">"timeout"</span>.<span class="fn">into</span>() }).<span class="fn">unwrap</span>();
+    } <span class="k">else</span> {
+        stats.completed.<span class="fn">fetch_add</span>(<span class="nu">1</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+        stats.bytes_kb.<span class="fn">fetch_add</span>(job.size_kb <span class="k">as</span> <span class="ty">usize</span>, <span class="ty">Ordering</span>::<span class="ty">Relaxed</span>);
+        res_tx.<span class="fn">send</span>(<span class="ty">Outcome</span>::<span class="ty">Done</span> { id: job.id, worker: wid, kb: job.size_kb }).<span class="fn">unwrap</span>();
+    }
+})</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The whole point of the exercise</span>
+          <p>The <code>sleep</code> is outside the lock. Move it inside and your four workers become one — correct results, zero parallelism, no warning. That is exercise 3.5 in a realistic setting.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.4">
+    <div class="ex-head">
+      <span class="ex-id">C.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Shutting down cleanly</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Two <code>drop</code> calls are needed for this program to terminate. Identify both and say what each one releases.</p>
+      <div class="answer-lines">
+        <p>Which two, and why</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer</div>
+<pre><code><span class="fn">drop</span>(res_tx);   <span class="cm">// main's results sender — else the collector loop</span>
+                <span class="cm">// never ends, because main still holds a sender</span>
+
+<span class="k">for</span> j <span class="k">in</span> jobs { job_tx.<span class="fn">send</span>(j).<span class="fn">unwrap</span>(); }
+<span class="fn">drop</span>(job_tx);   <span class="cm">// closes the queue — workers' recv() returns Err,</span>
+                <span class="cm">// so every worker breaks out of its loop</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Two independent shutdown chains</span>
+          <p><code>drop(job_tx)</code> stops the workers. Each worker then drops its own <code>res_tx</code> clone as it exits; once all of them plus main's copy are gone, the results loop ends. Miss either <code>drop</code> and the program hangs with no error at all.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.5">
+    <div class="ex-head">
+      <span class="ex-id">C.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Collect the results</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Drain the results channel, separating successes from failures and tallying jobs per worker.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified output</div>
+<pre><code><span class="k">for</span> outcome <span class="k">in</span> res_rx {
+    <span class="k">match</span> outcome {
+        <span class="ty">Outcome</span>::<span class="ty">Done</span> { id, worker, .. } =&gt; {
+            done.<span class="fn">push</span>(id);
+            *per_worker.<span class="fn">entry</span>(worker).<span class="fn">or_insert</span>(<span class="nu">0</span>) += <span class="nu">1</span>;
+        }
+        <span class="ty">Outcome</span>::<span class="ty">Failed</span> { id, .. } =&gt; failed.<span class="fn">push</span>(id),
+    }
+}</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified — identical across runs</div>
+<pre><code>1. completed   = 10
+2. failed      = 2
+3. total kb    = 6300
+4. done ids    = [1, 2, 3, 4, 6, 7, 8, 9, 11, 12]
+5. failed ids  = [5, 10]
+6. all 12 accounted for = true</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">No lock needed here</span>
+          <p><code>main</code> is the sole consumer, so <code>done</code>, <code>failed</code>, and <code>per_worker</code> are ordinary local variables. Collecting results on one thread avoids sharing entirely — the cheapest synchronisation is none.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.6">
+    <div class="ex-head">
+      <span class="ex-id">C.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">What is deterministic, and what is not?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Run the finished program several times. Which outputs are identical every run, and which vary? Explain.</p>
+      <div class="answer-lines">
+        <p>Stable</p>
+        <div class="line"></div>
+        <p>Varies</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Verified across repeated runs</div>
+<pre><code><span class="cm">// STABLE — every run:</span>
+completed = 10, failed = 2, total kb = 6300
+done ids  = [1,2,3,4,6,7,8,9,11,12]     <span class="cm">// after sorting</span>
+all 12 accounted for = true
+
+<span class="cm">// VARIES between runs:</span>
+which worker handled which job
+the order results arrive in the channel</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The property you want</span>
+          <p>A correct concurrent program is <strong>deterministic in its aggregates and non-deterministic in its scheduling</strong>. The totals are guaranteed because atomics make each update indivisible; the assignment of work is the scheduler's business and must never be asserted on.</p>
+          <p>If a total ever varies between runs, you have a race — go back and find it.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p><b>All 32 exercises and the 6-part capstone were compiled and run</b> on rustc 1.96.0, edition 2021, on a 12-core machine. Every output shown is real program output.</p>
+    <p><b>Guides:</b> <b>cs_threading_fundamentals.html</b> for the concepts, <b>rust_threads_guide.html</b> for the Rust.</p>
+    <p><b>Next.</b> <code>async</code>/<code>await</code> for I/O-bound concurrency, or <code>rayon</code> for data parallelism.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var TKEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(TKEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = currentIsDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(TKEY, next); } catch (e) {}
+    syncBtn();
+  });
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-threads-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>
