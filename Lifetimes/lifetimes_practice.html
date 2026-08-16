@@ -1,0 +1,1561 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lifetimes in Rust — Practice Workbook</title>
+<style>
+/* ==========================================================================
+   Shares the palette and identity of the Rust learning-notes series.
+   Denser register: this is a workbook, not a reference.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --gold:        #8A6A1F;
+  --gold-wash:   #F8F1DF;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+
+    --gold:        #D8B65E;
+    --gold-wash:   #241D0F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+
+  --gold:        #D8B65E;
+  --gold-wash:   #241D0F;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.5rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 2.4rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.progress { margin: 1.5rem 0 0; padding-top: 1.1rem; border-top: 1px solid var(--rule); }
+.progress-label {
+  font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-faint); margin: 0 0 0.5rem;
+}
+.progress-bar {
+  height: 4px; background: var(--surface-alt);
+  border-radius: 2px; overflow: hidden; border: 1px solid var(--rule);
+}
+.progress-fill { height: 100%; width: 0%; background: var(--rust); transition: width 0.25s ease; }
+.progress-count {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0.45rem 0 0; font-variant-numeric: tabular-nums;
+}
+.progress-reset {
+  margin-top: 0.6rem; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  background: none; border: 1px solid var(--rule-strong);
+  color: var(--ink-faint); padding: 0.25rem 0.5rem;
+  border-radius: 3px; cursor: pointer; width: 100%;
+}
+.progress-reset:hover { color: var(--rust); border-color: var(--rust); }
+.progress-reset:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.15rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+.howto {
+  max-width: calc(var(--measure) + 10ch);
+  margin: 0 0 3.5rem; padding: 1.35rem 1.5rem;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust); border-radius: 2px;
+}
+.howto h2 {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.85rem; font-weight: 700;
+}
+.howto ol { margin: 0; padding-left: 1.3rem; font-size: 0.9688rem; }
+.howto li { margin-bottom: 0.45rem; }
+.howto li:last-child { margin-bottom: 0; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 4.5rem; scroll-margin-top: 1.5rem; }
+
+.set-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.5rem;
+}
+.set-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.set-head h2 {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1rem; }
+ul, ol { margin: 0 0 1.1rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.4rem; }
+li::marker { color: var(--rust); }
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-underline-offset: 2px; }
+
+/* ---- Exercise card -------------------------------------------------- */
+
+.ex {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 3px; margin: 0 0 1.25rem;
+  max-width: calc(var(--measure) + 10ch); overflow: hidden;
+}
+.ex-head {
+  display: grid; grid-template-columns: auto auto 1fr auto;
+  align-items: center; gap: 0.7rem;
+  padding: 0.7rem 1rem; background: var(--surface-alt);
+  border-bottom: 1px solid var(--rule);
+}
+.ex-id {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  color: var(--rust); font-variant-numeric: tabular-nums;
+}
+.pill {
+  font-family: var(--mono); font-size: 0.5938rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 0.15rem 0.42rem; border-radius: 2px; border: 1px solid;
+}
+.pill.easy { color: var(--oxide); border-color: var(--oxide); background: var(--oxide-wash); }
+.pill.med  { color: var(--gold);  border-color: var(--gold);  background: var(--gold-wash); }
+.pill.hard { color: var(--ember); border-color: var(--ember); background: var(--ember-wash); }
+.ex-title {
+  font-family: var(--serif); font-size: 1rem; font-weight: 700;
+  line-height: 1.3; min-width: 0;
+}
+
+.ex-done {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-faint); cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ex-done input {
+  appearance: none; -webkit-appearance: none;
+  width: 0.95rem; height: 0.95rem; margin: 0;
+  border: 1px solid var(--rule-strong); border-radius: 2px;
+  background: var(--surface); cursor: pointer; position: relative;
+}
+.ex-done input:checked { background: var(--oxide); border-color: var(--oxide); }
+.ex-done input:checked::after {
+  content: "✓"; position: absolute; inset: 0;
+  display: grid; place-items: center; color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.ex-done input:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+
+.ex.is-done { opacity: 0.62; }
+.ex.is-done .ex-head { background: var(--oxide-wash); }
+.ex.is-done .ex-title { text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+.ex-body { padding: 1rem 1.1rem 1.1rem; }
+.ex-body > :last-child { margin-bottom: 0; }
+.ex-body p { font-size: 0.9688rem; }
+
+.task {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 1.1rem 0 0.45rem;
+}
+.task:first-child { margin-top: 0; }
+
+/* ---- Code ----------------------------------------------------------- */
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+.ex-body code { background: var(--ground); }
+
+.code {
+  margin: 0.9rem 0; background: var(--ground);
+  border: 1px solid var(--rule); border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.42rem 0.9rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 0.9rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.7813rem; line-height: 1.6;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-out { border-left-color: var(--oxide); }
+.code.is-bad { border-left-color: var(--ember); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); }
+.td { color: var(--ember); font-weight: 700; }
+
+/* ---- Hint ----------------------------------------------------------- */
+
+.hint {
+  margin: 0.9rem 0; padding: 0.75rem 0.95rem;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  border-radius: 2px; font-size: 0.9063rem; line-height: 1.55;
+}
+.hint > :last-child { margin-bottom: 0; }
+.hint-tag {
+  display: block; font-family: var(--mono); font-size: 0.625rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.35rem;
+}
+.hint.is-why { border-left-color: var(--rust); background: var(--rust-wash); }
+.hint.is-why .hint-tag { color: var(--rust); }
+.hint.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.hint.is-trap .hint-tag { color: var(--ember); }
+.hint.is-win { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.hint.is-win .hint-tag { color: var(--oxide); }
+.hint code { background: var(--surface); }
+
+.errblock {
+  margin: 0.9rem 0; background: var(--ember-wash);
+  border: 1px solid var(--rule); border-left: 3px solid var(--ember);
+  border-radius: 2px; padding: 0.8rem 0.95rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.55; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+.answer-lines {
+  margin: 0.9rem 0; padding: 0.85rem 1rem;
+  background: var(--ground); border: 1px dashed var(--rule-strong); border-radius: 2px;
+}
+.answer-lines p {
+  margin: 0 0 0.4rem; font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint);
+}
+.answer-lines .line { border-bottom: 1px solid var(--rule-strong); height: 1.5rem; }
+
+/* ---- Solution disclosure -------------------------------------------- */
+
+details.sol {
+  margin: 1rem 0 0; border: 1px solid var(--rule);
+  border-radius: 2px; background: var(--ground); overflow: hidden;
+}
+details.sol > summary {
+  cursor: pointer; list-style: none; padding: 0.6rem 0.95rem;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+details.sol > summary::-webkit-details-marker { display: none; }
+details.sol > summary::before { content: "▸"; color: var(--rust); font-size: 0.8rem; }
+details.sol[open] > summary::before { content: "▾"; }
+details.sol > summary:hover { color: var(--rust); }
+details.sol > summary:focus-visible { outline: 2px solid var(--rust); outline-offset: -2px; }
+.sol-body { padding: 0.35rem 0.95rem 0.9rem; }
+.sol-body > :first-child { margin-top: 0.6rem; }
+.sol-body > :last-child { margin-bottom: 0; }
+.sol-body p { font-size: 0.9375rem; }
+.sol-body .code { border-left-color: var(--oxide); }
+
+.set-note { max-width: var(--measure); margin: 0 0 1.5rem; font-size: 0.9688rem; color: var(--ink-soft); }
+
+.foot {
+  margin-top: 4rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+  .ex-head { grid-template-columns: auto auto 1fr; row-gap: 0.4rem; }
+  .ex-done { grid-column: 1 / -1; }
+}
+
+@media print {
+  .rail, .toggle, .ex-done, .progress { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  .ex, .code, .errblock { page-break-inside: avoid; }
+  details.sol[open] > summary { color: #000; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<aside class="rail">
+  <p class="rail-brand">Lifetimes in Rust</p>
+  <p class="rail-sub">24 exercises<br>+ 6-part capstone</p>
+  <nav id="toc">
+    <div class="rail-group">Sets</div>
+    <a href="#s1"><span class="n">01</span><span>Reading signatures</span></a>
+    <a href="#s2"><span class="n">02</span><span>Elision</span></a>
+    <a href="#s3"><span class="n">03</span><span>Structs holding refs</span></a>
+    <a href="#s4"><span class="n">04</span><span>Returning refs &amp; 'static</span></a>
+    <a href="#s5"><span class="n">05</span><span>Real patterns</span></a>
+
+    <div class="rail-group">Final</div>
+    <a href="#cap"><span class="n">★</span><span>Capstone: config parser</span></a>
+  </nav>
+
+  <div class="progress">
+    <p class="progress-label">Your progress</p>
+    <div class="progress-bar"><div class="progress-fill" id="progFill"></div></div>
+    <p class="progress-count" id="progCount">0 / 0 done</p>
+    <button class="progress-reset" id="progReset" type="button">Reset</button>
+  </div>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Practice workbook</p>
+  <h1>Lifetimes:<br><em>24 exercises</em></h1>
+  <p class="standfirst">For every signature here, ask the same question before writing anything: what does the returned reference point into? Nearly every lifetime error is that question, unanswered.</p>
+  <div class="masthead-meta">
+    <span><b>24</b> exercises + capstone</span>
+    <span><b>Guide:</b> lifetimes_guide.html</span>
+    <span><b>Prerequisite:</b> ownership_guide.html</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<div class="howto">
+  <h2>How to use this workbook</h2>
+  <ol>
+    <li>Write your attempt <strong>before</strong> opening the solution.</li>
+    <li>Compile and run: <code>rustc --edition 2021 practice.rs &amp;&amp; ./practice</code></li>
+    <li>For every signature, ask the one question: <strong>what does the returned reference point into?</strong> Almost every lifetime error answers to that.</li>
+    <li>When you get E0597, read the three annotations in order — <em>declared here</em>, <em>dropped here while still borrowed</em>, <em>borrow later used here</em>. The fix is always to move one of them.</li>
+  </ol>
+</div>
+
+<!-- ============ SET 1 ============ -->
+<section id="s1">
+  <div class="set-head">
+    <span class="set-num">SET 01</span>
+    <h2>Reading signatures</h2>
+  </div>
+  <p class="set-note">Before writing any annotations, learn to read them. Say each one out loud.</p>
+
+  <article class="ex" data-ex="1.1">
+    <div class="ex-head">
+      <span class="ex-id">1.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">The classic <code>longest</code></span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function returning the longer of two <code>&amp;str</code>. Then say in words what your signature promises.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>long string</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">longest</span>&lt;<span class="td">'a</span>&gt;(a: &amp;<span class="td">'a</span> <span class="ty">str</span>, b: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="k">if</span> a.<span class="fn">len</span>() &gt; b.<span class="fn">len</span>() { a } <span class="k">else</span> { b }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Says</span>
+          <p>"The result lives as long as the <strong>shorter</strong> of <code>a</code> and <code>b</code>." Not "both must be equal" — <code>'a</code> is the overlap of the two input lifetimes, and the result cannot escape it.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.2">
+    <div class="ex-head">
+      <span class="ex-id">1.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Why does this one need nothing?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p><code>fn trim_it(s: &amp;str) -&gt; &amp;str { s.trim() }</code> compiles with no annotation. Which elision rule applies?</p>
+      <div class="answer-lines">
+        <p>Rule, and why</p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Rule 2 — verified <code>"padded"</code></div>
+<pre><code><span class="cm">// You write:</span>
+<span class="k">fn</span> <span class="fn">trim_it</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> { s.<span class="fn">trim</span>() }
+<span class="cm">// Compiler sees:</span>
+<span class="k">fn</span> <span class="fn">trim_it</span>&lt;<span class="td">'a</span>&gt;(s: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span></code></pre>
+        </div>
+        <p>Exactly one input reference, so there is no ambiguity about where the output borrows from. That is the whole difference from 1.1.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.3">
+    <div class="ex-head">
+      <span class="ex-id">1.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Tie the output to one input only</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function taking two references but returning one tied <em>only</em> to the first. The second should be free to die immediately.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>kept</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">first_of</span>&lt;<span class="td">'a</span>&gt;(x: &amp;<span class="td">'a</span> <span class="ty">str</span>, _y: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> { x }</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">A stronger promise</span>
+          <p><code>_y</code> gets its own anonymous lifetime from rule 1, unrelated to the result. This is more useful than forcing both into <code>'a</code>, which would needlessly shorten the result to the overlap.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.4">
+    <div class="ex-head">
+      <span class="ex-id">1.4</span><span class="pill easy">easy</span>
+      <span class="ex-title">When is no lifetime involved?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function taking <code>&amp;str</code> and returning <code>usize</code>. Why is there no lifetime question here at all?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>5</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">count</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">usize</span> { s.<span class="fn">len</span>() }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">No reference out, no question</span>
+          <p><code>usize</code> is owned <code>Copy</code> data — it does not point at anything. Lifetimes only matter for <em>returned references</em>. This is why most functions never need them.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="1.5">
+    <div class="ex-head">
+      <span class="ex-id">1.5</span><span class="pill easy">easy</span>
+      <span class="ex-title">A borrow inside an <code>Option</code></span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the first element of a slice as <code>Option&lt;&amp;i32&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some(7)</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">first</span>&lt;<span class="td">'a</span>&gt;(v: &amp;<span class="td">'a</span> [<span class="ty">i32</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="td">'a</span> <span class="ty">i32</span>&gt; { v.<span class="fn">first</span>() }
+
+<span class="cm">// elision handles it too — one input reference:</span>
+<span class="k">fn</span> <span class="fn">first</span>(v: &amp;[<span class="ty">i32</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">i32</span>&gt; { v.<span class="fn">first</span>() }</code></pre>
+        </div>
+        <p>A lifetime inside a generic type works exactly the same way. <code>Option&lt;&amp;'a i32&gt;</code> cannot outlive <code>'a</code>.</p>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 2 ============ -->
+<section id="s2">
+  <div class="set-head">
+    <span class="set-num">SET 02</span>
+    <h2>Elision — predicting the rules</h2>
+  </div>
+  <p class="set-note">For each, decide whether it compiles bare, and what the compiler expands it to.</p>
+
+  <article class="ex" data-ex="2.1">
+    <div class="ex-head">
+      <span class="ex-id">2.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">First word</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the first word of a sentence, with no annotation. This is the function from the ownership guide — now you can say why it works.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>the</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">first_word</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> {
+    <span class="k">match</span> s.<span class="fn">find</span>(<span class="st">' '</span>) { <span class="ty">Some</span>(i) =&gt; &amp;s[..i], <span class="ty">None</span> =&gt; s }
+}</code></pre>
+        </div>
+        <p>Rule 2. The returned slice points into <code>s</code>, and there is only one input it could point into.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.2">
+    <div class="ex-head">
+      <span class="ex-id">2.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Longest item in a slice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the longest <code>String</code> in a slice as a borrow.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("bbb")</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">longest_item</span>(v: &amp;[<span class="ty">String</span>]) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">String</span>&gt; {
+    v.<span class="fn">iter</span>().<span class="fn">max_by_key</span>(|s| s.<span class="fn">len</span>())
+}</code></pre>
+        </div>
+        <p>No annotation needed — one input reference. Returning <code>Option&lt;&amp;String&gt;</code> rather than <code>Option&lt;String&gt;</code> avoids a clone.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.3">
+    <div class="ex-head">
+      <span class="ex-id">2.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Two outputs from one input</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Split a string in half and return both pieces. How many lifetimes are involved?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>("abc", "def")</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">halves</span>(s: &amp;<span class="ty">str</span>) -&gt; (&amp;<span class="ty">str</span>, &amp;<span class="ty">str</span>) { s.<span class="fn">split_at</span>(s.<span class="fn">len</span>()/<span class="nu">2</span>) }
+
+<span class="cm">// expands to:</span>
+<span class="k">fn</span> <span class="fn">halves</span>&lt;<span class="td">'a</span>&gt;(s: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; (&amp;<span class="td">'a</span> <span class="ty">str</span>, &amp;<span class="td">'a</span> <span class="ty">str</span>)</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">One lifetime, two uses</span>
+          <p>Rule 2 assigns the single input lifetime to <em>all</em> outputs. Both slices point into <code>s</code>, so both share <code>'a</code>.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="2.4">
+    <div class="ex-head">
+      <span class="ex-id">2.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Rule 3, and when to override it</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Given <code>struct B&lt;'a&gt; { v: &amp;'a str }</code>, write two getters — one elided, one returning <code>&amp;'a str</code> explicitly. What is the difference to a caller?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — both verified, both print <code>held</code></div>
+<pre><code><span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">B</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">get</span>(&amp;<span class="k">self</span>) -&gt; &amp;<span class="ty">str</span> { <span class="k">self</span>.v }          <span class="cm">// rule 3: tied to &amp;self</span>
+    <span class="k">fn</span> <span class="fn">get_long</span>(&amp;<span class="k">self</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> { <span class="k">self</span>.v }   <span class="cm">// tied to 'a</span>
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">The difference that matters</span>
+          <p><code>get</code>'s result keeps <code>self</code> borrowed while you hold it — so you cannot call a <code>&amp;mut self</code> method meanwhile. <code>get_long</code>'s result is tied to the <em>original string</em>, so <code>self</code> is free again immediately. Same runtime behaviour, very different ergonomics. This is the key to exercise 5.1.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 3 ============ -->
+<section id="s3">
+  <div class="set-head">
+    <span class="set-num">SET 03</span>
+    <h2>Structs that hold references</h2>
+  </div>
+  <p class="set-note">Where you genuinely must write annotations.</p>
+
+  <article class="ex" data-ex="3.1">
+    <div class="ex-head">
+      <span class="ex-id">3.1</span><span class="pill easy">easy</span>
+      <span class="ex-title">An excerpt struct</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a struct holding a <code>&amp;str</code> borrowed from a novel, plus a constructor and two methods — one returning the part, one returning an <code>i32</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Excerpt { part: "Call me Ishmael" }</code></div>
+<pre><code><span class="at">#[derive(Debug)]</span>
+<span class="k">struct</span> <span class="ty">Excerpt</span>&lt;<span class="td">'a</span>&gt; { part: &amp;<span class="td">'a</span> <span class="ty">str</span> }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Excerpt</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">new</span>(part: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; <span class="ty">Self</span> { <span class="ty">Excerpt</span> { part } }
+    <span class="k">fn</span> <span class="fn">part</span>(&amp;<span class="k">self</span>) -&gt; &amp;<span class="ty">str</span> { <span class="k">self</span>.part }
+    <span class="k">fn</span> <span class="fn">level</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">i32</span> { <span class="nu">3</span> }        <span class="cm">// no reference out</span>
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag"><code>impl&lt;'a&gt; Excerpt&lt;'a&gt;</code></span>
+          <p><code>'a</code> appears twice: declared in <code>impl&lt;'a&gt;</code>, then used in <code>Excerpt&lt;'a&gt;</code>. Identical shape to <code>impl&lt;T&gt; Wrapper&lt;T&gt;</code>. <code>level</code> needs nothing because it returns no reference.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.2">
+    <div class="ex-head">
+      <span class="ex-id">3.2</span><span class="pill med">medium</span>
+      <span class="ex-title">Make the struct outlive its source</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Deliberately break 3.1 — construct an <code>Excerpt</code> inside a block and use it outside. Predict the error and read all four annotations.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-bad">
+          <div class="code-label">E0597</div>
+<pre><code><span class="k">let</span> e;
+{
+    <span class="k">let</span> novel = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Call me Ishmael."</span>);
+    e = <span class="ty">Excerpt</span> { part: &amp;novel };
+}
+<span class="fn">println!</span>(<span class="st">"{}"</span>, e.part);</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Verified compiler output</div>
+<pre><code><span class="er">error[E0597]</span>: `novel` does not live long enough
+5 |         let novel = String::from("Call me Ishmael.");
+  |             ----- binding `novel` declared here
+6 |         e = Excerpt { part: &amp;novel };
+  |                             ^^^^^^ borrowed value does not live long enough
+7 |     }
+  |     - `novel` dropped here while still borrowed
+8 |     println!("{}", e.part);
+  |                    ------ borrow later used here</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">What <code>&lt;'a&gt;</code> bought you</span>
+          <p>The struct declaration is what makes this checkable: <code>Excerpt&lt;'a&gt;</code> says "an <code>Excerpt</code> may not outlive what it borrows." The fix is to declare <code>novel</code> in the outer scope.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.3">
+    <div class="ex-head">
+      <span class="ex-id">3.3</span><span class="pill med">medium</span>
+      <span class="ex-title">A struct with two borrows</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>Pair</code> holding two <code>&amp;str</code> fields, with a method returning the longer one — tied to the source, not to <code>&amp;self</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>alpha</code></div>
+<pre><code><span class="k">struct</span> <span class="ty">Pair</span>&lt;<span class="td">'a</span>&gt; { first: &amp;<span class="td">'a</span> <span class="ty">str</span>, second: &amp;<span class="td">'a</span> <span class="ty">str</span> }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Pair</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">longer</span>(&amp;<span class="k">self</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+        <span class="k">if</span> <span class="k">self</span>.first.<span class="fn">len</span>() &gt;= <span class="k">self</span>.second.<span class="fn">len</span>() { <span class="k">self</span>.first } <span class="k">else</span> { <span class="k">self</span>.second }
+    }
+}</code></pre>
+        </div>
+        <p>One <code>'a</code> covers both fields — they must share a common lifetime, which is their overlap. The explicit <code>&amp;'a str</code> return overrides rule 3.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="3.4">
+    <div class="ex-head">
+      <span class="ex-id">3.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">Lifetime plus generic type</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a struct holding <code>&amp;'a T</code> for any <code>T: Display</code>, with a method formatting it.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>42</code></div>
+<pre><code><span class="k">struct</span> <span class="ty">Wrapper</span>&lt;<span class="td">'a</span>, <span class="ty">T</span>&gt; { inner: &amp;<span class="td">'a</span> <span class="ty">T</span> }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>, <span class="ty">T</span>: <span class="ty">Display</span>&gt; <span class="ty">Wrapper</span>&lt;<span class="td">'a</span>, <span class="ty">T</span>&gt; {
+    <span class="k">fn</span> <span class="fn">show</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">String</span> { <span class="fn">format!</span>(<span class="st">"{}"</span>, <span class="k">self</span>.inner) }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Order matters</span>
+          <p>Lifetimes come <em>first</em> in the parameter list: <code>&lt;'a, T&gt;</code>, never <code>&lt;T, 'a&gt;</code>. To the compiler they are the same kind of thing — compile-time parameters — and both are erased before codegen.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 4 ============ -->
+<section id="s4">
+  <div class="set-head">
+    <span class="set-num">SET 04</span>
+    <h2>Returning references, and <code>'static</code></h2>
+  </div>
+  <p class="set-note">The escape hatches, and when each is correct.</p>
+
+  <article class="ex" data-ex="4.1">
+    <div class="ex-head">
+      <span class="ex-id">4.1</span><span class="pill med">medium</span>
+      <span class="ex-title">Fix a dangling return</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This does not compile. Give two different valid fixes.</p>
+      <div class="code is-bad">
+        <div class="code-label">E0515</div>
+<pre><code><span class="k">fn</span> <span class="fn">make</span>&lt;<span class="td">'a</span>&gt;() -&gt; &amp;<span class="td">'a</span> <span class="ty">String</span> {
+    <span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+    &amp;s
+}</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Fix 1 — return owned</div>
+<pre><code><span class="k">fn</span> <span class="fn">make</span>() -&gt; <span class="ty">String</span> { <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>) }</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Fix 2 — a literal, which is <code>'static</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">make</span>() -&gt; &amp;<span class="td">'static</span> <span class="ty">str</span> { <span class="st">"hello"</span> }</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">Why the annotation did not help</span>
+          <p>E0515 says <em>"returns a reference to data owned by the current function."</em> Declaring <code>'a</code> promises a lifetime the caller chooses — but the data dies at the closing brace regardless. <strong>Annotations describe reality; they cannot alter it.</strong></p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.2">
+    <div class="ex-head">
+      <span class="ex-id">4.2</span><span class="pill easy">easy</span>
+      <span class="ex-title">Borrow in, owned out</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Uppercase a <code>&amp;str</code>. Why must the return be owned rather than a slice?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>SHOUT</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">shout</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> { s.<span class="fn">to_uppercase</span>() }</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Nothing to borrow from</span>
+          <p>The uppercased text does not exist anywhere in the input — it is new data, so it needs new storage. A slice can only be a <em>window</em> onto bytes that already exist. This is the same reasoning as reversing a string in the ownership workbook.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.3">
+    <div class="ex-head">
+      <span class="ex-id">4.3</span><span class="pill med">medium</span>
+      <span class="ex-title"><code>&amp;'static str</code> vs <code>T: 'static</code></span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a function with bound <code>T: 'static</code> and pass it an owned <code>String</code>. Explain why that compiles, given that a <code>String</code> is not a literal.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>owned data satisfies 'static</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">needs_static</span>&lt;<span class="ty">T</span>: <span class="td">'static</span>&gt;(_t: <span class="ty">T</span>) -&gt; &amp;<span class="td">'static</span> <span class="ty">str</span> {
+    <span class="st">"owned data satisfies 'static"</span>
+}
+
+<span class="fn">needs_static</span>(<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"x"</span>));   <span class="cm">// compiles</span></code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Two different meanings</span>
+          <p><code>&amp;'static T</code> is "a reference valid forever." <code>T: 'static</code> is "a type containing no short-lived borrows" — which <em>all owned data</em> satisfies. That is precisely why <code>thread::spawn</code>'s <code>F: Send + 'static</code> accepts owned <code>String</code>s and <code>Vec</code>s.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.4">
+    <div class="ex-head">
+      <span class="ex-id">4.4</span><span class="pill med">medium</span>
+      <span class="ex-title">A slice of a slice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return the middle of a slice (first and last removed), never panicking on short inputs.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>[2, 3, 4]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">middle</span>&lt;<span class="td">'a</span>&gt;(v: &amp;<span class="td">'a</span> [<span class="ty">i32</span>]) -&gt; &amp;<span class="td">'a</span> [<span class="ty">i32</span>] {
+    <span class="k">if</span> v.<span class="fn">len</span>() &lt;= <span class="nu">2</span> { v } <span class="k">else</span> { &amp;v[<span class="nu">1</span>..v.<span class="fn">len</span>()-<span class="nu">1</span>] }
+}</code></pre>
+        </div>
+        <p>The <code>'a</code> is optional here — rule 2 would infer it. Writing it out makes the "output borrows from input" relationship explicit, which is often worth it in a public API.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="4.5">
+    <div class="ex-head">
+      <span class="ex-id">4.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">Add the outlives bound</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>This fails. Read the compiler's suggestion and apply it.</p>
+      <div class="code is-bad">
+        <div class="code-label">lifetime may not live long enough</div>
+<pre><code><span class="k">fn</span> <span class="fn">pick</span>&lt;<span class="td">'a</span>, <span class="td">'b</span>&gt;(x: &amp;<span class="td">'a</span> <span class="ty">str</span>, y: &amp;<span class="td">'b</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="k">if</span> x.<span class="fn">len</span>() &gt; y.<span class="fn">len</span>() { x } <span class="k">else</span> { y }
+}</code></pre>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>aa</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">pick</span>&lt;<span class="td">'a</span>, <span class="td">'b</span>: <span class="td">'a</span>&gt;(x: &amp;<span class="td">'a</span> <span class="ty">str</span>, y: &amp;<span class="td">'b</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="k">if</span> x.<span class="fn">len</span>() &gt; y.<span class="fn">len</span>() { x } <span class="k">else</span> { y }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Reading <code>'b: 'a</code></span>
+          <p>"<code>'b</code> outlives <code>'a</code>." A <code>&amp;'b str</code> is then usable wherever a <code>&amp;'a str</code> is wanted — longer coerces to shorter, never the reverse. The compiler's own error said <em>"consider adding the following bound: <code>'b: 'a</code>"</em>.</p>
+          <p>Simply using one <code>'a</code> for both also works, and is what you would usually write. The bound is for when the two must stay distinct elsewhere in the signature.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ SET 5 ============ -->
+<section id="s5">
+  <div class="set-head">
+    <span class="set-num">SET 05</span>
+    <h2>Real patterns</h2>
+  </div>
+  <p class="set-note">Where lifetimes stop being an exercise and start earning their keep.</p>
+
+  <article class="ex" data-ex="5.1">
+    <div class="ex-head">
+      <span class="ex-id">5.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">A borrowing tokenizer</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a <code>Parser</code> holding <code>&amp;'a str</code> with <code>next_token(&amp;mut self) -&gt; Option&lt;&amp;'a str&gt;</code>. Then explain what breaks if you elide that return lifetime.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["let", "x", "=", "5"]</code></div>
+<pre><code><span class="k">struct</span> <span class="ty">Parser</span>&lt;<span class="td">'a</span>&gt; { input: &amp;<span class="td">'a</span> <span class="ty">str</span>, pos: <span class="ty">usize</span> }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Parser</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">new</span>(input: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; <span class="ty">Self</span> { <span class="ty">Parser</span> { input, pos: <span class="nu">0</span> } }
+
+    <span class="k">fn</span> <span class="fn">next_token</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+        <span class="k">let</span> rest = <span class="k">self</span>.input[<span class="k">self</span>.pos..].<span class="fn">trim_start</span>();
+        <span class="k">if</span> rest.<span class="fn">is_empty</span>() { <span class="k">return</span> <span class="ty">None</span>; }
+        <span class="k">let</span> start = <span class="k">self</span>.input.<span class="fn">len</span>() - rest.<span class="fn">len</span>();
+        <span class="k">let</span> end = rest.<span class="fn">find</span>(<span class="st">' '</span>).<span class="fn">map</span>(|i| start + i)
+                      .<span class="fn">unwrap_or</span>(<span class="k">self</span>.input.<span class="fn">len</span>());
+        <span class="k">self</span>.pos = end;
+        <span class="ty">Some</span>(&amp;<span class="k">self</span>.input[start..end])
+    }
+}</code></pre>
+        </div>
+        <div class="hint is-trap">
+          <span class="hint-tag">The most valuable lifetime lesson there is</span>
+          <p>Elide that return and rule 3 ties each token to <code>&amp;mut self</code>. Holding a token then keeps the parser mutably borrowed — so <code>while let Some(t) = parser.next_token()</code> will not compile, because you are calling a <code>&amp;mut self</code> method while a previous borrow is live.</p>
+          <p>Writing <code>&amp;'a str</code> ties tokens to the <em>input string</em> instead, which outlives the parser entirely. The parser is free again the instant the call returns.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.2">
+    <div class="ex-head">
+      <span class="ex-id">5.2</span><span class="pill med">medium</span>
+      <span class="ex-title">Split without allocating</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Split a string on a separator and return trimmed pieces — with zero allocations for the pieces themselves.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["a", "b", "c"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">split_trim</span>&lt;<span class="td">'a</span>&gt;(text: &amp;<span class="td">'a</span> <span class="ty">str</span>, sep: <span class="ty">char</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+    text.<span class="fn">split</span>(sep).<span class="fn">map</span>(|s| s.<span class="fn">trim</span>()).<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Only the <code>Vec</code> allocates</span>
+          <p>Every <code>&amp;str</code> inside points into <code>text</code>. <code>Vec&lt;&amp;'a str&gt;</code> versus <code>Vec&lt;String&gt;</code> is the difference between one allocation and one-per-piece. Note <code>sep</code> is <code>char</code> — <code>Copy</code>, so no lifetime.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.3">
+    <div class="ex-head">
+      <span class="ex-id">5.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Two independent lifetimes in practice</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Filter a slice of <code>String</code>s by a prefix, returning borrows. The prefix must <em>not</em> need to outlive the result.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["db_host", "db_port"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">with_prefix</span>&lt;<span class="td">'a</span>, <span class="td">'k</span>&gt;(items: &amp;<span class="td">'a</span> [<span class="ty">String</span>], prefix: &amp;<span class="td">'k</span> <span class="ty">str</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+    items.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|s| s.<span class="fn">starts_with</span>(prefix))
+        .<span class="fn">map</span>(|s| s.<span class="fn">as_str</span>())
+        .<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Why two names</span>
+          <p>The results borrow from <code>items</code> (<code>'a</code>); <code>prefix</code> is only read during the call (<code>'k</code>). Separating them lets callers pass a temporary prefix — <code>with_prefix(&amp;items, &amp;format!("db_"))</code> — and still keep the results. One shared <code>'a</code> would have forbidden that.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.4">
+    <div class="ex-head">
+      <span class="ex-id">5.4</span><span class="pill med">medium</span>
+      <span class="ex-title">Borrowing out of a HashMap</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Look up a key and return <code>Option&lt;&amp;str&gt;</code> tied to the map, not to the key.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("v")</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">lookup</span>&lt;<span class="td">'a</span>&gt;(m: &amp;<span class="td">'a</span> <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">String</span>&gt;, k: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+    m.<span class="fn">get</span>(k).<span class="fn">map</span>(|s| s.<span class="fn">as_str</span>())
+}</code></pre>
+        </div>
+        <p>Here the annotation <em>is</em> required: two input references, so rule 2 does not apply. Without it you get E0106 and the compiler asks whether the result borrows from <code>m</code> or from <code>k</code>.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.5">
+    <div class="ex-head">
+      <span class="ex-id">5.5</span><span class="pill hard">hard</span>
+      <span class="ex-title">A caching view</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write a struct borrowing a <code>&amp;[i32]</code> that computes a sum once and caches it. Why is there no borrow conflict between the shared field and <code>&amp;mut self</code>?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>10 then cached 10</code></div>
+<pre><code><span class="k">struct</span> <span class="ty">Cache</span>&lt;<span class="td">'a</span>&gt; { data: &amp;<span class="td">'a</span> [<span class="ty">i32</span>], computed: <span class="ty">Option</span>&lt;<span class="ty">i32</span>&gt; }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Cache</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">new</span>(data: &amp;<span class="td">'a</span> [<span class="ty">i32</span>]) -&gt; <span class="ty">Self</span> { <span class="ty">Cache</span> { data, computed: <span class="ty">None</span> } }
+
+    <span class="k">fn</span> <span class="fn">sum</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">i32</span> {
+        <span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(v) = <span class="k">self</span>.computed { <span class="k">return</span> v; }
+        <span class="k">let</span> v = <span class="k">self</span>.data.<span class="fn">iter</span>().<span class="fn">sum</span>();
+        <span class="k">self</span>.computed = <span class="ty">Some</span>(v);
+        v
+    }
+}</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Two different things</span>
+          <p>Mutating the <em>struct</em> (its <code>computed</code> field) is separate from the data it points at. <code>&amp;mut self</code> gives exclusive access to the <code>Cache</code>, while <code>data</code> remains a shared borrow of someone else's slice. Returning <code>i32</code> rather than a reference also keeps the caller free of any borrow.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="5.6">
+    <div class="ex-head">
+      <span class="ex-id">5.6</span><span class="pill med">medium</span>
+      <span class="ex-title">Borrow or own?</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>No code — decide. For each, write <code>&amp;'a str</code> or <code>String</code>:</p>
+      <div class="answer-lines">
+        <p>a) a token produced by a parser scanning a buffer</p>
+        <div class="line"></div>
+        <p>b) a username stored in a <code>Vec&lt;User&gt;</code> for the program's life</p>
+        <div class="line"></div>
+        <p>c) a config value read from a file that stays in memory</p>
+        <div class="line"></div>
+        <p>d) an error message built by <code>format!</code></p>
+        <div class="line"></div>
+      </div>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answers</div>
+<pre><code><span class="cm">// a) &amp;'a str  — a view over the buffer, zero-copy</span>
+<span class="cm">// b) String   — long-lived and stored; a lifetime would infect Vec&lt;User&gt;</span>
+<span class="cm">// c) &amp;'a str  — the file contents outlive the config (the capstone's design)</span>
+<span class="cm">// d) String   — newly created, nothing to borrow from</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">The rule</span>
+          <p>Borrow for a <em>view</em> over data you are passing through; own for a <em>thing</em> your program keeps. If lifetime parameters start spreading through your types, that is the signal to own at some boundary — not to add more annotations.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+</section>
+
+<!-- ============ CAPSTONE ============ -->
+<section id="cap">
+  <div class="set-head">
+    <span class="set-num">FINAL</span>
+    <h2>Capstone: a zero-copy config parser</h2>
+  </div>
+  <p class="set-note">Parse an INI-style config where every key and value <em>borrows</em> from the original text. No <code>String</code> allocations until the very last step.</p>
+
+  <div class="code">
+    <div class="code-label">Given</div>
+<pre><code><span class="at">#[derive(Debug, PartialEq)]</span>
+<span class="k">struct</span> <span class="ty">Entry</span>&lt;<span class="td">'a</span>&gt; { key: &amp;<span class="td">'a</span> <span class="ty">str</span>, value: &amp;<span class="td">'a</span> <span class="ty">str</span>, section: &amp;<span class="td">'a</span> <span class="ty">str</span> }
+
+<span class="k">struct</span> <span class="ty">Config</span>&lt;<span class="td">'a</span>&gt; { entries: <span class="ty">Vec</span>&lt;<span class="ty">Entry</span>&lt;<span class="td">'a</span>&gt;&gt;, source: &amp;<span class="td">'a</span> <span class="ty">str</span> }
+
+<span class="cm">// Input:</span>
+<span class="cm">// # server config</span>
+<span class="cm">// [server]</span>
+<span class="cm">// host = localhost</span>
+<span class="cm">// port = 8080</span>
+<span class="cm">//</span>
+<span class="cm">// [db]</span>
+<span class="cm">// db_host = 127.0.0.1</span>
+<span class="cm">// db_port = 5432</span></code></pre>
+  </div>
+
+  <article class="ex" data-ex="cap.1">
+    <div class="ex-head">
+      <span class="ex-id">C.1</span><span class="pill hard">hard</span>
+      <span class="ex-title">Parse without allocating</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>Config::parse(source: &amp;'a str) -&gt; Self</code>. Skip comments and blanks, track the current section, and store only borrows.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>4 entries, source len 95</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">parse</span>(source: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; <span class="ty">Self</span> {
+    <span class="k">let</span> <span class="k">mut</span> entries = <span class="ty">Vec</span>::<span class="fn">new</span>();
+    <span class="k">let</span> <span class="k">mut</span> section = <span class="st">"global"</span>;          <span class="cm">// a &amp;'static str — also fine as &amp;'a</span>
+    <span class="k">for</span> line <span class="k">in</span> source.<span class="fn">lines</span>() {
+        <span class="k">let</span> line = line.<span class="fn">trim</span>();
+        <span class="k">if</span> line.<span class="fn">is_empty</span>() || line.<span class="fn">starts_with</span>(<span class="st">'#'</span>) { <span class="k">continue</span>; }
+        <span class="k">if</span> line.<span class="fn">starts_with</span>(<span class="st">'['</span>) &amp;&amp; line.<span class="fn">ends_with</span>(<span class="st">']'</span>) {
+            section = &amp;line[<span class="nu">1</span>..line.<span class="fn">len</span>()-<span class="nu">1</span>];
+            <span class="k">continue</span>;
+        }
+        <span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(eq) = line.<span class="fn">find</span>(<span class="st">'='</span>) {
+            entries.<span class="fn">push</span>(<span class="ty">Entry</span> {
+                key:   line[..eq].<span class="fn">trim</span>(),
+                value: line[eq+<span class="nu">1</span>..].<span class="fn">trim</span>(),
+                section,
+            });
+        }
+    }
+    <span class="ty">Config</span> { entries, source }
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Every slice points into <code>source</code></span>
+          <p><code>line</code> comes from <code>source.lines()</code>, so it borrows from <code>source</code>. Slicing <code>line</code> further keeps that lifetime. The entire parse allocates only the <code>Vec</code> — not one byte of text is copied.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.2">
+    <div class="ex-head">
+      <span class="ex-id">C.2</span><span class="pill hard">hard</span>
+      <span class="ex-title">Two getters, two lifetimes</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>get</code> (elided) and <code>get_long</code> (returning <code>Option&lt;&amp;'a str&gt;</code>). What can a caller do with one but not the other?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>Some("localhost")</code> and <code>Some("8080")</code></div>
+<pre><code><span class="cm">// elided — result tied to &amp;self</span>
+<span class="k">fn</span> <span class="fn">get</span>(&amp;<span class="k">self</span>, key: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="ty">str</span>&gt; {
+    <span class="k">self</span>.entries.<span class="fn">iter</span>().<span class="fn">find</span>(|e| e.key == key).<span class="fn">map</span>(|e| e.value)
+}
+
+<span class="cm">// explicit — result tied to the SOURCE, outliving &amp;self</span>
+<span class="k">fn</span> <span class="fn">get_long</span>(&amp;<span class="k">self</span>, key: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+    <span class="k">self</span>.entries.<span class="fn">iter</span>().<span class="fn">find</span>(|e| e.key == key).<span class="fn">map</span>(|e| e.value)
+}</code></pre>
+        </div>
+        <div class="code is-out">
+          <div class="code-label">Proof — <code>get_long</code> survives the <code>Config</code> being dropped</div>
+<pre><code><span class="k">let</span> value_outliving_config;
+{
+    <span class="k">let</span> cfg = <span class="ty">Config</span> { <span class="cm">/* borrows text */</span> };
+    value_outliving_config = cfg.<span class="fn">get_long</span>(<span class="st">"host"</span>);
+}   <span class="cm">// cfg dropped here</span>
+<span class="fn">println!</span>(<span class="st">"{:?}"</span>, value_outliving_config);
+<span class="cm">// → Some("localhost")   ✓ compiles and runs</span></code></pre>
+        </div>
+        <div class="code is-bad">
+          <div class="code-label">The same code with <code>get()</code> — real compiler output</div>
+<pre><code><span class="er">error[E0597]</span>: `cfg` does not live long enough
+15 |         let cfg = Config { ... };
+   |             --- binding `cfg` declared here
+16 |         value_outliving_config = cfg.get("host");
+   |                                  ^^^ borrowed value does not live long enough
+17 |     }
+   |     - `cfg` dropped here while still borrowed
+18 |     println!("{:?}", value_outliving_config);
+   |                      ---------------------- borrow later used here</code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">Identical bodies, different contracts</span>
+          <p>The two methods have exactly the same body and compile to exactly the same machine code. Only the <em>signature</em> differs — and that difference decides whether the caller above compiles.</p>
+          <p><code>get</code>'s result keeps the <code>Config</code> borrowed; <code>get_long</code>'s points into <code>source</code>, which outlives the config. Rule 3 chose the weaker option by default; writing <code>'a</code> takes the stronger one.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.3">
+    <div class="ex-head">
+      <span class="ex-id">C.3</span><span class="pill med">medium</span>
+      <span class="ex-title">Return a collection of borrows</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return every key in a named section as <code>Vec&lt;&amp;'a str&gt;</code>.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["db_host", "db_port"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">section</span>(&amp;<span class="k">self</span>, name: &amp;<span class="ty">str</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+    <span class="k">self</span>.entries.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|e| e.section == name)
+        .<span class="fn">map</span>(|e| e.key)
+        .<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <p>One allocation for the <code>Vec</code>; the strings inside are still views into the original text.</p>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.4">
+    <div class="ex-head">
+      <span class="ex-id">C.4</span><span class="pill hard">hard</span>
+      <span class="ex-title">A needle that need not outlive the haystack</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Return all values whose key starts with a prefix. The prefix may be a temporary.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["127.0.0.1", "5432"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">find_prefix</span>&lt;<span class="td">'k</span>&gt;(&amp;<span class="k">self</span>, prefix: &amp;<span class="td">'k</span> <span class="ty">str</span>) -&gt; <span class="ty">Vec</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+    <span class="k">self</span>.entries.<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|e| e.key.<span class="fn">starts_with</span>(prefix))
+        .<span class="fn">map</span>(|e| e.value)
+        .<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">Three lifetimes in one signature</span>
+          <p><code>'a</code> (the source), <code>'k</code> (the prefix), and the elided lifetime of <code>&amp;self</code> — all distinct. The results are tied only to <code>'a</code>, so the prefix can be a temporary and <code>self</code> can be dropped, and the returned values stay valid.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.5">
+    <div class="ex-head">
+      <span class="ex-id">C.5</span><span class="pill med">medium</span>
+      <span class="ex-title">Prove it is really zero-copy</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Demonstrate that a parsed value points <em>inside</em> the original buffer rather than being a copy. Use pointer arithmetic.</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>true</code></div>
+<pre><code><span class="k">let</span> v = cfg.<span class="fn">get</span>(<span class="st">"host"</span>).<span class="fn">unwrap</span>();
+<span class="k">let</span> inside = v.<span class="fn">as_ptr</span>() <span class="k">as</span> <span class="ty">usize</span> &gt;= text.<span class="fn">as_ptr</span>() <span class="k">as</span> <span class="ty">usize</span>
+          &amp;&amp; (v.<span class="fn">as_ptr</span>() <span class="k">as</span> <span class="ty">usize</span>) &lt; text.<span class="fn">as_ptr</span>() <span class="k">as</span> <span class="ty">usize</span> + text.<span class="fn">len</span>();
+<span class="cm">// value borrows into the original buffer = true</span></code></pre>
+        </div>
+        <div class="hint is-why">
+          <span class="hint-tag">What the lifetime was protecting</span>
+          <p>The value's pointer falls within the original <code>String</code>'s heap allocation — it is genuinely the same memory. That is exactly why <code>Config&lt;'a&gt;</code> must not outlive <code>text</code>: drop the text and every parsed value becomes a dangling pointer. The annotation is what makes that impossible.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <article class="ex" data-ex="cap.6">
+    <div class="ex-head">
+      <span class="ex-id">C.6</span><span class="pill hard">hard</span>
+      <span class="ex-title">Escape the lifetime</span>
+      <label class="ex-done"><input type="checkbox"> done</label>
+    </div>
+    <div class="ex-body">
+      <p class="task">Task</p>
+      <p>Write <code>into_owned(self) -&gt; HashMap&lt;String, String&gt;</code>. Why does the return type have no lifetime parameter — and when would you actually call this?</p>
+      <details class="sol"><summary>Solution</summary><div class="sol-body">
+        <div class="code is-out">
+          <div class="code-label">Answer — verified <code>["db_host", "db_port", "host", "port"]</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">into_owned</span>(<span class="k">self</span>) -&gt; <span class="ty">HashMap</span>&lt;<span class="ty">String</span>, <span class="ty">String</span>&gt; {
+    <span class="k">self</span>.entries.<span class="fn">into_iter</span>()
+        .<span class="fn">map</span>(|e| (e.key.<span class="fn">to_string</span>(), e.value.<span class="fn">to_string</span>()))
+        .<span class="fn">collect</span>()
+}</code></pre>
+        </div>
+        <div class="hint is-win">
+          <span class="hint-tag">The boundary between borrowed and owned</span>
+          <p>This is the only place that allocates strings — and it is deliberate. The result owns its data, so it has no lifetime parameter and can outlive <code>text</code>, be stored in a struct, or be sent to another thread (it now satisfies <code>T: 'static</code>).</p>
+          <p><strong>The pattern:</strong> borrow while parsing and filtering, which is the hot path; own once at the boundary, when the data must outlive its source. Taking <code>self</code> by value means the keys and values move out with no double allocation.</p>
+        </div>
+      </div></details>
+    </div>
+  </article>
+
+  <div class="foot">
+    <p><b>All 24 exercises and the 6-part capstone were compiled and run</b> on rustc 1.96.0, edition 2021. Every output shown is real program output.</p>
+    <p><b>Guide:</b> lifetimes_guide.html — 17 parts, with every compiler error shown in full.</p>
+    <p><b>Next.</b> Error handling with <code>Result</code>, <code>?</code>, and custom error types. Then smart pointers (<code>Box</code>/<code>Rc</code>/<code>RefCell</code>), which answer several "borrow or own?" questions this topic raised.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var TKEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(TKEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function prefersDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function currentIsDark() {
+    var stamped = root.getAttribute('data-theme');
+    if (stamped === 'dark') return true;
+    if (stamped === 'light') return false;
+    return prefersDark();
+  }
+  function syncBtn() { btn.textContent = currentIsDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = currentIsDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(TKEY, next); } catch (e) {}
+    syncBtn();
+  });
+  syncBtn();
+
+  // ---- Progress tracking, persisted locally ----
+  var KEY = 'rust-lifetimes-practice-done';
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ex'));
+  var fill = document.getElementById('progFill');
+  var count = document.getElementById('progCount');
+  var reset = document.getElementById('progReset');
+  var TOTAL = cards.length;
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+  function save(state) {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var state = load();
+
+  function render() {
+    var done = 0;
+    cards.forEach(function (card) {
+      var id = card.getAttribute('data-ex');
+      var box = card.querySelector('.ex-done input');
+      var isDone = !!state[id];
+      box.checked = isDone;
+      card.classList.toggle('is-done', isDone);
+      if (isDone) done++;
+    });
+    var pct = TOTAL ? Math.round((done / TOTAL) * 100) : 0;
+    fill.style.width = pct + '%';
+    count.textContent = done + ' / ' + TOTAL + ' done';
+  }
+
+  cards.forEach(function (card) {
+    var id = card.getAttribute('data-ex');
+    var box = card.querySelector('.ex-done input');
+    box.addEventListener('change', function () {
+      if (box.checked) { state[id] = true; } else { delete state[id]; }
+      save(state);
+      render();
+    });
+  });
+
+  reset.addEventListener('click', function () {
+    state = {};
+    save(state);
+    render();
+  });
+
+  render();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>

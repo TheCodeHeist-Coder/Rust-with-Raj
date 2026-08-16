@@ -1,0 +1,1445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lifetimes in Rust — The Complete Guide</title>
+<style>
+/* ==========================================================================
+   TOKENS — light is the base, dark redefines only the values.
+   Palette is grounded in iron oxide: Rust's own material world.
+   ========================================================================== */
+:root {
+  --ground:      #FAF7F4;
+  --surface:     #FFFFFF;
+  --surface-alt: #F2EDE8;
+  --ink:         #14100E;
+  --ink-soft:    #4A423D;
+  --ink-faint:   #7D726B;
+  --rule:        #E2D9D2;
+  --rule-strong: #CDC0B7;
+
+  --rust:        #B7410E;
+  --rust-deep:   #8C3208;
+  --rust-wash:   #FBEFE9;
+
+  --oxide:       #3D5A4C;
+  --oxide-wash:  #ECF2EE;
+
+  --ember:       #8C2F1A;
+  --ember-wash:  #FBECE8;
+
+  --steel:       #3E5468;
+  --steel-wash:  #ECF0F4;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+          "IBM Plex Mono", Menlo, Consolas, "Liberation Mono",
+          "DejaVu Sans Mono", monospace;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter,
+           "Bitstream Charter", "Source Serif 4", Georgia,
+           "DejaVu Serif", serif;
+
+  --measure: 68ch;
+  --rail: 16.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #14100E;
+    --surface:     #1C1715;
+    --surface-alt: #241D1A;
+    --ink:         #F2EBE6;
+    --ink-soft:    #BEB1A9;
+    --ink-faint:   #8B7E76;
+    --rule:        #322925;
+    --rule-strong: #473B35;
+
+    --rust:        #E8703A;
+    --rust-deep:   #F0906A;
+    --rust-wash:   #2A1811;
+
+    --oxide:       #7FB79A;
+    --oxide-wash:  #16221C;
+
+    --ember:       #E8735A;
+    --ember-wash:  #2A1512;
+
+    --steel:       #8FAFC9;
+    --steel-wash:  #161E25;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #14100E;
+  --surface:     #1C1715;
+  --surface-alt: #241D1A;
+  --ink:         #F2EBE6;
+  --ink-soft:    #BEB1A9;
+  --ink-faint:   #8B7E76;
+  --rule:        #322925;
+  --rule-strong: #473B35;
+
+  --rust:        #E8703A;
+  --rust-deep:   #F0906A;
+  --rust-wash:   #2A1811;
+
+  --oxide:       #7FB79A;
+  --oxide-wash:  #16221C;
+
+  --ember:       #E8735A;
+  --ember-wash:  #2A1512;
+
+  --steel:       #8FAFC9;
+  --steel-wash:  #161E25;
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  max-width: 84rem;
+  margin: 0 auto;
+}
+
+/* ---- Rail ----------------------------------------------------------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; overflow-y: auto;
+  padding: 2.25rem 1.5rem 3rem 1.75rem;
+  border-right: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 0.75rem; line-height: 1.5;
+}
+.rail-brand {
+  font-size: 0.6875rem; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 0.35rem; font-weight: 700;
+}
+.rail-sub {
+  font-size: 0.6875rem; color: var(--ink-faint);
+  margin: 0 0 1.75rem; line-height: 1.5;
+}
+.rail nav { display: flex; flex-direction: column; gap: 0.1rem; }
+.rail a {
+  display: grid; grid-template-columns: 1.85rem 1fr; gap: 0.35rem;
+  padding: 0.3rem 0.5rem 0.3rem 0.35rem;
+  color: var(--ink-soft); text-decoration: none;
+  border-radius: 3px; border-left: 2px solid transparent;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.rail a:hover { background: var(--surface-alt); color: var(--ink); }
+.rail a:focus-visible { outline: 2px solid var(--rust); outline-offset: 1px; }
+.rail a.is-active {
+  color: var(--rust); border-left-color: var(--rust);
+  background: var(--rust-wash); font-weight: 700;
+}
+.rail .n { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.rail a.is-active .n { color: var(--rust); }
+
+.rail-group {
+  margin: 1.4rem 0 0.45rem; padding-left: 0.35rem;
+  font-size: 0.625rem; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--ink-faint); border-top: 1px solid var(--rule); padding-top: 0.9rem;
+}
+.rail-group:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+
+/* ---- Main ----------------------------------------------------------- */
+
+.main { padding: 0 3rem 8rem; min-width: 0; }
+
+.masthead {
+  padding: 4.5rem 0 2.5rem;
+  border-bottom: 3px double var(--rule-strong);
+  margin-bottom: 3.5rem;
+}
+.eyebrow {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--rust); margin: 0 0 1.1rem; font-weight: 700;
+}
+.masthead h1 {
+  font-family: var(--serif);
+  font-size: clamp(2.4rem, 5.6vw, 3.9rem);
+  line-height: 1.03; letter-spacing: -0.022em; font-weight: 600;
+  margin: 0 0 1.1rem; text-wrap: balance;
+}
+.masthead h1 em { font-style: italic; color: var(--rust); }
+.standfirst {
+  font-size: 1.1875rem; line-height: 1.6; color: var(--ink-soft);
+  max-width: 54ch; margin: 0 0 2rem;
+}
+.masthead-meta {
+  display: flex; flex-wrap: wrap; gap: 0.5rem 2rem;
+  font-family: var(--mono); font-size: 0.75rem; color: var(--ink-faint);
+  padding-top: 1.5rem; border-top: 1px solid var(--rule);
+}
+.masthead-meta b { color: var(--ink); font-weight: 700; }
+
+/* ---- Sections ------------------------------------------------------- */
+
+section { margin-bottom: 5rem; scroll-margin-top: 1.5rem; }
+
+.part-head {
+  display: grid; grid-template-columns: auto 1fr; align-items: baseline;
+  gap: 1rem; padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--rule-strong); margin-bottom: 1.75rem;
+}
+.part-num {
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; color: var(--rust);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.part-head h2 {
+  font-family: var(--serif); font-size: clamp(1.65rem, 3.2vw, 2.15rem);
+  line-height: 1.14; letter-spacing: -0.017em; font-weight: 600;
+  margin: 0; text-wrap: balance;
+}
+
+h3 {
+  font-family: var(--serif); font-size: 1.28rem; line-height: 1.28;
+  font-weight: 700; letter-spacing: -0.008em;
+  margin: 2.75rem 0 0.85rem; max-width: var(--measure);
+}
+h4 {
+  font-family: var(--mono); font-size: 0.75rem;
+  letter-spacing: 0.11em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); margin: 2rem 0 0.7rem;
+}
+
+p, ul, ol { max-width: var(--measure); }
+p { margin: 0 0 1.05rem; }
+ul, ol { margin: 0 0 1.15rem; padding-left: 1.35rem; }
+li { margin-bottom: 0.42rem; }
+li::marker { color: var(--rust); }
+
+strong { font-weight: 700; }
+em { font-style: italic; }
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; border-radius: 2px; }
+
+code {
+  font-family: var(--mono); font-size: 0.855em;
+  background: var(--surface-alt); padding: 0.1em 0.34em;
+  border-radius: 3px; border: 1px solid var(--rule); white-space: nowrap;
+}
+
+/* ---- Code blocks ---------------------------------------------------- */
+
+.code {
+  margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rust);
+  border-radius: 2px; overflow: hidden;
+}
+.code-label {
+  font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--ink-faint);
+  padding: 0.5rem 1rem; border-bottom: 1px solid var(--rule);
+  background: var(--surface-alt);
+}
+.code pre {
+  margin: 0; padding: 1.05rem 1.15rem; overflow-x: auto;
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62;
+  color: var(--ink); tab-size: 4;
+}
+.code pre code {
+  background: none; border: none; padding: 0; font-size: inherit; white-space: pre;
+}
+.code.is-bad  { border-left-color: var(--ember); }
+.code.is-good { border-left-color: var(--oxide); }
+
+.k  { color: var(--rust); font-weight: 700; }
+.ty { color: var(--steel); font-weight: 600; }
+.fn { color: var(--ink); font-weight: 700; }
+.st { color: var(--oxide); }
+.nu { color: var(--oxide); }
+.cm { color: var(--ink-faint); font-style: italic; }
+.at { color: var(--steel); }
+.td { color: var(--steel); font-style: italic; }
+.er { color: var(--ember); font-weight: 700; }
+.ok { color: var(--oxide); font-weight: 700; }
+
+/* ---- Callouts ------------------------------------------------------- */
+
+.note {
+  max-width: var(--measure); margin: 1.5rem 0;
+  padding: 1rem 1.15rem; border-radius: 2px;
+  border-left: 3px solid var(--steel); background: var(--steel-wash);
+  font-size: 0.9688rem; line-height: 1.6;
+}
+.note > :last-child { margin-bottom: 0; }
+.note-tag {
+  display: block; font-family: var(--mono); font-size: 0.6563rem;
+  letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700;
+  color: var(--steel); margin-bottom: 0.4rem;
+}
+.note.is-rule { border-left-color: var(--rust); background: var(--rust-wash); }
+.note.is-rule .note-tag { color: var(--rust); }
+.note.is-trap { border-left-color: var(--ember); background: var(--ember-wash); }
+.note.is-trap .note-tag { color: var(--ember); }
+.note.is-win  { border-left-color: var(--oxide); background: var(--oxide-wash); }
+.note.is-win .note-tag { color: var(--oxide); }
+.note code { background: var(--surface); }
+
+/* ---- Tables --------------------------------------------------------- */
+
+.table-wrap {
+  overflow-x: auto; margin: 1.5rem 0 1.75rem;
+  max-width: calc(var(--measure) + 10ch);
+  border: 1px solid var(--rule); border-radius: 2px;
+}
+table { border-collapse: collapse; width: 100%; font-size: 0.875rem; background: var(--surface); }
+th, td {
+  text-align: left; padding: 0.62rem 0.9rem;
+  border-bottom: 1px solid var(--rule); vertical-align: top;
+}
+th {
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.09em; text-transform: uppercase; font-weight: 700;
+  color: var(--ink-faint); background: var(--surface-alt); white-space: nowrap;
+}
+tbody tr:last-child td { border-bottom: none; }
+td code { white-space: nowrap; }
+.col-mono { font-family: var(--mono); font-size: 0.8125rem; }
+
+/* ---- Figure --------------------------------------------------------- */
+
+.figure {
+  margin: 1.75rem 0; max-width: calc(var(--measure) + 10ch);
+  padding: 1.35rem; background: var(--surface);
+  border: 1px solid var(--rule); border-radius: 2px; overflow-x: auto;
+}
+.figure pre {
+  margin: 0; font-family: var(--mono); font-size: 0.75rem;
+  line-height: 1.5; color: var(--ink-soft); white-space: pre;
+}
+.figcap {
+  font-family: var(--mono); font-size: 0.6875rem; color: var(--ink-faint);
+  margin-top: 0.9rem; padding-top: 0.7rem; border-top: 1px solid var(--rule);
+}
+
+/* ---- Decision tree -------------------------------------------------- */
+
+.tree {
+  font-family: var(--mono); font-size: 0.8125rem; line-height: 1.75;
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 2px; padding: 1.15rem 1.3rem; margin: 1.4rem 0;
+  max-width: calc(var(--measure) + 10ch);
+  overflow-x: auto; white-space: pre; color: var(--ink-soft);
+}
+.tree b { color: var(--rust); font-weight: 700; }
+.tree i { color: var(--oxide); font-style: normal; font-weight: 700; }
+
+/* ---- Split ---------------------------------------------------------- */
+
+.split {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 1rem; margin: 1.5rem 0; max-width: calc(var(--measure) + 10ch);
+}
+.split .code { margin: 0; max-width: none; }
+
+/* ---- Error block ---------------------------------------------------- */
+
+.errblock {
+  margin: 1.35rem 0; max-width: calc(var(--measure) + 10ch);
+  background: var(--ember-wash); border: 1px solid var(--rule);
+  border-left: 3px solid var(--ember); border-radius: 2px;
+  padding: 0.95rem 1.1rem; overflow-x: auto;
+}
+.errblock pre {
+  margin: 0; font-family: var(--mono); font-size: 0.7813rem;
+  line-height: 1.6; color: var(--ink-soft); white-space: pre;
+}
+.errblock .code-id { color: var(--ember); font-weight: 700; }
+
+/* ---- Keyline -------------------------------------------------------- */
+
+.keyline {
+  max-width: var(--measure); margin: 2rem 0;
+  padding: 1.3rem 0 1.3rem 1.4rem;
+  border-left: 3px solid var(--rust);
+  font-family: var(--serif); font-size: 1.2rem; line-height: 1.45;
+  font-style: italic; color: var(--ink);
+}
+
+/* ---- Footer --------------------------------------------------------- */
+
+.foot {
+  margin-top: 5rem; padding-top: 2rem;
+  border-top: 3px double var(--rule-strong);
+  font-family: var(--mono); font-size: 0.75rem;
+  color: var(--ink-faint); max-width: var(--measure);
+}
+.foot p { max-width: none; margin-bottom: 0.5rem; }
+
+/* ---- Toggle --------------------------------------------------------- */
+
+.toggle {
+  position: fixed; top: 1rem; right: 1rem; z-index: 20;
+  font-family: var(--mono); font-size: 0.6875rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.45rem 0.75rem; background: var(--surface);
+  color: var(--ink-soft); border: 1px solid var(--rule-strong);
+  border-radius: 3px; cursor: pointer;
+}
+.toggle:hover { color: var(--rust); border-color: var(--rust); }
+.toggle:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+/* ---- Responsive ----------------------------------------------------- */
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: 1fr; }
+  .rail {
+    position: static; height: auto;
+    border-right: none; border-bottom: 1px solid var(--rule);
+    padding: 1.5rem 1.5rem 1.75rem;
+  }
+  .rail nav {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.1rem 0.75rem;
+  }
+  .main { padding: 0 1.5rem 5rem; }
+  .masthead { padding-top: 2.5rem; }
+}
+
+@media print {
+  .rail, .toggle { display: none; }
+  .shell { grid-template-columns: 1fr; }
+  body { background: #fff; color: #000; font-size: 10.5pt; }
+  section { page-break-inside: avoid; }
+  .code, .table-wrap, .figure { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<button class="toggle" id="themeToggle" type="button">Dark</button>
+
+<div class="shell">
+
+<aside class="rail">
+  <p class="rail-brand">Lifetimes in Rust</p>
+  <p class="rail-sub">Complete guide<br>17 parts</p>
+  <nav id="toc">
+    <div class="rail-group">The idea</div>
+    <a href="#p1"><span class="n">01</span><span>What a lifetime is</span></a>
+    <a href="#p2"><span class="n">02</span><span>Why the syntax exists</span></a>
+    <a href="#p3"><span class="n">03</span><span>Reading the syntax</span></a>
+    <a href="#p4"><span class="n">04</span><span>What it enforces</span></a>
+    <div class="rail-group">Not writing them</div>
+    <a href="#p5"><span class="n">05</span><span>Elision — the 3 rules</span></a>
+    <div class="rail-group">Where you do</div>
+    <a href="#p6"><span class="n">06</span><span>Structs holding refs</span></a>
+    <a href="#p7"><span class="n">07</span><span>Returning references</span></a>
+    <a href="#p8"><span class="n">08</span><span>'static</span></a>
+    <a href="#p9"><span class="n">09</span><span>Multiple lifetimes</span></a>
+    <div class="rail-group">In practice</div>
+    <a href="#p10"><span class="n">10</span><span>Zero-cost proof</span></a>
+    <a href="#p11"><span class="n">11</span><span>A borrowing parser</span></a>
+    <a href="#p12"><span class="n">12</span><span>With the borrow checker</span></a>
+    <a href="#p13"><span class="n">13</span><span>Borrow or own?</span></a>
+    <div class="rail-group">Revision</div>
+    <a href="#p14"><span class="n">14</span><span>Every error, decoded</span></a>
+    <a href="#p15"><span class="n">15</span><span>Things you don't need yet</span></a>
+    <a href="#p16"><span class="n">16</span><span>Where they already appeared</span></a>
+    <a href="#p17"><span class="n">17</span><span>Cheat sheet</span></a>
+  </nav>
+</aside>
+
+<main class="main">
+
+<header class="masthead">
+  <p class="eyebrow">Rust · Learning notes</p>
+  <h1>Lifetimes:<br>naming what you <em>already</em> knew</h1>
+  <p class="standfirst">Lifetimes have a reputation for being the hard part of Rust. They are not a new rule — every borrow you have ever written already had one. The compiler was inferring them silently. Lifetime syntax appears only when it genuinely cannot guess, and this guide is about the handful of cases where that happens.</p>
+  <div class="masthead-meta">
+    <span><b>17</b> parts</span>
+    <span><b>Prerequisite:</b> ownership_guide.html</span>
+    <span><b>Practice:</b> lifetimes_practice.html</span>
+    <span><b>Verified on</b> rustc 1.96</span>
+  </div>
+</header>
+
+<!-- ============ PART 1 ============ -->
+<section id="p1">
+  <div class="part-head">
+    <span class="part-num">PART 01</span>
+    <h2>What a lifetime actually is</h2>
+  </div>
+
+  <div class="keyline">A lifetime is the span of code over which a reference is valid.</div>
+
+  <p>That is the whole definition. Not a duration in seconds, not a runtime property — a <em>region of your source code</em>. Every reference has one, and the compiler has been computing them for you since your first program.</p>
+
+  <div class="figure">
+<pre>  fn main() {
+      let r;                       ┐
+      {                            │
+          let x = 5;        ┐      │  'a — how long r
+          r = &amp;x;           │ 'b   │       must be valid
+      }                     ┘      │
+      println!("{r}");             ┘
+  }
+
+  'b (x's life) is SHORTER than 'a (r's life)
+  → the borrow checker rejects this.</pre>
+    <p class="figcap">The borrow checker compares two regions and asks: does the referent outlive the reference?</p>
+  </div>
+
+  <p>Here is that program, and the error it produces:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">let</span> result;
+{
+    <span class="k">let</span> inner = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"short lived"</span>);
+    result = &amp;inner;
+}
+<span class="fn">println!</span>(<span class="st">"{result}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0597]</span>: `inner` does not live long enough
+ --&gt; le2.rs:5:18
+  |
+4 |         let inner = String::from("short lived");
+  |             ----- binding `inner` declared here
+5 |         result = &amp;inner;
+  |                  ^^^^^^ borrowed value does not live long enough
+6 |     }
+  |     - `inner` dropped here while still borrowed
+7 |     println!("{result}");
+  |                ------ borrow later used here</pre>
+  </div>
+
+  <p>Read those four annotations in order — they are the complete argument. Declared here, borrowed here, <strong>dropped here while still borrowed</strong>, used here. The compiler is showing you a reference that outlives its referent.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">You have already met this</span>
+    <p>This is the same E0597 from the ownership guide, and the same rule: <em>every reference must always be valid</em>. Lifetimes are not a second system bolted on top — they are the <strong>notation</strong> for the rule you already know.</p>
+  </div>
+</section>
+
+<!-- ============ PART 2 ============ -->
+<section id="p2">
+  <div class="part-head">
+    <span class="part-num">PART 02</span>
+    <h2>Why the syntax exists at all</h2>
+  </div>
+
+  <p>Inside a single function the compiler can see everything and needs no help. The problem appears at <strong>function boundaries</strong>, where it can only see the signature.</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">fn</span> <span class="fn">longest</span>(a: &amp;<span class="ty">str</span>, b: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> {
+    <span class="k">if</span> a.<span class="fn">len</span>() &gt; b.<span class="fn">len</span>() { a } <span class="k">else</span> { b }
+}</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0106]</span>: missing lifetime specifier
+ --&gt; le1.rs:1:33
+  |
+1 | fn longest(a: &amp;str, b: &amp;str) -&gt; &amp;str {
+  |               ----     ----     ^ expected named lifetime parameter
+  |
+  = help: this function's return type contains a borrowed value, but the signature does
+          not say whether it is borrowed from `a` or `b`
+help: consider introducing a named lifetime parameter
+  |
+1 | fn longest&lt;'a&gt;(a: &amp;'a str, b: &amp;'a str) -&gt; &amp;'a str {
+  |           ++++     ++          ++          ++</pre>
+  </div>
+
+  <div class="keyline">"the signature does not say whether it is borrowed from <code>a</code> or <code>b</code>"</div>
+
+  <p>That single sentence is the entire reason lifetime syntax exists. The compiler is not confused about the <em>body</em> — it can see the <code>if</code>. It is telling you that <strong>callers</strong> only get to read the signature, and the signature is ambiguous.</p>
+
+  <h3>Why the caller needs to know</h3>
+
+  <p>Consider what a caller must decide: <em>how long may I keep the returned reference?</em> If the answer is "as long as <code>a</code> lives" that permits one thing; "as long as <code>b</code> lives" permits another. Without the annotation there is no answer, and the compiler will not guess.</p>
+
+  <div class="code is-good">
+    <div class="code-label">Annotated — verified output <code>long string is long</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">longest</span>&lt;<span class="td">'a</span>&gt;(a: &amp;<span class="td">'a</span> <span class="ty">str</span>, b: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="k">if</span> a.<span class="fn">len</span>() &gt; b.<span class="fn">len</span>() { a } <span class="k">else</span> { b }
+}</code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Annotations describe; they do not change</span>
+    <p>Writing <code>'a</code> does not make anything live longer. You are <em>describing</em> a relationship that already exists so the compiler can check it. Lifetime syntax is documentation the compiler enforces — nothing about the running program changes.</p>
+  </div>
+</section>
+
+<!-- ============ PART 3 ============ -->
+<section id="p3">
+  <div class="part-head">
+    <span class="part-num">PART 03</span>
+    <h2>Reading the syntax</h2>
+  </div>
+
+  <p>The notation is small. Four pieces and you can read any signature.</p>
+
+  <div class="figure">
+<pre>  fn longest&lt;'a&gt;(a: &amp;'a str, b: &amp;'a str) -&gt; &amp;'a str
+             │        │            │           │
+             │        └────────────┴───────────┴──  used here
+             │
+             └── declared here, like a generic parameter
+
+  &amp;str        a reference          (lifetime inferred)
+  &amp;'a str     a reference with lifetime 'a
+  &amp;'a mut str a mutable reference with lifetime 'a
+  &lt;'a&gt;        declares the lifetime parameter</pre>
+    <p class="figcap">Lifetimes are declared in angle brackets, exactly like generic type parameters.</p>
+  </div>
+
+  <p>The name is arbitrary — <code>'a</code>, <code>'b</code>, <code>'input</code> all work. Convention is short lowercase, starting at <code>'a</code>. The apostrophe is what marks it as a lifetime rather than a type.</p>
+
+  <h3>How to say it out loud</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Signature</th><th>Reads as</th></tr></thead>
+      <tbody>
+        <tr><td><code>fn f&lt;'a&gt;(x: &amp;'a str) -&gt; &amp;'a str</code></td><td>"the output lives as long as <code>x</code>"</td></tr>
+        <tr><td><code>fn f&lt;'a&gt;(x: &amp;'a str, y: &amp;str) -&gt; &amp;'a str</code></td><td>"the output lives as long as <code>x</code>; <code>y</code> is unrelated"</td></tr>
+        <tr><td><code>fn f&lt;'a&gt;(x: &amp;'a str, y: &amp;'a str) -&gt; &amp;'a str</code></td><td>"the output lives as long as the <em>shorter</em> of <code>x</code> and <code>y</code>"</td></tr>
+        <tr><td><code>struct S&lt;'a&gt; { f: &amp;'a str }</code></td><td>"an <code>S</code> cannot outlive what <code>f</code> borrows"</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">The third row is the one people misread</span>
+    <p>Giving two parameters the same <code>'a</code> does <em>not</em> mean they must have equal lifetimes. It means the compiler substitutes the <strong>shorter</strong> of the two — <code>'a</code> is the overlap. That is why part 04's example fails: the overlap ends when the inner scope does.</p>
+  </div>
+</section>
+
+<!-- ============ PART 4 ============ -->
+<section id="p4">
+  <div class="part-head">
+    <span class="part-num">PART 04</span>
+    <h2>What the annotation actually enforces</h2>
+  </div>
+
+  <p>Here is where the theory becomes concrete. With <code>longest</code> correctly annotated, this <em>still</em> fails — and understanding why is the heart of the topic:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile, even though <code>longest</code> is correct</div>
+<pre><code><span class="k">let</span> outer = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"outer"</span>);
+<span class="k">let</span> result;
+{
+    <span class="k">let</span> inner = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"inner is much longer"</span>);
+    result = <span class="fn">longest</span>(&amp;outer, &amp;inner);
+}
+<span class="fn">println!</span>(<span class="st">"{result}"</span>);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0597]</span>: `inner` does not live long enough
+  --&gt; le3.rs:9:34
+   |
+ 8 |         let inner = String::from("inner is much longer");
+   |             ----- binding `inner` declared here
+ 9 |         result = longest(&amp;outer, &amp;inner);
+   |                                  ^^^^^^ borrowed value does not live long enough
+10 |     }
+   |     - `inner` dropped here while still borrowed
+11 |     println!("{result}");
+   |                ------ borrow later used here</pre>
+  </div>
+
+  <p>Notice what the compiler did <em>not</em> do: it never looked at the function body. It did not reason "well, <code>inner</code> is longer, so the result is <code>inner</code>, so this is unsafe." It only used the signature.</p>
+
+  <div class="figure">
+<pre>  let outer = ...;          ┐
+  let result;               │  'outer
+  {                         │
+      let inner = ...;  ┐   │
+      result = longest( │   │   'a = the SHORTER of the two
+          &amp;outer,       │'in│      = 'inner
+          &amp;inner);      │   │
+  }                     ┘   │   ← 'a ends HERE
+  println!("{result}");     │   ← but result is used HERE ✗
+                            ┘</pre>
+    <p class="figcap"><code>'a</code> is the overlap of the two input lifetimes. The result cannot outlive it.</p>
+  </div>
+
+  <p>The signature said the output lives as long as <code>'a</code>, and <code>'a</code> is the shorter of the two inputs. So the result is only valid until <code>inner</code> dies — regardless of which branch actually ran.</p>
+
+  <div class="note is-win">
+    <span class="note-tag">Why this design is right</span>
+    <p>Checking signatures rather than bodies is what makes Rust's analysis <strong>modular</strong>. Change a function's body and no caller needs rechecking; change its signature and the compiler tells you exactly who is affected. It also means the check works across crates, where the body may not even be available.</p>
+  </div>
+
+  <p>And this version compiles, because the result is used while both inputs are still alive:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>outer is longer</code></div>
+<pre><code><span class="k">let</span> outer = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"outer is longer"</span>);
+{
+    <span class="k">let</span> inner = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"inner"</span>);
+    <span class="fn">println!</span>(<span class="st">"{}"</span>, <span class="fn">longest</span>(&amp;outer, &amp;inner));   <span class="cm">// used inside the scope</span>
+}</code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 5 ============ -->
+<section id="p5">
+  <div class="part-head">
+    <span class="part-num">PART 05</span>
+    <h2>Elision — why you rarely write any of this</h2>
+  </div>
+
+  <p>If every borrow has a lifetime, why does almost no Rust code have annotations? Because of three <strong>elision rules</strong> the compiler applies automatically. If they determine every lifetime, you write nothing.</p>
+
+  <div class="keyline">
+    Rule 1: each elided input reference gets its own lifetime parameter.<br>
+    Rule 2: if there is exactly <em>one</em> input lifetime, it is assigned to all outputs.<br>
+    Rule 3: if one input is <code>&amp;self</code> or <code>&amp;mut self</code>, <em>its</em> lifetime is assigned to all outputs.
+  </div>
+
+  <h3>Rule 2 in action</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>the</code></div>
+<pre><code><span class="cm">// What you write:</span>
+<span class="k">fn</span> <span class="fn">first_word</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> {
+    <span class="k">match</span> s.<span class="fn">find</span>(<span class="st">' '</span>) { <span class="ty">Some</span>(i) =&gt; &amp;s[..i], <span class="ty">None</span> =&gt; s }
+}
+
+<span class="cm">// What the compiler sees (rule 1 then rule 2):</span>
+<span class="k">fn</span> <span class="fn">first_word</span>&lt;<span class="td">'a</span>&gt;(s: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span></code></pre>
+  </div>
+
+  <p>One input reference, so there is no ambiguity about where the output borrows from. That is why <code>first_word</code> in the ownership guide needed no annotation while <code>longest</code> did — <code>longest</code> has two inputs, so rule 2 does not apply and nothing else resolves it.</p>
+
+  <h3>Rule 3 in action</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Verified — both work</div>
+<pre><code><span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Excerpt</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="cm">// elided → tied to &amp;self by rule 3</span>
+    <span class="k">fn</span> <span class="fn">part</span>(&amp;<span class="k">self</span>) -&gt; &amp;<span class="ty">str</span> { <span class="k">self</span>.part }
+
+    <span class="cm">// explicit → tied to 'a, which OUTLIVES &amp;self</span>
+    <span class="k">fn</span> <span class="fn">announce</span>(&amp;<span class="k">self</span>, msg: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+        <span class="fn">println!</span>(<span class="st">"announce: {msg}"</span>);
+        <span class="k">self</span>.part
+    }
+}</code></pre>
+  </div>
+
+  <p>Rule 3 is why methods almost never need annotations. It is also why <code>announce</code> must be explicit if you want the stronger guarantee — see part 09.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">When elision fails, you get E0106</span>
+    <p>The rules are not heuristics or guesses — they are deterministic. If they resolve every output lifetime, your code compiles with no annotations. If they do not, you get <em>"missing lifetime specifier"</em> and must say what you mean. There is no third outcome.</p>
+  </div>
+</section>
+
+<!-- ============ PART 6 ============ -->
+<section id="p6">
+  <div class="part-head">
+    <span class="part-num">PART 06</span>
+    <h2>Structs that hold references</h2>
+  </div>
+
+  <p>So far every struct you have written owned its data. A struct can hold a <em>borrow</em> instead — but then it needs a lifetime parameter:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">struct</span> <span class="ty">Excerpt</span> { part: &amp;<span class="ty">str</span> }</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0106]</span>: missing lifetime specifier
+ --&gt; le6.rs:1:24
+  |
+1 | struct Excerpt { part: &amp;str }
+  |                        ^ expected named lifetime parameter
+  |
+help: consider introducing a named lifetime parameter
+  |
+1 | struct Excerpt&lt;'a&gt; { part: &amp;'a str }
+  |               ++++          ++</pre>
+  </div>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>Excerpt { part: "Call me Ishmael" }</code></div>
+<pre><code><span class="at">#[derive(Debug)]</span>
+<span class="k">struct</span> <span class="ty">Excerpt</span>&lt;<span class="td">'a</span>&gt; { part: &amp;<span class="td">'a</span> <span class="ty">str</span> }
+
+<span class="k">let</span> novel = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Call me Ishmael. Some years ago..."</span>);
+<span class="k">let</span> first = novel.<span class="fn">split</span>(<span class="st">'.'</span>).<span class="fn">next</span>().<span class="fn">expect</span>(<span class="st">"no ."</span>);
+<span class="k">let</span> e = <span class="ty">Excerpt</span> { part: first };</code></pre>
+  </div>
+
+  <div class="keyline"><code>struct Excerpt&lt;'a&gt;</code> means: an <code>Excerpt</code> may not outlive the string it borrows from.</div>
+
+  <p>And the compiler enforces exactly that:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile — the struct outlives its source</div>
+<pre><code><span class="k">let</span> e;
+{
+    <span class="k">let</span> novel = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"Call me Ishmael."</span>);
+    e = <span class="ty">Excerpt</span> { part: &amp;novel };
+}
+<span class="fn">println!</span>(<span class="st">"{}"</span>, e.part);</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0597]</span>: `novel` does not live long enough
+ --&gt; le4.rs:6:29
+  |
+5 |         let novel = String::from("Call me Ishmael.");
+  |             ----- binding `novel` declared here
+6 |         e = Excerpt { part: &amp;novel };
+  |                             ^^^^^^ borrowed value does not live long enough
+7 |     }
+  |     - `novel` dropped here while still borrowed
+8 |     println!("{}", e.part);
+  |                    ------ borrow later used here</pre>
+  </div>
+
+  <h3>The <code>impl</code> block needs it too</h3>
+
+  <div class="code">
+    <div class="code-label">Note <code>'a</code> appears twice</div>
+<pre><code><span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Excerpt</span>&lt;<span class="td">'a</span>&gt; {
+<span class="cm">//   ↑ declare      ↑ use</span>
+    <span class="k">fn</span> <span class="fn">new</span>(part: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; <span class="ty">Self</span> { <span class="ty">Excerpt</span> { part } }
+    <span class="k">fn</span> <span class="fn">level</span>(&amp;<span class="k">self</span>) -&gt; <span class="ty">i32</span> { <span class="nu">3</span> }        <span class="cm">// no reference out — no lifetime</span>
+}</code></pre>
+  </div>
+
+  <p>Same shape as generics: <code>impl&lt;T&gt; Wrapper&lt;T&gt;</code> declares then uses. Methods returning no references need no annotation at all.</p>
+
+  <div class="note is-trap">
+    <span class="note-tag">Should your struct hold a reference?</span>
+    <p>Often not. A struct with a lifetime parameter infects everything that holds it — every containing struct needs one too. Borrow when you are building a short-lived <em>view</em> over data (a parser, an iterator, an excerpt); own when the struct is long-lived or stored in a collection. Part 13 develops this.</p>
+  </div>
+</section>
+
+<!-- ============ PART 7 ============ -->
+<section id="p7">
+  <div class="part-head">
+    <span class="part-num">PART 07</span>
+    <h2>Returning references — and E0515</h2>
+  </div>
+
+  <p>The most common lifetime failure. Annotating a return type does not conjure a valid reference:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile — annotation cannot save it</div>
+<pre><code><span class="k">fn</span> <span class="fn">dangle</span>&lt;<span class="td">'a</span>&gt;() -&gt; &amp;<span class="td">'a</span> <span class="ty">String</span> {
+    <span class="k">let</span> s = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"hello"</span>);
+    &amp;s
+}</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0515]</span>: cannot return reference to local variable `s`
+ --&gt; le5.rs:3:5
+  |
+3 |     &amp;s
+  |     ^^ returns a reference to data owned by the current function</pre>
+  </div>
+
+  <p>A different error from the ownership guide's version of this — there, omitting <code>'a</code> gave E0106. Here the lifetime is declared, so the compiler moves on to the real problem: <strong>the data is owned by this function and dies at the closing brace</strong>. There is nothing for <code>'a</code> to refer to.</p>
+
+  <div class="keyline">A returned reference must borrow from an <em>input</em>, or from something that outlives the call. Never from a local.</div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>You want to return</th><th>Do this</th></tr></thead>
+      <tbody>
+        <tr><td>Part of an argument</td><td><code>fn f(s: &amp;str) -&gt; &amp;str</code> — elision handles it</td></tr>
+        <tr><td>Something newly created</td><td>Return it owned: <code>-&gt; String</code></td></tr>
+        <tr><td>A string literal</td><td><code>-&gt; &amp;'static str</code> — see part 08</td></tr>
+        <tr><td>Data from <code>self</code></td><td><code>fn f(&amp;self) -&gt; &amp;str</code> — rule 3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code is-good">
+    <div class="code-label">The three valid shapes — all verified</div>
+<pre><code><span class="cm">// borrow from the input</span>
+<span class="k">fn</span> <span class="fn">trim_it</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span> { s.<span class="fn">trim</span>() }            <span class="cm">// "padded"</span>
+
+<span class="cm">// return owned</span>
+<span class="k">fn</span> <span class="fn">shout</span>(s: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> { s.<span class="fn">to_uppercase</span>() }        <span class="cm">// "SHOUT"</span>
+
+<span class="cm">// a literal lives forever</span>
+<span class="k">fn</span> <span class="fn">label</span>() -&gt; &amp;<span class="td">'static</span> <span class="ty">str</span> { <span class="st">"literals are &amp;'static str"</span> }</code></pre>
+  </div>
+</section>
+
+<!-- ============ PART 8 ============ -->
+<section id="p8">
+  <div class="part-head">
+    <span class="part-num">PART 08</span>
+    <h2><code>'static</code> — the longest lifetime</h2>
+  </div>
+
+  <p><code>'static</code> means "valid for the entire program." Two things have it naturally:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="cm">// 1. string literals — baked into the binary</span>
+<span class="k">let</span> s: &amp;<span class="td">'static</span> <span class="ty">str</span> = <span class="st">"I live for the whole program"</span>;
+
+<span class="cm">// 2. anything you leak or declare static</span>
+<span class="k">static</span> <span class="ty">GREETING</span>: &amp;<span class="td">'static</span> <span class="ty">str</span> = <span class="st">"hello"</span>;</code></pre>
+  </div>
+
+  <p>Every string literal you have ever written was a <code>&amp;'static str</code>. That is why passing <code>"hello"</code> to a function expecting <code>&amp;str</code> always works, no matter how long the result is kept.</p>
+
+  <h3>The distinction that trips people up</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th><code>&amp;'static T</code></th><th><code>T: 'static</code></th></tr></thead>
+      <tbody>
+        <tr><td>Means</td><td>A reference valid forever</td><td>A type containing no short-lived borrows</td></tr>
+        <tr><td>Satisfied by</td><td>Literals, leaked data</td><td><em>All owned data</em> — <code>String</code>, <code>Vec</code>, <code>i32</code></td></tr>
+        <tr><td>Common in</td><td>Constants</td><td><code>thread::spawn</code> bounds</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code is-good">
+    <div class="code-label">Verified — an owned <code>String</code> satisfies <code>T: 'static</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">needs_static</span>&lt;<span class="ty">T</span>: <span class="td">'static</span>&gt;(_t: <span class="ty">T</span>) -&gt; &amp;<span class="td">'static</span> <span class="ty">str</span> { <span class="st">"ok"</span> }
+
+<span class="fn">needs_static</span>(<span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"owned is 'static"</span>));   <span class="cm">// compiles!</span></code></pre>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">This resolves a threading puzzle</span>
+    <p><code>thread::spawn</code> requires <code>F: Send + 'static</code>, yet you pass it owned <code>String</code>s and <code>Vec</code>s constantly. Now you know why: <code>T: 'static</code> means "contains no borrows that could dangle," and owned data qualifies trivially. It never meant "lives forever."</p>
+  </div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Not a fix for lifetime errors</span>
+    <p>Adding <code>'static</code> to silence a borrow error almost always makes things worse — you have promised something stronger and pushed the error to the call site. If a reference does not live long enough, either restructure so it does, or return owned data.</p>
+  </div>
+</section>
+
+<!-- ============ PART 9 ============ -->
+<section id="p9">
+  <div class="part-head">
+    <span class="part-num">PART 09</span>
+    <h2>Multiple lifetimes, and outlives bounds</h2>
+  </div>
+
+  <p>When inputs genuinely have unrelated lifetimes, give them different names:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>alpha</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">first_of</span>&lt;<span class="td">'a</span>, <span class="td">'b</span>&gt;(x: &amp;<span class="td">'a</span> <span class="ty">str</span>, _y: &amp;<span class="td">'b</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> { x }</code></pre>
+  </div>
+
+  <p>The result is tied to <code>x</code> only. <code>y</code> may die immediately afterwards and the result stays valid — a stronger and more useful promise than forcing both into one <code>'a</code>.</p>
+
+  <h3>When two lifetimes need a relationship</h3>
+
+  <p>Try to return either one and it fails:</p>
+
+  <div class="code is-bad">
+    <div class="code-label">Does not compile</div>
+<pre><code><span class="k">fn</span> <span class="fn">pick</span>&lt;<span class="td">'a</span>, <span class="td">'b</span>&gt;(x: &amp;<span class="td">'a</span> <span class="ty">str</span>, y: &amp;<span class="td">'b</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="k">if</span> x.<span class="fn">len</span>() &gt; y.<span class="fn">len</span>() { x } <span class="k">else</span> { y }
+}</code></pre>
+  </div>
+
+  <div class="errblock">
+<pre><span class="code-id">error</span>: lifetime may not live long enough
+ --&gt; le7.rs:3:39
+  |
+2 | fn pick&lt;'a, 'b&gt;(x: &amp;'a str, y: &amp;'b str) -&gt; &amp;'a str {
+  |         --  -- lifetime `'b` defined here
+  |         |
+  |         lifetime `'a` defined here
+3 |     if x.len() &gt; y.len() { x } else { y }
+  |                                       ^ function was supposed to return data with
+  |                                         lifetime `'a` but it is returning data
+  |                                         with lifetime `'b`
+  |
+  = help: consider adding the following bound: `'b: 'a`</pre>
+  </div>
+
+  <p>The compiler hands you the fix. <code>'b: 'a</code> reads <strong>"<code>'b</code> outlives <code>'a</code>"</strong> — so a <code>&amp;'b str</code> is safe to use anywhere a <code>&amp;'a str</code> is expected:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>aa</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">pick</span>&lt;<span class="td">'a</span>, <span class="td">'b</span>: <span class="td">'a</span>&gt;(x: &amp;<span class="td">'a</span> <span class="ty">str</span>, y: &amp;<span class="td">'b</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="k">if</span> x.<span class="fn">len</span>() &gt; y.<span class="fn">len</span>() { x } <span class="k">else</span> { y }
+}</code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">Reading <code>'b: 'a</code></span>
+    <p>The colon means the same as in trait bounds: "satisfies." <code>'b: 'a</code> is "<code>'b</code> lives at least as long as <code>'a</code>." Longer lifetimes coerce to shorter ones, never the reverse — the same direction as subtyping.</p>
+  </div>
+
+  <h3>Combined with generics and traits</h3>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>alpha</code></div>
+<pre><code><span class="k">fn</span> <span class="fn">longest_with</span>&lt;<span class="td">'a</span>, <span class="ty">T</span>: <span class="ty">Display</span>&gt;(a: &amp;<span class="td">'a</span> <span class="ty">str</span>, b: &amp;<span class="td">'a</span> <span class="ty">str</span>, ann: <span class="ty">T</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> {
+    <span class="fn">println!</span>(<span class="st">"note: {ann}"</span>);
+    <span class="k">if</span> a.<span class="fn">len</span>() &gt; b.<span class="fn">len</span>() { a } <span class="k">else</span> { b }
+}</code></pre>
+  </div>
+
+  <p>Lifetimes and type parameters share one angle-bracket list, lifetimes first. They are the same kind of thing to the compiler: parameters resolved at compile time.</p>
+</section>
+
+<!-- ============ PART 10 ============ -->
+<section id="p10">
+  <div class="part-head">
+    <span class="part-num">PART 10</span>
+    <h2>Lifetimes are erased — the zero-cost proof</h2>
+  </div>
+
+  <p>Everything so far happens at compile time. The binary contains no lifetime information at all:</p>
+
+  <div class="code">
+    <div class="code-label">Verified output</div>
+<pre><code><span class="fn">println!</span>(<span class="st">"{}"</span>, std::mem::size_of::&lt;&amp;<span class="ty">str</span>&gt;());            <span class="cm">// 16</span>
+<span class="fn">println!</span>(<span class="st">"{}"</span>, std::mem::size_of::&lt;&amp;<span class="td">'static</span> <span class="ty">str</span>&gt;());   <span class="cm">// 16</span></code></pre>
+  </div>
+
+  <p>Identical. A <code>&amp;'static str</code> and an ordinary <code>&amp;str</code> are the same 16 bytes — pointer plus length. The lifetime existed only during type checking and was then discarded.</p>
+
+  <div class="figure">
+<pre>  COMPILE TIME                          RUNTIME
+  ─────────────                         ───────
+  &amp;'a str   ┐
+  &amp;'b str   ├─ checked, then erased ──► just a pointer
+  &amp;'static  ┘                            + a length
+
+  no tags, no refcounts, no checks, no cost</pre>
+    <p class="figcap">Lifetimes are a static analysis. They cost nothing at runtime.</p>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">The same trick as everywhere else</span>
+    <p>Generics are monomorphised away; <code>Send</code>/<code>Sync</code> are markers with no methods; lifetimes are erased. Rust's pattern is consistent — encode the property in the type system, verify it, then compile it out. You pay in compile time and in learning, never at runtime.</p>
+  </div>
+</section>
+
+<!-- ============ PART 11 ============ -->
+<section id="p11">
+  <div class="part-head">
+    <span class="part-num">PART 11</span>
+    <h2>A real pattern: the borrowing parser</h2>
+  </div>
+
+  <p>Here is where lifetimes earn their keep. A parser that holds a reference to its input and hands out slices of it — no allocation anywhere:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>["let", "x", "=", "5"]</code></div>
+<pre><code><span class="k">struct</span> <span class="ty">Parser</span>&lt;<span class="td">'a</span>&gt; { input: &amp;<span class="td">'a</span> <span class="ty">str</span>, pos: <span class="ty">usize</span> }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Parser</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">new</span>(input: &amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; <span class="ty">Self</span> { <span class="ty">Parser</span> { input, pos: <span class="nu">0</span> } }
+
+    <span class="cm">// Returns &amp;'a str, NOT &amp;str — the token outlives the &amp;mut self borrow.</span>
+    <span class="k">fn</span> <span class="fn">next_token</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">Option</span>&lt;&amp;<span class="td">'a</span> <span class="ty">str</span>&gt; {
+        <span class="k">let</span> rest = <span class="k">self</span>.input[<span class="k">self</span>.pos..].<span class="fn">trim_start</span>();
+        <span class="k">if</span> rest.<span class="fn">is_empty</span>() { <span class="k">return</span> <span class="ty">None</span>; }
+        <span class="k">let</span> start = <span class="k">self</span>.input.<span class="fn">len</span>() - rest.<span class="fn">len</span>();
+        <span class="k">let</span> end = rest.<span class="fn">find</span>(<span class="st">' '</span>).<span class="fn">map</span>(|i| start + i).<span class="fn">unwrap_or</span>(<span class="k">self</span>.input.<span class="fn">len</span>());
+        <span class="k">self</span>.pos = end;
+        <span class="ty">Some</span>(&amp;<span class="k">self</span>.input[start..end])
+    }
+}
+
+<span class="k">let</span> text = <span class="ty">String</span>::<span class="fn">from</span>(<span class="st">"let x = 5"</span>);
+<span class="k">let</span> <span class="k">mut</span> parser = <span class="ty">Parser</span>::<span class="fn">new</span>(&amp;text);
+<span class="k">while</span> <span class="k">let</span> <span class="ty">Some</span>(t) = parser.<span class="fn">next_token</span>() { toks.<span class="fn">push</span>(t); }</code></pre>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">The one crucial detail</span>
+    <p><code>next_token</code> returns <code>Option&lt;&amp;'a str&gt;</code>, not the elided <code>Option&lt;&amp;str&gt;</code>. Rule 3 would have tied the token to <code>&amp;mut self</code> — meaning each token would keep the parser mutably borrowed, and you could not call <code>next_token</code> again while holding one. Writing <code>'a</code> explicitly ties tokens to the <em>input</em> instead, so they outlive the borrow of the parser. <strong>This is the single most valuable thing to understand about lifetimes in practice.</strong></p>
+  </div>
+
+  <p>Without it, the <code>while let</code> loop above would not compile — you would be holding a token (borrowing the parser) while calling a method needing <code>&amp;mut self</code>.</p>
+</section>
+
+<!-- ============ PART 12 ============ -->
+<section id="p12">
+  <div class="part-head">
+    <span class="part-num">PART 12</span>
+    <h2>Lifetimes and the borrow checker together</h2>
+  </div>
+
+  <p>A struct holding a borrow interacts with the usual borrowing rules. This works because the borrows are compatible:</p>
+
+  <div class="code is-good">
+    <div class="code-label">Verified output <code>10 then cached 10</code></div>
+<pre><code><span class="k">struct</span> <span class="ty">Cache</span>&lt;<span class="td">'a</span>&gt; { data: &amp;<span class="td">'a</span> [<span class="ty">i32</span>], computed: <span class="ty">Option</span>&lt;<span class="ty">i32</span>&gt; }
+
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Cache</span>&lt;<span class="td">'a</span>&gt; {
+    <span class="k">fn</span> <span class="fn">new</span>(data: &amp;<span class="td">'a</span> [<span class="ty">i32</span>]) -&gt; <span class="ty">Self</span> { <span class="ty">Cache</span> { data, computed: <span class="ty">None</span> } }
+
+    <span class="k">fn</span> <span class="fn">sum</span>(&amp;<span class="k">mut</span> <span class="k">self</span>) -&gt; <span class="ty">i32</span> {
+        <span class="k">if</span> <span class="k">let</span> <span class="ty">Some</span>(v) = <span class="k">self</span>.computed { <span class="k">return</span> v; }
+        <span class="k">let</span> v = <span class="k">self</span>.data.<span class="fn">iter</span>().<span class="fn">sum</span>();
+        <span class="k">self</span>.computed = <span class="ty">Some</span>(v);
+        v
+    }
+}</code></pre>
+  </div>
+
+  <p>The struct holds <code>&amp;'a [i32]</code> (shared) while <code>sum</code> takes <code>&amp;mut self</code>. No conflict: mutating the <em>struct</em> is separate from the data it points at. Returning <code>i32</code> rather than a reference also keeps things simple.</p>
+
+  <h3>The rule of thumb for return types</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Return</th><th>When</th><th>Effect on the caller</th></tr></thead>
+      <tbody>
+        <tr><td><code>&amp;str</code> (elided)</td><td>The value is logically part of <code>self</code></td><td>Keeps <code>self</code> borrowed while held</td></tr>
+        <tr><td><code>&amp;'a str</code> (explicit)</td><td>The value comes from borrowed input</td><td><code>self</code> is free again immediately</td></tr>
+        <tr><td><code>String</code> / <code>i32</code></td><td>The value is computed</td><td>No borrow at all</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>When a method returning a borrow makes callers fight the borrow checker, this table is where to look. Usually the answer is that an elided lifetime should have been <code>'a</code>.</p>
+</section>
+
+<!-- ============ PART 13 ============ -->
+<section id="p13">
+  <div class="part-head">
+    <span class="part-num">PART 13</span>
+    <h2>Should this struct borrow or own?</h2>
+  </div>
+
+  <p>The design question lifetimes force you to answer. Both versions are legitimate:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th><code>struct S&lt;'a&gt; { f: &amp;'a str }</code></th><th><code>struct S { f: String }</code></th></tr></thead>
+      <tbody>
+        <tr><td>Allocation</td><td>None — zero-copy</td><td>One per field</td></tr>
+        <tr><td>Lifespan</td><td>Cannot outlive its source</td><td>Independent</td></tr>
+        <tr><td>Storing in a collection</td><td>Awkward — infects the collection</td><td>Easy</td></tr>
+        <tr><td>Returning from a function</td><td>Only if borrowing an input</td><td>Always fine</td></tr>
+        <tr><td>Good for</td><td>Parsers, views, iterators, short-lived scans</td><td>Domain types, config, anything stored</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="keyline">Borrow for a <em>view</em> over data you are passing through. Own for a <em>thing</em> your program keeps.</div>
+
+  <div class="note is-trap">
+    <span class="note-tag">Lifetime parameters are contagious</span>
+    <p>Put <code>&amp;'a str</code> in a struct and every struct containing it needs <code>'a</code> too, and so on outward. That is fine for a parser used inside one function; it is painful for a type stored in a long-lived collection. If annotations are spreading through your codebase, the fix is usually to own the data at some boundary — not to add more lifetimes.</p>
+  </div>
+
+  <p>A common and healthy pattern is to borrow while processing and own at the end — exactly what the capstone in the practice workbook does with <code>into_owned</code>.</p>
+</section>
+
+<!-- ============ PART 14 ============ -->
+<section id="p14">
+  <div class="part-head">
+    <span class="part-num">PART 14</span>
+    <h2>Every error, decoded</h2>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Code</th><th>Says</th><th>Means</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>E0106</code></td>
+          <td>missing lifetime specifier</td>
+          <td>Elision could not decide where the output borrows from</td>
+          <td>Add <code>&lt;'a&gt;</code> and mark which input; or return owned</td>
+        </tr>
+        <tr>
+          <td><code>E0597</code></td>
+          <td><code>x</code> does not live long enough</td>
+          <td>A reference outlives its referent</td>
+          <td>Move the value to an outer scope, or use it earlier</td>
+        </tr>
+        <tr>
+          <td><code>E0515</code></td>
+          <td>cannot return reference to local variable</td>
+          <td>Returning a borrow of something this function owns</td>
+          <td>Return an owned value instead</td>
+        </tr>
+        <tr>
+          <td>(no code)</td>
+          <td>lifetime may not live long enough</td>
+          <td>Returning <code>'b</code> data where <code>'a</code> was promised</td>
+          <td>Add the bound <code>'b: 'a</code></td>
+        </tr>
+        <tr>
+          <td><code>E0621</code></td>
+          <td>explicit lifetime required</td>
+          <td>An elided lifetime is too weak for what you do</td>
+          <td>Name it and tie it to the right input</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>E0621 is the one you have not seen yet. It appears when an elided lifetime is <em>too weak</em> for what the body does — here, storing a reference into a collection that outlives it:</p>
+
+  <div class="errblock">
+<pre><span class="code-id">error[E0621]</span>: explicit lifetime required in the type of `item`
+ --&gt; le8.rs:3:5
+  |
+3 |     dest.push(item);
+  |     ^^^^^^^^^^^^^^^ lifetime `'a` required
+  |
+help: add explicit lifetime `'a` to the type of `item`
+  |
+2 | fn store&lt;'a&gt;(dest: &amp;mut Vec&lt;&amp;'a S&gt;, item: &amp;'a S) {
+  |                                            ++</pre>
+  </div>
+
+  <p>Elision gave <code>item</code> its own anonymous lifetime (rule 1), but pushing it into a <code>Vec&lt;&amp;'a S&gt;</code> requires it to live at least as long as <code>'a</code>. The fix, as always, is in the <code>help:</code> line.</p>
+
+  <h3>How to debug any lifetime error</h3>
+
+  <div class="keyline">Ask: <em>what does this reference point into, and is that thing still alive when the reference is used?</em></div>
+
+  <ol>
+    <li>Find <strong>"borrowed value does not live long enough"</strong> — that is the reference.</li>
+    <li>Find <strong>"dropped here while still borrowed"</strong> — that is when the data dies.</li>
+    <li>Find <strong>"borrow later used here"</strong> — that is why it needed to survive.</li>
+    <li>Fix by moving step 2 later (declare the value in an outer scope) or step 3 earlier.</li>
+    <li>If neither is possible, the reference should not be a reference — return owned data.</li>
+  </ol>
+
+  <p>Notice this is the same procedure as the ownership guide's borrow-error recipe. It is the same checker; lifetimes just give the regions names.</p>
+</section>
+
+<!-- ============ PART 15 ============ -->
+<section id="p15">
+  <div class="part-head">
+    <span class="part-num">PART 15</span>
+    <h2>Things you do not need yet</h2>
+  </div>
+
+  <p>Four features you will meet in other people's code. Recognising them is enough for now.</p>
+
+  <h3><code>'_</code> — the anonymous lifetime</h3>
+  <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">f</span>(e: <span class="ty">Excerpt</span>&lt;<span class="td">'_</span>&gt;) { }      <span class="cm">// "there is a lifetime, I don't need to name it"</span>
+<span class="k">impl</span> <span class="ty">Excerpt</span>&lt;<span class="td">'_</span>&gt; { }            <span class="cm">// same, in an impl block</span></code></pre>
+  </div>
+  <p>Purely for readability — it makes "this type has a lifetime" visible without inventing a name.</p>
+
+  <h3>Higher-ranked trait bounds</h3>
+  <div class="code">
+<pre><code><span class="k">fn</span> <span class="fn">call_with</span>&lt;<span class="ty">F</span>&gt;(f: <span class="ty">F</span>) <span class="k">where</span> <span class="ty">F</span>: <span class="k">for</span>&lt;<span class="td">'a</span>&gt; <span class="ty">Fn</span>(&amp;<span class="td">'a</span> <span class="ty">str</span>) -&gt; &amp;<span class="td">'a</span> <span class="ty">str</span> { }</code></pre>
+  </div>
+  <p><code>for&lt;'a&gt;</code> means "for <em>every</em> possible lifetime," not one specific one. Needed when a closure must work with references of any lifetime. You will see it in error messages long before you need to write it.</p>
+
+  <h3>Variance</h3>
+  <p>The rules for when <code>&amp;'long T</code> may be used as <code>&amp;'short T</code>. It is why longer lifetimes coerce to shorter ones, and it works silently. Worth knowing the word exists.</p>
+
+  <h3>Self-referential structs</h3>
+  <p>A struct holding a reference to its own field cannot be expressed in safe Rust — moving it would invalidate the reference. This is what <code>Pin</code> and crates like <code>ouroboros</code> address, and it is the one genuine expressiveness limit lifetimes impose.</p>
+
+  <div class="note is-rule">
+    <span class="note-tag">Do not go looking for these</span>
+    <p>Ordinary application code uses <code>&lt;'a&gt;</code> on a few structs and almost nothing else. If you find yourself needing HRTBs or fighting variance, step back and ask whether owning the data would be simpler. It usually is.</p>
+  </div>
+</section>
+
+<!-- ============ PART 16 ============ -->
+<section id="p16">
+  <div class="part-head">
+    <span class="part-num">PART 16</span>
+    <h2>Where lifetimes have already appeared</h2>
+  </div>
+
+  <p>Worth collecting, because you have been using them for six topics without the syntax.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Topic</th><th>What was really happening</th></tr></thead>
+      <tbody>
+        <tr><td>Ownership — <code>first_word</code></td><td>Elision rule 2 tied the output to the input</td></tr>
+        <tr><td>Ownership — <code>dangle</code></td><td>E0106: nothing for the return to borrow from</td></tr>
+        <tr><td>Vectors — <code>&amp;[T]</code> params</td><td>Slices are borrows with an inferred lifetime</td></tr>
+        <tr><td>HashMap — <code>.get()</code></td><td>Returns <code>Option&lt;&amp;V&gt;</code> tied to <code>&amp;self</code> by rule 3</td></tr>
+        <tr><td>Iterators — <code>.iter()</code></td><td>Yields <code>&amp;T</code> borrowed from the collection</td></tr>
+        <tr><td>Iterators — <code>IntoIterator for &amp;'a T</code></td><td>An explicit lifetime you already read</td></tr>
+        <tr><td>Threads — <code>F: Send + 'static</code></td><td>A lifetime <em>bound</em>, not a reference</td></tr>
+        <tr><td>Threads — <code>thread::scope</code></td><td>Exists precisely to relax that <code>'static</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-win">
+    <span class="note-tag">Why scoped threads work</span>
+    <p>Now you can state it exactly. <code>thread::spawn</code> demands <code>'static</code> because the thread may outlive the caller. <code>thread::scope</code> guarantees all threads join before it returns, so borrows of local data are provably valid for the whole thread's life — the <code>'static</code> requirement can be dropped. That was the one piece of the threads guide that needed this topic to be complete.</p>
+  </div>
+</section>
+
+<!-- ============ PART 17 ============ -->
+<section id="p17">
+  <div class="part-head">
+    <span class="part-num">PART 17</span>
+    <h2>Cheat sheet</h2>
+  </div>
+
+  <h3>Syntax</h3>
+  <div class="code">
+<pre><code>&amp;<span class="ty">str</span>              <span class="cm">// reference, lifetime inferred</span>
+&amp;<span class="td">'a</span> <span class="ty">str</span>           <span class="cm">// reference with lifetime 'a</span>
+&amp;<span class="td">'a</span> <span class="k">mut</span> <span class="ty">str</span>       <span class="cm">// mutable reference with lifetime 'a</span>
+&amp;<span class="td">'static</span> <span class="ty">str</span>      <span class="cm">// valid for the whole program</span>
+
+<span class="k">fn</span> <span class="fn">f</span>&lt;<span class="td">'a</span>&gt;(..)        <span class="cm">// declare a lifetime parameter</span>
+<span class="k">struct</span> <span class="ty">S</span>&lt;<span class="td">'a</span>&gt; {..}   <span class="cm">// struct holding a borrow</span>
+<span class="k">impl</span>&lt;<span class="td">'a</span>&gt; <span class="ty">S</span>&lt;<span class="td">'a</span>&gt; {..} <span class="cm">// declare, then use</span>
+&lt;<span class="td">'b</span>: <span class="td">'a</span>&gt;           <span class="cm">// 'b outlives 'a</span>
+<span class="ty">T</span>: <span class="td">'static</span>          <span class="cm">// T contains no short-lived borrows</span>
+<span class="ty">S</span>&lt;<span class="td">'_</span>&gt;              <span class="cm">// anonymous — "has a lifetime, unnamed"</span></code></pre>
+  </div>
+
+  <h3>The three elision rules</h3>
+  <div class="code">
+<pre><code><span class="cm">// 1. every elided input reference gets its own lifetime</span>
+<span class="cm">// 2. exactly ONE input lifetime  → assigned to all outputs</span>
+<span class="cm">// 3. one input is &amp;self/&amp;mut self → ITS lifetime goes to all outputs</span>
+
+<span class="k">fn</span> <span class="fn">f</span>(s: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span>              <span class="cm">// rule 2 — fine</span>
+<span class="k">fn</span> <span class="fn">f</span>(a: &amp;<span class="ty">str</span>, b: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span>    <span class="cm">// E0106 — must annotate</span>
+<span class="k">fn</span> <span class="fn">f</span>(&amp;<span class="k">self</span>, x: &amp;<span class="ty">str</span>) -&gt; &amp;<span class="ty">str</span>     <span class="cm">// rule 3 — tied to self</span></code></pre>
+  </div>
+
+  <h3>Do I need an annotation?</h3>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td>Function returns no reference</td><td>No</td></tr>
+        <tr><td>Exactly one input reference</td><td>No — rule 2</td></tr>
+        <tr><td>Method with <code>&amp;self</code> returning a borrow of <code>self</code></td><td>No — rule 3</td></tr>
+        <tr><td>Two-plus input refs, one returned</td><td><strong>Yes</strong> — say which</td></tr>
+        <tr><td>Struct holding a reference</td><td><strong>Yes</strong> — <code>struct S&lt;'a&gt;</code></td></tr>
+        <tr><td>Method result must outlive <code>&amp;self</code></td><td><strong>Yes</strong> — write <code>'a</code> explicitly</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Fixes, in order of preference</h3>
+  <div class="table-wrap">
+    <table>
+      <tbody>
+        <tr><td>1</td><td>Declare the borrowed value in a longer-lived scope</td></tr>
+        <tr><td>2</td><td>Use the result earlier, before the source dies</td></tr>
+        <tr><td>3</td><td>Return owned data (<code>String</code>) instead of a borrow</td></tr>
+        <tr><td>4</td><td>Add the annotation the compiler suggested</td></tr>
+        <tr><td>5</td><td>Add an outlives bound <code>'b: 'a</code></td></tr>
+        <tr><td>—</td><td>Reaching for <code>'static</code> is almost never the answer</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note is-rule">
+    <span class="note-tag">If you remember one thing</span>
+    <p>Lifetime annotations never change how long anything lives. They <em>describe</em> a relationship between input and output references so the compiler can verify at every call site what it cannot see from a signature alone. When you are stuck, ask what the reference points into — and whether that is still alive when it is used.</p>
+  </div>
+
+  <div class="foot">
+    <p><b>Practice.</b> Companion workbook: <b>lifetimes_practice.html</b> — exercises with worked solutions, plus a zero-copy config parser capstone.</p>
+    <p><b>Prerequisite.</b> This guide assumes <b>ownership_guide.html</b>. Lifetimes are the notation for the borrowing rules covered there.</p>
+    <p><b>Next.</b> Error handling with <code>Result</code>, <code>?</code>, and custom error types — the last major gap, and one where <code>Result</code> has now appeared in five guides running. After that: smart pointers (<code>Box</code>/<code>Rc</code>/<code>RefCell</code>), which resolve several "own or borrow?" questions this guide raised.</p>
+    <p>All output verified against rustc 1.96.0, edition 2021.</p>
+  </div>
+</section>
+
+
+</main>
+</div>
+
+<script>
+(function () {
+  // ---- Theme toggle: respects system default until the user chooses ----
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  var KEY = 'rust-notes-theme';
+
+  var saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (saved === 'dark' || saved === 'light') root.setAttribute('data-theme', saved);
+
+  function systemDark() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  function isDark() {
+    var attr = root.getAttribute('data-theme');
+    if (attr === 'dark') return true;
+    if (attr === 'light') return false;
+    return systemDark();
+  }
+  function sync() { btn.textContent = isDark() ? 'Light' : 'Dark'; }
+
+  btn.addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem(KEY, next); } catch (e) {}
+    sync();
+  });
+  sync();
+
+  // ---- Scrollspy ----
+  var links = Array.prototype.slice.call(document.querySelectorAll('#toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  var visible = {};
+
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) {
+        links.forEach(function (a) { a.classList.remove('is-active'); });
+        if (byId[sections[i].id]) byId[sections[i].id].classList.add('is-active');
+        break;
+      }
+    }
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { obs.observe(s); });
+})();
+</script>
+</body>
+</html>
